@@ -1,0 +1,113 @@
+% Shared preamble and notation for the numerical Einstein equations article.
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{amsthm}
+\usepackage{mathtools}
+\usepackage{mathrsfs}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage[dvipsnames]{xcolor}
+\usepackage[final,expansion=false]{microtype}
+\usepackage[a4paper,top=2.5cm,bottom=2.5cm,left=3cm,right=3cm]{geometry}
+\usepackage[colorlinks=true,linkcolor=MidnightBlue,citecolor=MidnightBlue,
+            urlcolor=MidnightBlue]{hyperref}
+
+\allowdisplaybreaks
+\numberwithin{equation}{section}
+\setlist[enumerate]{leftmargin=*,itemsep=0.4em}
+\setlist[itemize]{leftmargin=*,itemsep=0.25em}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{experiment}[theorem]{Experiment}
+
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\R}{\mathbb R}
+\newcommand{\C}{\mathbb C}
+\newcommand{\Z}{\mathbb Z}
+\newcommand{\Sph}{\mathbb S^2}
+\newcommand{\dd}{\mathop{}\!\mathrm d}
+\newcommand{\pd}{\partial}
+\newcommand{\Lie}{\mathcal L}
+\newcommand{\Rc}{\operatorname{Ric}}
+\newcommand{\Riem}{\operatorname{Riem}}
+\newcommand{\tr}{\operatorname{tr}}
+\newcommand{\tf}{\operatorname{tf}}
+\newcommand{\diver}{\operatorname{div}}
+\newcommand{\curl}{\operatorname{curl}}
+\newcommand{\Sym}{\operatorname{Sym}}
+\newcommand{\Boxg}{\Box_{\mathbf g}}
+\newcommand{\norm}[1]{\left\lVert #1\right\rVert}
+\newcommand{\abs}[1]{\left\lvert #1\right\rvert}
+\newcommand{\inner}[2]{\left\langle #1,#2\right\rangle}
+\newcommand{\restr}[2]{\left.#1\right|_{#2}}
+
+\newcommand{\bg}{\mathbf g}
+\newcommand{\slg}{\gamma}
+\newcommand{\roundg}{\overset{\circ}{\gamma}}
+\newcommand{\sK}{K}
+\newcommand{\sRic}{Ric\mkern-19mu /\,\,\,\,}
+\newcommand{\sL}{{\cal L}\mkern-10mu /}
+\newcommand{\sLh}{\hat{\sL}}
+\newcommand{\sg}{g\mkern-9mu /}
+\newcommand{\seps}{\epsilon\mkern-8mu /}
+\newcommand{\sd}{d\mkern-10mu /}
+\newcommand{\sR}{R\mkern-10mu /}
+\newcommand{\snab}{\nabla\mkern-13mu /\,\,}
+\newcommand{\sdiv}{\mbox{div}\mkern-19mu /\,\,\,\,}
+\newcommand{\scurl}{\mbox{curl}\mkern-19mu /\,\,\,\,}
+\newcommand{\strc}{\mbox{tr}\mkern-13mu /\,\,}
+\newcommand{\slap}{\mbox{$\triangle  \mkern-13mu / \,$}}
+\newcommand{\Hb}{\underline H}
+\newcommand{\Lb}{\underline L}
+\newcommand{\chib}{\underline\chi}
+\newcommand{\chih}{\widehat\chi}
+\newcommand{\chibh}{\widehat{\underline\chi}}
+\newcommand{\etab}{\underline\eta}
+\newcommand{\omegab}{\underline\omega}
+\newcommand{\alphab}{\underline\alpha}
+\newcommand{\betab}{\underline\beta}
+\newcommand{\hatotimes}{\mathbin{\widehat\otimes}}
+
+\newcommand{\Aout}{A}
+\newcommand{\Ain}{\underline A}
+\newcommand{\Xout}{\mathcal X}
+\newcommand{\Xin}{\underline{\mathcal X}}
+\newcommand{\Sigmaout}{\Sigma}
+\newcommand{\Sigmain}{\underline\Sigma}
+\newcommand{\Wout}{W}
+\newcommand{\Win}{\underline W}
+\newcommand{\Pthree}{P}
+\newcommand{\Pfour}{Q}
+\newcommand{\Gradphi}{\Pi}
+
+\newcommand{\State}{\mathcal U}
+\newcommand{\BoundaryData}{\mathcal D}
+\newcommand{\Config}{\mathcal C}
+\newcommand{\Picard}{\Phi}
+\newcommand{\Domain}{\mathcal Q}
+\newcommand{\Proj}{\Pi}
+\newcommand{\Residual}{\mathfrak R}
+\newcommand{\Defect}{\mathfrak D}
+\newcommand{\diag}{\operatorname{diag}}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\dv}{\operatorname{div}}
+\newcommand{\cl}{\operatorname{curl}}
+
+\def\oc{\overset{\circ}}
+\def\wt{\widetilde}

@@ -66,7 +66,9 @@ A successful run writes `resolved-config.toml`, `manifest.json`,
 
 The mathematical derivation is in [docs/article/article.tex](docs/article/article.tex).
 The state, Picard order, discretization, and reliability rules are summarized
-in [docs/algorithms/method.md](docs/algorithms/method.md).
+in [docs/algorithms/method.md](docs/algorithms/method.md). Full-run timings,
+replay comparisons, and scientific gate outcomes are collected in
+[docs/validation.md](docs/validation.md).
 
 ## Citation
 

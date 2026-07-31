@@ -63,7 +63,19 @@ def schwarzschild_interior(config: ExperimentConfig, output: Path) -> dict[str, 
     from nee.geometry.curved_sphere import exact_fields, overgrid_audit, solve
 
     output.mkdir(parents=True)
-    solution = solve(0.5, 17, 17, iterations=3, tolerance=1.0e-10)
+    solution = solve(
+        0.5,
+        17,
+        17,
+        iterations=config.solver.maximum_sweeps,
+        tolerance=config.solver.tolerance,
+    )
+    for record in solution.records:
+        print(
+            "exp03-smoke: sweep "
+            f"{int(record['iteration'])}/{config.solver.maximum_sweeps} "
+            f"update={record['update']:.6e}"
+        )
     exact = exact_fields(
         solution.u, solution.xi, 0.5, 1.0, high_precision=False
     )
@@ -87,7 +99,7 @@ def schwarzschild_interior(config: ExperimentConfig, output: Path) -> dict[str, 
         "experiment": 3,
         "terminal_status": "completed",
         "epsilon": 0.5,
-        "sweeps": 3,
+        "sweeps": len(solution.records),
         "radius_error_maximum": float(np.max(np.abs(solution.radius - exact["radius"]))),
         "independent_audit": residual,
     }

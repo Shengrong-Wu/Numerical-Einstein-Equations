@@ -612,8 +612,8 @@ def plot_regions(
 ) -> dict[str, int]:
     categories = residual_regions(total)
     colors = ["#2b283d", "#6f6689", "#9a89b3", "#ccb8dc", "#f3e8f5"]
-    width, height = 1500, 980
-    left, right, top, bottom = 150, 370, 100, 130
+    width, height = 1700, 980
+    left, right, top, bottom = 150, 570, 100, 130
     plot_width = width - left - right
     plot_height = height - top - bottom
     image = Image.new("RGB", (width, height), "white")

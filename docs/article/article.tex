@@ -1,6 +1,10 @@
 \documentclass[11pt]{article}
 
 \input{../setup.tex}
+\hypersetup{
+  pdftitle={Picard Iteration for the Characteristic Initial Value Problem in Einstein Equations},
+  pdfauthor={Shengrong Wu}
+}
 
 \title{Picard Iteration for the Characteristic Initial Value Problem in Einstein Equations}
 \author{Shengrong Wu}
@@ -701,16 +705,71 @@ $10^{-3}$ and $10^{-2}$ and $124$ between $10^{-4}$ and $10^{-3}$.
 the Experiment~5 standard run and may be curated here after its audit.}}}
 \caption{Spectrum of
 $r=r_{33}+r_{34}+r_{3A}+r_{4A}+r_{AB}+r_R$.
-Colors show the elementwise spectral interpolation of $\log_{10}r$.
-White contours mark $10^{-4}$, $10^{-3}$, $10^{-2}$, and $10^{-1}$;
-thin lines mark coordinate-element interfaces.}
+Colors classify retained nodes by the residual thresholds
+$10^{-4}$, $10^{-3}$, $10^{-2}$, and $10^{-1}$. Gray cells are excluded
+by endpoint, interface, or derivative stencils.}
 \label{fig:article-crossed-residual-spectrum}
 \end{figure}
 \clearpage
 
 \section{Results for Einstein Scalar-field Equations}
 
+\subsection{Regular exact scalar solutions}
+The Fisher--Janis--Newman--Winicour family supplies simultaneous exact
+metric and scalar controls.  We use $\sigma=1$ and
+$\nu\in\{0.99,0.8,0.5,0.2\}$ on two, four, and eight degree-six elements.
+All twelve runs complete eight Picard sweeps.  On the finest $\nu=0.99$
+grid, the scalar maximum absolute error is $1.14\times10^{-14}$ and the
+sphere-metric maximum absolute error is $2.09\times10^{-12}$.  The
+$\nu=1$ control has identically vanishing scalar variables and recovers
+Schwarzschild mass $1/2$.
+
+\subsection{Nonspherical scalar refinement}
+Smooth real-harmonic lapse, shift, shear, and scalar data are completed by
+the characteristic Einstein--scalar constraints.  The protected independent
+residual sum decreases along the coordinate sequence
+\[
+ 28.18 \longrightarrow 0.429 \longrightarrow 0.0650
+\]
+and along the angular sequence
+\[
+ 0.529 \longrightarrow 0.429 \longrightarrow 0.411 .
+\]
+The associated closure envelopes decrease, and the five refinement cases
+end below a $10^{-6}$ Picard update.  Two extreme stress probes are rejected
+before evolution because their incoming-scalar constraint radicand is
+negative.  They are retained as failed positivity tests rather than omitted
+from the campaign.
+
+\subsection{Scalar pulse and trapped-section sign audit}
+For the pulse test we take $\kappa=0.25$, $\delta=0.1$, scalar amplitude
+$2$, profile scale $0.01$, and quadrupolar shear amplitude $0.1$.  A
+twelve-element base domain is prolonged by one complete tau element.  The
+standard angular band $(L,W,N)=(5,10,170)$ and control band
+$(7,14,300)$ independently evaluate the two expansion suprema on 1000
+sphere points.
+
+The base update reaches $3.58\times10^{-6}$ in the standard band and
+$1.32\times10^{-5}$ in the control.  The continued updates remain
+$1.76\times10^{-3}$ and $9.90\times10^{-3}$.  Their protected negative-sign
+masks contain 18 and 16 cells, with all 16 control cells contained in the
+standard mask.  However, the protected independent Einstein--scalar residual
+sums are $9.64\times10^3$ and $6.98\times10^3$.  Thus the sign observation
+is neither a numerical candidate nor a certificate: the Picard, residual,
+and coordinate-refinement gates are not met.
+
 \section{Conclusion}
+
+The weighted first-order variables expose a triangular Picard hierarchy for
+the characteristic vacuum and Einstein--scalar equations.  Immutable face
+data, trace-free angular projection, spectral elements, and independent
+four-metric audits turn that hierarchy into a testable numerical method.
+Exact regular solutions and the crossed-pulse slab evolution provide the
+strongest validations.  Near a singular radius, in a degenerate static
+horizon chart, and in the continued scalar pulse, the diagnostics also show
+where a completed computation does not support an accuracy or existence
+claim.  Those distinctions between execution, candidate status, and
+certificate status are part of the numerical result.
 
 \bibliographystyle{plain}
 \bibliography{ref}
