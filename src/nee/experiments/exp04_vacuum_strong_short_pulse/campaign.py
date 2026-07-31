@@ -1,19 +1,16 @@
-"""Fresh Experiment-4 two-hemisphere vacuum-pulse matrix.
+"""Experiment 4 two-hemisphere vacuum-pulse matrix.
 
-The numerical kernel is the audited EVE numerical backend Q1 driver.  This wrapper
-redirects every artifact into the official workspace, regenerates the boundary
-constraint data for every run, and records failures without stopping later
-strengths or continuation caps.
+The shared vacuum kernel regenerates the boundary constraint data for every
+run and records failures without stopping later strengths or continuation
+caps.
 """
 
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import math
 import platform
-import sys
 from dataclasses import replace
 from pathlib import Path
 from typing import Any

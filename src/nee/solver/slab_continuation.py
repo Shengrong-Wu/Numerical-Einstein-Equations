@@ -1,4 +1,4 @@
-"""Characteristic-slab continuation helpers for experiment 4B."""
+"""Reusable characteristic-slab continuation helpers."""
 
 from __future__ import annotations
 

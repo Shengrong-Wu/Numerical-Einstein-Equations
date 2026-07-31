@@ -1,13 +1,7 @@
-"""Production completion campaign for the six-experiment official plan.
-
-Exploratory outputs remain untouched.  This driver writes a new immutable,
-content-addressed campaign and uses the full weighted official state between every
-Picard sweep.
-"""
+"""Shared orchestration and audit support for the public experiments."""
 
 from __future__ import annotations
 
-import argparse
 import json
 import math
 import time
@@ -17,12 +11,12 @@ from typing import Any, Callable
 import numpy as np
 
 
-ROOT = Path(__file__).resolve().parents[3]
-
 from nee.exact_solutions import fisher_jnw as ese_bench  # noqa: E402
 from nee.exact_solutions import vacuum_benchmarks as vacuum_bench  # noqa: E402
 from nee.diagnostics.construction_residuals import evaluate as closure_audit  # noqa: E402
+from nee.diagnostics.exact_comparison import field_error
 from nee.geometry.curved_sphere import (  # noqa: E402
+    chebyshev_lobatto,
     exact_fields as curved_exact_fields,
     overgrid_audit as curved_overgrid_audit,
     solve as solve_curved,
@@ -51,9 +45,6 @@ from nee.discretization.overgrid import (  # noqa: E402
     resample_primitives,
     resample_primitives_power,
 )
-NUMERICS_ROOT = Path(__file__).resolve().parents[1] / "numerics"
-CHECK_ROOT = Path(__file__).resolve().parents[3] / "tests" / "unit"
-from nee.io.provenance import runtime_provenance  # noqa: E402
 from nee.state.boundary import BoundaryData
 from nee.state.iterate import PicardState as WeightedState  # noqa: E402
 
@@ -66,17 +57,6 @@ def write_json(path: Path, value: Any) -> None:
     path.write_text(
         json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n"
     )
-
-
-def field_error(actual: Array, expected: Array) -> dict[str, float]:
-    difference = np.asarray(actual) - np.asarray(expected)
-    absolute_rms = float(np.sqrt(np.mean(difference**2)))
-    exact_rms = float(np.sqrt(np.mean(np.asarray(expected) ** 2)))
-    return {
-        "absolute_maximum": float(np.max(np.abs(difference))),
-        "absolute_rms": absolute_rms,
-        "relative_rms": absolute_rms / max(exact_rms, 1.0e-14),
-    }
 
 
 def direct_residual_value(summary: dict[str, Any]) -> float | None:
@@ -425,7 +405,7 @@ def vacuum_case(
     exact.save(output / "official-exact-state.npz", u=u, v=v)
     save_boundary(output / "boundary-data.npz", boundary, u=u, v=v)
     summary = {
-        "schema": "nee-official-production-vacuum-case-v1",
+        "schema": "nee-official-vacuum-case-v1",
         "case_id": case_id,
         "terminal_status": "completed",
         "state_semantics": "full weighted forms; traces derived from current metric",
@@ -575,7 +555,7 @@ def run_experiment_1(output: Path) -> dict[str, Any]:
                     write_json(case / "summary.json", summary)
                 summaries.append(summary)
     aggregate = {
-        "schema": "nee-official-production-experiment-01-v1",
+        "schema": "nee-official-experiment-01-aggregate-v1",
         "experiment": 1,
         "runs": summaries,
     }
@@ -638,7 +618,7 @@ def run_experiment_2(output: Path) -> dict[str, Any]:
             )
         )
     aggregate = {
-        "schema": "nee-official-production-experiment-02-v1",
+        "schema": "nee-official-experiment-02-aggregate-v1",
         "experiment": 2,
         "runs": summaries,
         "high_precision_note": (
@@ -659,19 +639,37 @@ def run_experiment_3(output: Path) -> dict[str, Any]:
             case = output / f"epsilon-{epsilon:.8f}" / f"coordinate-{level}"
             case.mkdir(parents=True)
             try:
+                u_nodes, _ = chebyshev_lobatto(count, -1.0, -0.5)
+                xi_nodes, _ = chebyshev_lobatto(count, 0.0, 1.0)
+                exact = curved_exact_fields(
+                    u_nodes,
+                    xi_nodes,
+                    epsilon,
+                    1.0,
+                    high_precision=epsilon <= 2.0**-4,
+                )
+                np.savez_compressed(
+                    case / "boundary-data.npz",
+                    schema=np.asarray(
+                        "nee-official-curved-characteristic-boundary-v1"
+                    ),
+                    u=np.asarray(u_nodes),
+                    xi=np.asarray(xi_nodes),
+                    v0=np.asarray(exact["v0"]),
+                    outgoing_radius=np.asarray(exact["radius"][0]),
+                    incoming_radius=np.asarray(exact["radius"][:, 0]),
+                    outgoing_log_lapse=np.asarray(exact["log_omega"][0]),
+                    incoming_log_lapse=np.asarray(exact["log_omega"][:, 0]),
+                    corner_radius_mismatch=np.asarray(0.0),
+                    corner_log_lapse_mismatch=np.asarray(0.0),
+                    minimum_radius=np.asarray(np.min(exact["radius"])),
+                )
                 solution = solve_curved(
                     epsilon,
                     count,
                     count,
                     iterations=20,
                     tolerance=1.0e-12,
-                )
-                exact = curved_exact_fields(
-                    solution.u,
-                    solution.xi,
-                    epsilon,
-                    1.0,
-                    high_precision=epsilon <= 2.0**-4,
                 )
                 overgrid = curved_overgrid_audit(solution, epsilon)
                 relative = np.abs(solution.radius - exact["radius"]) / np.maximum(
@@ -711,7 +709,7 @@ def run_experiment_3(output: Path) -> dict[str, Any]:
                     w_in=np.asarray(solution.w_in),
                 )
                 summary = {
-                    "schema": "nee-official-production-curved-spherical-v1",
+                    "schema": "nee-official-curved-spherical-v1",
                     "case_id": f"exp03-eps{epsilon:.8f}-C{level}",
                     "terminal_status": "completed",
                     "state_semantics": "full weighted spherical forms",
@@ -737,295 +735,10 @@ def run_experiment_3(output: Path) -> dict[str, Any]:
             write_json(case / "summary.json", summary)
             summaries.append(summary)
     aggregate = {
-        "schema": "nee-official-production-experiment-03-v1",
+        "schema": "nee-official-experiment-03-aggregate-v1",
         "experiment": 3,
         "runs": summaries,
         "map": "v=xi*v0(u), with both physical derivative Jacobian terms",
-    }
-    write_json(output / "aggregate-summary.json", aggregate)
-    return aggregate
-
-
-def vacuum_pulse_case(
-    *,
-    output: Path,
-    name: str,
-    strength: float,
-    cap: float,
-    u_count: int,
-    v_count: int,
-    retained: int,
-    work: int,
-    points: int,
-    iterations: int,
-) -> dict[str, Any]:
-    """Run Q1 with a persistent official state and append independent audits."""
-
-    import vacuum_pulse as pulse
-
-    q1 = pulse.q1
-    captured: dict[str, Any] = {}
-    original_boundary_seed = q1.boundary_compatible_initial_state
-    original_step = q1.picard_step
-    original_update_norm = q1.update_norm
-    original_update_map = q1.update_map
-    original_save_state = q1.save_state
-
-    def boundary_seed(
-        grid: Any, u: Array, v: Array, boundary: dict[str, Array]
-    ) -> WeightedState:
-        state = from_numerical(
-            original_boundary_seed(grid, u, v, boundary), grid
-        )
-        outgoing = {
-            field: value[:, :, 0].copy()
-            for field, value in state.arrays().items()
-        }
-        incoming = {
-            field: value[:, 0, :].copy()
-            for field, value in state.arrays().items()
-        }
-        captured.update(
-            {
-                "grid": grid,
-                "u": np.asarray(u),
-                "v": np.asarray(v),
-                "boundary": BoundaryData.create(outgoing, incoming),
-            }
-        )
-        return state
-
-    def step(
-        grid: Any,
-        state: WeightedState,
-        boundary: dict[str, Array],
-        u: Array,
-        v: Array,
-        **kwargs: Any,
-    ) -> tuple[WeightedState, dict[str, Any]]:
-        next_state, context = original_step(
-            grid, state, boundary, u, v, **kwargs
-        )
-        result = from_numerical(next_state, grid)
-        captured.update(
-            {
-                "grid": grid,
-                "u": np.asarray(u),
-                "v": np.asarray(v),
-                "state": result,
-                "coordinates": kwargs.get("coordinates"),
-            }
-        )
-        captured["boundary"].verify_unchanged()
-        return result, context
-
-    def save_state(
-        path: Path,
-        state: WeightedState,
-        u: Array,
-        v: Array,
-        *,
-        extra: dict[str, Any] | None = None,
-    ) -> None:
-        state.save(path, u=u, v=v, extra=extra)
-
-    q1.boundary_compatible_initial_state = boundary_seed
-    q1.picard_step = step
-    q1.update_norm = weighted_update_norm
-    q1.update_map = weighted_update_map
-    q1.save_state = save_state
-    try:
-        numerical_summary = pulse._run_one(
-            output_root=output,
-            label=name,
-            strength=strength,
-            cap=cap,
-            u_count=u_count,
-            v_count=v_count,
-            retained=retained,
-            work=work,
-            points=points,
-            iterations=iterations,
-        )
-    finally:
-        q1.boundary_compatible_initial_state = original_boundary_seed
-        q1.picard_step = original_step
-        q1.update_norm = original_update_norm
-        q1.update_map = original_update_map
-        q1.save_state = original_save_state
-
-    case_output = output / "results" / "Q1" / name
-    if "state" not in captured:
-        return {
-            **numerical_summary,
-            "case_id": name,
-            "terminal_status": "failed",
-            "failure_classification": (
-                "pulse boundary, positivity, or Picard failure before one sweep"
-            ),
-        }
-    grid = captured["grid"]
-    state = captured["state"]
-    u = captured["u"]
-    v = captured["v"]
-    boundary = captured["boundary"]
-    null_residual = first_order_audit(
-        grid,
-        state,
-        u,
-        v,
-        coordinates=captured.get("coordinates"),
-    )
-    geometric_residual = direct_audit(
-        grid,
-        state,
-        u,
-        v,
-        retained_degree=retained,
-        source_points=points,
-    )
-    closures = closure_audit(grid, state, u, v, stencil=7, halo=2)
-    boundary.verify_unchanged()
-    save_boundary(
-        case_output / "boundary-data.npz", boundary, u=u, v=v
-    )
-    summary = {
-        **numerical_summary,
-        "schema": "nee-official-production-vacuum-pulse-case-v1",
-        "case_id": name,
-        "terminal_status": (
-            "completed"
-            if numerical_summary.get("status") == "completed"
-            else "failed"
-        ),
-        "state_semantics": (
-            "persistent full weighted forms; trace/shear derived from "
-            "the current metric on every sweep"
-        ),
-        "boundary_digest": boundary.digest,
-        "corrected_closures": closures,
-        "first_order_null_residual_fresh": null_residual,
-        "independent_four_metric_residual": geometric_residual,
-    }
-    write_json(case_output / "summary.json", summary)
-    return summary
-
-
-def run_experiment_4(output: Path) -> dict[str, Any]:
-    output.mkdir(parents=True, exist_ok=False)
-    summaries: list[dict[str, Any]] = []
-    continuation_gates: list[dict[str, Any]] = []
-
-    def run_or_record(**kwargs: Any) -> None:
-        name = str(kwargs["name"])
-        try:
-            summary = vacuum_pulse_case(output=output, **kwargs)
-        except Exception as error:
-            case = output / "results" / "Q1" / name
-            case.mkdir(parents=True, exist_ok=True)
-            summary = {
-                "case_id": name,
-                "terminal_status": "failed",
-                "failure_classification": (
-                    "constraint, positivity, Picard, or audit failure"
-                ),
-                "error": repr(error),
-            }
-            write_json(case / "summary.json", summary)
-        summaries.append(summary)
-
-    strengths = (0.0, 0.5, 1.0, 1.5)
-    caps = (0.01, 0.02, 0.04, 0.10, 0.25, 0.50)
-    for strength in strengths:
-        for cap in caps:
-            first = len(summaries)
-            for coordinate_level, (u_count, v_count) in enumerate(
-                ((9, 17), (13, 25), (17, 33))
-            ):
-                run_or_record(
-                    name=(
-                        f"strength-{strength:.1f}-cap-{cap:.2f}-"
-                        f"C{coordinate_level}-A1"
-                    ),
-                    strength=strength,
-                    cap=cap,
-                    u_count=u_count,
-                    v_count=v_count,
-                    retained=5,
-                    work=10,
-                    points=180,
-                    iterations=8,
-                )
-            # Clean angular controls hold the middle coordinate mesh fixed.
-            for angular_level, (retained, work, points) in enumerate(
-                ((4, 8, 120), (6, 12, 220))
-            ):
-                run_or_record(
-                    name=(
-                        f"strength-{strength:.1f}-cap-{cap:.2f}-"
-                        f"C1-A{2*angular_level}"
-                    ),
-                    strength=strength,
-                    cap=cap,
-                    u_count=13,
-                    v_count=25,
-                    retained=retained,
-                    work=work,
-                    points=points,
-                    iterations=8,
-                )
-            cap_runs = summaries[first:]
-            coordinate_residuals = [
-                direct_residual_value(run) for run in cap_runs[:3]
-            ]
-            angular_residuals = [
-                direct_residual_value(cap_runs[index])
-                for index in (3, 1, 4)
-            ]
-            coordinate_converges = strictly_decreasing_finite(
-                coordinate_residuals
-            )
-            angular_converges = strictly_decreasing_finite(
-                angular_residuals
-            )
-            all_completed = all(
-                run.get("terminal_status") == "completed"
-                for run in cap_runs
-            )
-            gate = {
-                "strength": strength,
-                "cap": cap,
-                "all_five_runs_completed": all_completed,
-                "coordinate_direct_residuals": coordinate_residuals,
-                "angular_direct_residuals": angular_residuals,
-                "coordinate_residual_strictly_decreasing": (
-                    coordinate_converges
-                ),
-                "angular_residual_strictly_decreasing": angular_converges,
-                "passed": bool(
-                    all_completed
-                    and coordinate_converges
-                    and angular_converges
-                ),
-            }
-            continuation_gates.append(gate)
-            # This is the plan's declared continuation rule.  A failed cap
-            # remains in the record, and the next experiment proceeds.
-            if not gate["passed"]:
-                break
-
-    aggregate = {
-        "schema": "nee-official-production-experiment-04-v1",
-        "experiment": 4,
-        "runs": summaries,
-        "matrix": {
-            "strengths": strengths,
-            "caps": caps,
-            "coordinate_levels": ((9, 17), (13, 25), (17, 33)),
-            "angular_levels": ((4, 8, 120), (5, 10, 180), (6, 12, 220)),
-            "picard_sweeps_for_every_level": 8,
-        },
-        "continuation_gates": continuation_gates,
     }
     write_json(output / "aggregate-summary.json", aggregate)
     return aggregate
@@ -1158,8 +871,8 @@ def ese_case(
     exact.save(output / "official-exact-state.npz", u=mesh.u, v=mesh.v)
     save_boundary(output / "boundary-data.npz", boundary, u=mesh.u, v=mesh.v)
     summary = {
-        "schema": "nee-official-production-ese-exact-case-v1",
-        "case_id": f"exp05-jnw-nu{nu:.2f}-C{level}",
+        "schema": "nee-official-ese-exact-case-v1",
+        "case_id": f"exp06-jnw-nu{nu:.2f}-C{level}",
         "terminal_status": "completed",
         "state_semantics": "full weighted forms; traces derived from current metric",
         "config": config.to_dict(),
@@ -1175,7 +888,7 @@ def ese_case(
     return summary
 
 
-def run_experiment_5(output: Path) -> dict[str, Any]:
+def run_experiment_6(output: Path) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=False)
     levels = ((2, 6, 2, 6), (4, 6, 4, 6), (8, 6, 8, 6))
     summaries = []
@@ -1202,7 +915,7 @@ def run_experiment_5(output: Path) -> dict[str, Any]:
             except Exception as error:
                 case.mkdir(parents=True, exist_ok=True)
                 summary = {
-                    "case_id": f"exp05-jnw-nu{nu:.2f}-C{level}",
+                    "case_id": f"exp06-jnw-nu{nu:.2f}-C{level}",
                     "terminal_status": "failed",
                     "failure_classification": (
                         "Picard, positivity, independent residual, or resolution"
@@ -1240,8 +953,8 @@ def run_experiment_5(output: Path) -> dict[str, Any]:
         "diagnostics": diagnostics,
     }
     aggregate = {
-        "schema": "nee-official-production-experiment-05-v1",
-        "experiment": 5,
+        "schema": "nee-official-experiment-06-aggregate-v1",
+        "experiment": 6,
         "runs": summaries,
         "nu_to_one_limit": limit_test,
     }
@@ -1269,7 +982,9 @@ def nonspherical_ese_case(
 ) -> dict[str, Any]:
     """Run the smooth-harmonic ESE case with a persistent official state."""
 
-    from nee.initial_data import nonspherical_scalar as nonspherical
+    from nee.experiments.exp07_nonspherical_scalar import (
+        campaign as nonspherical,
+    )
 
     ese_run = nonspherical.ese_run
     captured: dict[str, Any] = {}
@@ -1439,7 +1154,7 @@ def nonspherical_ese_case(
     )
     summary = {
         **numerical_summary,
-        "schema": "nee-official-production-nonspherical-ese-case-v1",
+        "schema": "nee-official-nonspherical-ese-case-v1",
         "case_id": name,
         "terminal_status": "completed",
         "state_semantics": (
@@ -1460,7 +1175,7 @@ def nonspherical_ese_case(
     return summary
 
 
-def run_experiment_6(output: Path) -> dict[str, Any]:
+def run_experiment_7(output: Path) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=False)
     baseline = (1.0, 1.0, 1.0, 1.0)
     summaries: list[dict[str, Any]] = []
@@ -1693,8 +1408,8 @@ def run_experiment_6(output: Path) -> dict[str, Any]:
                 central,
             )
     aggregate = {
-        "schema": "nee-official-production-experiment-06-official",
-        "experiment": 6,
+        "schema": "nee-official-experiment-07-aggregate-v1",
+        "experiment": 7,
         "runs": summaries,
         "harmonics": {
             "Y_Omega": "normalized real Y_20",
@@ -1718,165 +1433,3 @@ def run_experiment_6(output: Path) -> dict[str, Any]:
     }
     write_json(output / "aggregate-summary.json", aggregate)
     return aggregate
-
-
-def run_preflight(output: Path) -> dict[str, Any]:
-    """Run source-level identity, mutation, and exact-control gates."""
-
-    path = output / "preflight.json"
-    if path.exists():
-        return json.loads(path.read_text())
-    grid = vacuum_bench._grid(86, 7)
-    u = np.linspace(-1.0, -0.5, 33)
-    v = np.linspace(0.0, 0.5, 33)
-    kerr_old, _ = vacuum_bench.kerr_exact_state(
-        grid, u, v, mass=1.0, rotation=0.7, reference_radius=4.0
-    )
-    kerr = from_numerical(kerr_old, grid)
-    corrected = closure_audit(
-        grid, kerr, u, v, stencil=9, halo=4
-    )
-    omitted = closure_audit(
-        grid,
-        kerr,
-        u,
-        v,
-        stencil=9,
-        halo=4,
-        omit_lie_derivative=True,
-    )
-    scalar_mutation = ese_bench.scalar_normalization_mutation(0.8)
-
-    minkowski_controls: dict[str, Any] = {}
-    for name, (u_right, v_right) in {
-        "short": (-0.5, 0.5),
-        "long": (0.0, 1.0),
-    }.items():
-        flat_grid = vacuum_bench._grid(50, 5)
-        flat_u = np.linspace(-1.0, u_right, 17)
-        flat_v = np.linspace(0.0, v_right, 17)
-        radius = (
-            flat_v[None, None, :] - flat_u[None, :, None] + 2.0
-        )
-        scalar_shape = (flat_grid.count, len(flat_u), len(flat_v))
-        metric = (
-            radius[..., None, None] ** 2
-            * flat_grid.projector[:, None, None]
-        )
-        flat = WeightedState(
-            metric=metric,
-            shift=np.zeros(scalar_shape + (3,)),
-            log_omega=np.zeros(scalar_shape),
-            x_out=(
-                radius[..., None, None]
-                * flat_grid.projector[:, None, None]
-            ),
-            x_in=(
-                -radius[..., None, None]
-                * flat_grid.projector[:, None, None]
-            ),
-            zeta_up=np.zeros(scalar_shape + (3,)),
-            w_out=np.zeros(scalar_shape),
-            w_in=np.zeros(scalar_shape),
-        )
-        flat_old = to_numerical(flat)
-        flat_outgoing, flat_incoming = vacuum_bench.characteristic_data(
-            flat_grid, flat_old
-        )
-        exact_flat_residual = direct_audit(
-            flat_grid,
-            flat,
-            flat_u,
-            flat_v,
-            retained_degree=5,
-            source_points=50,
-        )
-        flat_next, _ = vacuum_picard_step(
-            flat_grid,
-            flat,
-            flat_outgoing,
-            flat_u,
-            flat_v,
-            metric_substeps=2,
-            metric_parameterization="direct",
-            metric_integrator="rk4",
-            u_integrator="rk4",
-            incoming=flat_incoming,
-        )
-        flat_residual = direct_audit(
-            flat_grid,
-            flat_next,
-            flat_u,
-            flat_v,
-            retained_degree=5,
-            source_points=50,
-        )
-        minkowski_controls[name] = {
-            "official_picard_update": weighted_update_norm(flat_next, flat),
-            "field_errors": state_errors(flat_next, flat),
-            "exact_input_independent_four_metric_residual": (
-                exact_flat_residual
-            ),
-            "post_picard_independent_four_metric_residual": flat_residual,
-        }
-    result = {
-        "schema": "nee-official-production-preflight-v1",
-        "unit_tests": {
-            "passed": True,
-            "scope": "the maintained unit suite is executed before campaigns",
-        },
-        "minkowski_exact_picard_controls": minkowski_controls,
-        "kerr_C3_lie_derivative_mutation": {
-            "corrected": corrected["C3"],
-            "lie_derivative_omitted": omitted["C3"],
-            "rejected": bool(
-                omitted["C3"]["raw_maximum"]
-                > 10.0 * max(corrected["C3"]["raw_maximum"], 1.0e-30)
-            ),
-        },
-        "jnw_scalar_normalization_mutation": scalar_mutation,
-    }
-    write_json(path, result)
-    return result
-
-
-def prepare_campaign(output: Path) -> Any:
-    if not output.exists():
-        output.mkdir(parents=True)
-    manifest = output / "source-revision.json"
-    revision = (
-        runtime_provenance(ROOT)
-        if manifest.exists()
-        else runtime_provenance(ROOT)
-    )
-    revision.verify()
-    return revision
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument(
-        "--experiment", type=int, choices=(1, 2, 3, 4, 5, 6), required=True
-    )
-    args = parser.parse_args()
-    revision = prepare_campaign(args.output)
-    run_preflight(args.output)
-    revision.verify()
-    target = args.output / f"experiment-{args.experiment:02d}"
-    runners = {
-        1: run_experiment_1,
-        2: run_experiment_2,
-        3: run_experiment_3,
-        4: run_experiment_4,
-        5: run_experiment_5,
-        6: run_experiment_6,
-    }
-    result = runners[args.experiment](target)
-    revision.verify()
-    result["source_revision"] = revision.revision
-    write_json(target / "aggregate-summary.json", result)
-
-
-if __name__ == "__main__":
-    main()

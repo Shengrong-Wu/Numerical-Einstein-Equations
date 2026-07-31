@@ -9,7 +9,7 @@ platform runtime counter to GiB.
 |---|---:|---:|---:|---:|
 | Experiment 1 standard | 0 / completed | 6259.41 | 1.69 | 1.0 GiB |
 | Experiment 2 standard | 0 / completed | 1725.25 | 1.28 | 268 MiB |
-| Experiment 3 standard | 0 / completed | 151.83 | 0.10 | 1.6 MiB |
+| Experiment 3 standard | 0 / completed | 150.26 | 0.10 | 1.7 MiB |
 | Experiment 4 standard | 0 / completed | 938.21 | 1.74 | 717 MiB |
 | Experiment 5 standard | 0 / completed | 3087.59 | 2.37 | 492 MiB |
 | Experiment 6 standard | 0 / completed | 3211.11 | 1.49 | 512 MiB |
@@ -20,6 +20,11 @@ platform runtime counter to GiB.
 Experiment 7 exits nonzero because two extreme stress inputs make the incoming
 scalar constraint radicand negative. This is an explicit invalid-data gate; 22
 other cases complete.
+
+The finalized Experiment 3 artifact set includes its separately regenerated
+and hashed characteristic boundary. An independent repeat preserved 198 arrays
+(160,518 values) and 2,205 numerical summary leaves bit for bit; manifest-hash
+resume validation also passed.
 
 ## Same-grid numerical comparisons
 

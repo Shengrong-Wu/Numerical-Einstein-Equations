@@ -1,4 +1,4 @@
-"""Reliability masks for composite square-root-coordinate diagnostics."""
+"""Reliability masks for spectral convergence-region diagnostics."""
 
 from __future__ import annotations
 

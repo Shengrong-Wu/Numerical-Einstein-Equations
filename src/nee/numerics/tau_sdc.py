@@ -1,8 +1,7 @@
 """Coordinate-aware spectral deferred correction on one tau LGL element.
 
-This module is an isolated pilot for the incoming ``tau=-log(-u)`` solves.
-It deliberately does not import, wrap, or modify the production SDC kernel.
-The important differences from that kernel are:
+This module supplies coordinate-aware incoming ``tau=-log(-u)`` solves.
+Its acceptance diagnostics use the following conventions:
 
 * a retraction receives the coordinate of every trial value;
 * both collocation and independent overgrid acceptance are scalar global

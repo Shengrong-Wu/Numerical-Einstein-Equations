@@ -342,7 +342,7 @@ def run_case(
     bundle.save(output / "boundary-data.npz")
     summary: dict[str, Any] = {
         "schema": "nee-official-exact-jnw-run-v1",
-        "case_id": f"exp05-jnw-nu{nu:.2f}-L{level}",
+        "case_id": f"exp06-jnw-nu{nu:.2f}-L{level}",
         "config": config.to_dict(),
         "exact_diagnostics": exact_diagnostics,
         "normalization_mutation_test": scalar_normalization_mutation(nu),
@@ -394,7 +394,7 @@ def run_experiment(output: Path, quick: bool) -> dict[str, Any]:
                 failed = output / f"nu-{nu:.2f}" / f"coordinate-level-{level}"
                 failed.mkdir(parents=True, exist_ok=False)
                 summary = {
-                    "case_id": f"exp05-jnw-nu{nu:.2f}-L{level}",
+                    "case_id": f"exp06-jnw-nu{nu:.2f}-L{level}",
                     "terminal_status": "failed",
                     "failure_classification": "ESE solver or discretization",
                     "error": repr(error),
@@ -405,8 +405,8 @@ def run_experiment(output: Path, quick: bool) -> dict[str, Any]:
                 )
             summaries.append(summary)
     aggregate = {
-        "schema": "nee-official-experiment-05-aggregate-v1",
-        "experiment": 5,
+        "schema": "nee-official-experiment-06-aggregate-v1",
+        "experiment": 6,
         "runs": summaries,
         "provenance": provenance(),
     }

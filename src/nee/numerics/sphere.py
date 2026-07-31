@@ -1,4 +1,4 @@
-"""Coordinate-free whole-sphere angular operators for global EVE work.
+"""Coordinate-free whole-sphere angular operators for Einstein equations.
 
 Fields are sampled on a Fibonacci sphere and stored as ambient Cartesian
 tangent vectors/tensors.  Local polynomial differentiation and projection

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.interpolate import CubicSpline, PchipInterpolator
 
-from nee.diagnostics.independent_audit import PrimitiveFields
+from nee.state.fields import PrimitiveFields
 
 
 Array = np.ndarray

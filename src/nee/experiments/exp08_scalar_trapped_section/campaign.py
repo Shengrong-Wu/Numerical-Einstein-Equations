@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 
 from nee.diagnostics.trapped_sections import trapped_sections
-from nee.experiments._reference_campaign import mapped_direct_audit
+from nee.experiments._campaign_support import mapped_direct_audit
 from nee.io.boundary_artifact import load_boundary_data, save_boundary_data
 from nee.io.manifest import write_json
 from nee.io.state_artifact import save_state

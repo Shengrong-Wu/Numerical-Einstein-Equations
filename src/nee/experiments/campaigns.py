@@ -10,7 +10,7 @@ import numpy as np
 from nee.config import ExperimentConfig
 from nee.exact_solutions import fisher_jnw, vacuum_benchmarks
 
-from . import _reference_campaign as reference
+from . import _campaign_support as support
 
 
 def _smoke(config: ExperimentConfig) -> bool:
@@ -19,8 +19,8 @@ def _smoke(config: ExperimentConfig) -> bool:
 
 def regular_vacuum(config: ExperimentConfig, output: Path) -> dict[str, Any]:
     if not _smoke(config):
-        return reference.run_experiment_1(output)
-    summary = reference.vacuum_case(
+        return support.run_experiment_1(output)
+    summary = support.vacuum_case(
         case_id="exp01-smoke",
         builder=lambda grid, u, v: vacuum_benchmarks.regular_schwarzschild_state(
             grid, u, v, 1.0
@@ -33,14 +33,14 @@ def regular_vacuum(config: ExperimentConfig, output: Path) -> dict[str, Any]:
         output=output / "regular-schwarzschild",
     )
     output.mkdir(parents=True, exist_ok=True)
-    reference.write_json(output / "aggregate-summary.json", {"experiment": 1, "runs": [summary]})
+    support.write_json(output / "aggregate-summary.json", {"experiment": 1, "runs": [summary]})
     return {"experiment": 1, "runs": [summary]}
 
 
 def schwarzschild_horizon(config: ExperimentConfig, output: Path) -> dict[str, Any]:
     if not _smoke(config):
-        return reference.run_experiment_2(output)
-    summary = reference.vacuum_case(
+        return support.run_experiment_2(output)
+    summary = support.vacuum_case(
         case_id="exp02-smoke-kruskal",
         builder=lambda grid, u, v: vacuum_benchmarks.kruskal_state(
             grid, u, v, 1.0, u_offset=0.75, v_offset=1.0
@@ -53,13 +53,13 @@ def schwarzschild_horizon(config: ExperimentConfig, output: Path) -> dict[str, A
         output=output / "kruskal-crossing",
     )
     output.mkdir(parents=True, exist_ok=True)
-    reference.write_json(output / "aggregate-summary.json", {"experiment": 2, "runs": [summary]})
+    support.write_json(output / "aggregate-summary.json", {"experiment": 2, "runs": [summary]})
     return {"experiment": 2, "runs": [summary]}
 
 
 def schwarzschild_interior(config: ExperimentConfig, output: Path) -> dict[str, Any]:
     if not _smoke(config):
-        return reference.run_experiment_3(output)
+        return support.run_experiment_3(output)
     from nee.geometry.curved_sphere import exact_fields, overgrid_audit, solve
 
     output.mkdir(parents=True)
@@ -103,7 +103,7 @@ def schwarzschild_interior(config: ExperimentConfig, output: Path) -> dict[str, 
         "radius_error_maximum": float(np.max(np.abs(solution.radius - exact["radius"]))),
         "independent_audit": residual,
     }
-    reference.write_json(output / "summary.json", summary)
+    support.write_json(output / "summary.json", summary)
     return summary
 
 
@@ -128,7 +128,7 @@ def strong_vacuum_pulse(config: ExperimentConfig, output: Path) -> dict[str, Any
         iterations=1,
     )
     aggregate = {"experiment": 4, "runs": [summary]}
-    reference.write_json(output / "aggregate-summary.json", aggregate)
+    support.write_json(output / "aggregate-summary.json", aggregate)
     return aggregate
 
 
@@ -143,13 +143,13 @@ def crossed_vacuum_pulses(config: ExperimentConfig, output: Path) -> dict[str, A
     )
     summary = campaign.run_level(output / "smoke", resolution)
     aggregate = {"experiment": 5, "levels": [summary], "reported_summary": summary}
-    reference.write_json(output / "aggregate-summary.json", aggregate)
+    support.write_json(output / "aggregate-summary.json", aggregate)
     return aggregate
 
 
 def regular_exact_scalar(config: ExperimentConfig, output: Path) -> dict[str, Any]:
     if not _smoke(config):
-        return reference.run_experiment_5(output)
+        return support.run_experiment_6(output)
     numerical = fisher_jnw._configuration(
         name="smoke",
         tau_elements=2,
@@ -159,18 +159,18 @@ def regular_exact_scalar(config: ExperimentConfig, output: Path) -> dict[str, An
         iterations=1,
         quick=True,
     )
-    summary = reference.ese_case(nu=0.8, level=0, config=numerical, output=output / "nu-0.80")
+    summary = support.ese_case(nu=0.8, level=0, config=numerical, output=output / "nu-0.80")
     output.mkdir(parents=True, exist_ok=True)
     aggregate = {"experiment": 6, "runs": [summary]}
-    reference.write_json(output / "aggregate-summary.json", aggregate)
+    support.write_json(output / "aggregate-summary.json", aggregate)
     return aggregate
 
 
 def nonspherical_scalar(config: ExperimentConfig, output: Path) -> dict[str, Any]:
     if not _smoke(config):
-        return reference.run_experiment_6(output)
+        return support.run_experiment_7(output)
     output.mkdir(parents=True)
-    summary = reference.nonspherical_ese_case(
+    summary = support.nonspherical_ese_case(
         output=output,
         name="smoke",
         cap=0.02,
@@ -187,7 +187,7 @@ def nonspherical_scalar(config: ExperimentConfig, output: Path) -> dict[str, Any
         iterations=1,
     )
     aggregate = {"experiment": 7, "runs": [summary]}
-    reference.write_json(output / "aggregate-summary.json", aggregate)
+    support.write_json(output / "aggregate-summary.json", aggregate)
     return aggregate
 
 

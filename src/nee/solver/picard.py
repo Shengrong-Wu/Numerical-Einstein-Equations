@@ -1,4 +1,4 @@
-"""Boundary-preserving Picard I/O for experiment 4B.
+"""Boundary-preserving Picard I/O for characteristic vacuum slabs.
 
 The shared equation kernel returns a raw full-state candidate.  This module
 owns the experiment-specific seed, fixed characteristic traces, relaxation,

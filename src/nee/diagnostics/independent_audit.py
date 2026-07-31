@@ -19,6 +19,7 @@ Array = np.ndarray
 
 from nee.numerics.coordinate_differentiation import high_order_differentiate  # noqa: E402
 from nee.numerics.sphere import PointSphereGrid, tangent_inverse  # noqa: E402
+from nee.state.fields import PrimitiveFields
 
 
 def _differentiate_u(
@@ -377,14 +378,6 @@ def positive_null_norm(
         components["AB"],
     )
     return np.sqrt(np.maximum(value, 0.0))
-
-
-@dataclass(frozen=True)
-class PrimitiveFields:
-    metric: Array
-    log_omega: Array
-    shift: Array
-    phi: Array | None = None
 
 
 @dataclass(frozen=True)

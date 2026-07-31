@@ -45,6 +45,16 @@ class SymmetricTensorField:
         object.__setattr__(self, "values", value)
 
 
+@dataclass(frozen=True)
+class PrimitiveFields:
+    """Four-metric primitive fields accepted by independent audits."""
+
+    metric: Array
+    log_omega: Array
+    shift: Array
+    phi: Array | None = None
+
+
 def tangent_inverse(metric: Array) -> Array:
     symmetric = 0.5 * (metric + np.swapaxes(metric, -1, -2))
     return np.linalg.pinv(symmetric, rcond=1.0e-13, hermitian=True)
@@ -57,4 +67,3 @@ def tensor_trace(tensor: Array, inverse: Array) -> Array:
 def tracefree(tensor: Array, metric: Array, inverse: Array | None = None) -> Array:
     inverse = tangent_inverse(metric) if inverse is None else inverse
     return tensor - 0.5 * tensor_trace(tensor, inverse)[..., None, None] * metric
-

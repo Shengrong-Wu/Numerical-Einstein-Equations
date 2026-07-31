@@ -4,8 +4,7 @@ The primary audit intentionally avoids differentiating the trace-free
 ``R_{A4B4}`` component.  In the iteration, ``Ric_44`` is zero by the
 Raychaudhuri construction of ``Omega^{-1} tr(chi)``.  The remaining Ricci
 components are obtained from the null propagation and Gauss--Codazzi
-identities in ``doc/theoretical-research-ese/Sections/preliminaries.tex`` and
-``approximation.tex``.
+identities documented in ``docs/article/article.tex``.
 """
 
 from __future__ import annotations
@@ -14,6 +13,8 @@ import math
 from dataclasses import dataclass
 
 import numpy as np
+
+from nee.geometry.null_geometry import one_form_lie_derivative
 
 from .coordinate_differentiation import high_order_differentiate
 from .vacuum_state import GlobalState, section_geometry
@@ -43,16 +44,6 @@ class ResidualCoefficients:
     ric34_d3_trace: float = -0.25
     ric4_divergence: float = 1.0
     ric3_divergence: float = 1.0
-
-
-def one_form_lie_derivative(
-    grid: PointSphereGrid, vector: Array, form: Array
-) -> Array:
-    derivative_form = grid.reference_derivative(form, tensor_rank=1)
-    derivative_vector = grid.reference_derivative(vector, tensor_rank=1)
-    return np.einsum("n...k,n...ki->n...i", vector, derivative_form) + np.einsum(
-        "n...k,n...ik->n...i", form, derivative_vector
-    )
 
 
 def d3_scalar(grid: PointSphereGrid, scalar: Array, shift: Array, u: Array) -> Array:

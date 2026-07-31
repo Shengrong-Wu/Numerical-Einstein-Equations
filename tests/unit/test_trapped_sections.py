@@ -1,11 +1,11 @@
 import numpy as np
 
-from nee.diagnostics.trapped_sections import (
+from nee.diagnostics.trapped_sections import trapped_sections
+from nee.initial_data.scalar_pulse import (
     TrappedSectionParameters,
     incoming_spherical_data,
     prolong_exact_prefix,
     pulse_profile,
-    trapped_sections,
 )
 
 
@@ -51,4 +51,3 @@ def test_endpoint_halo_excludes_candidates() -> None:
     assert not np.any(protected[:3])
     assert not np.any(protected[-3:])
     assert np.all(protected[3:-3])
-
