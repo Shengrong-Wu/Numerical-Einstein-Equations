@@ -176,7 +176,9 @@ def _run_spectral_case(
         q1.calibrate_low_band_profiles = previous_calibrator
 
 
-def run_standard(output: Path) -> dict[str, Any]:
+def run_standard(
+    output: Path, *, iterations: int = 6
+) -> dict[str, Any]:
     """Run the strong pulse and same-discretization zero control."""
 
     if output.exists():
@@ -186,13 +188,13 @@ def run_standard(output: Path) -> dict[str, Any]:
         output_root=output,
         label="strong-pulse",
         strength=1.0,
-        iterations=6,
+        iterations=iterations,
     )
     control = _run_spectral_case(
         output_root=output,
         label="zero-control",
         strength=0.0,
-        iterations=6,
+        iterations=iterations,
     )
     aggregate = {
         "schema": "nee-vacuum-strong-pulse-1",

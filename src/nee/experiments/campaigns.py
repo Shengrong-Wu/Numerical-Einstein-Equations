@@ -99,7 +99,9 @@ def strong_vacuum_pulse(config: ExperimentConfig, output: Path) -> dict[str, Any
     from .exp04_vacuum_strong_short_pulse import campaign
 
     if not _smoke(config):
-        return campaign.run_standard(output)
+        return campaign.run_standard(
+            output, iterations=config.solver.maximum_sweeps
+        )
     output.mkdir(parents=True)
     summary = campaign._run_one(
         output_root=output,
