@@ -34,7 +34,9 @@ python -m nee.experiments.exp01_regular_vacuum \
 
 Replace `smoke.toml` with `standard.toml` for the research configuration.
 Experiment 8 also provides `angular-control.toml`. Existing output directories
-are rejected unless `--resume` is explicitly supplied.
+are rejected unless `--resume` is explicitly supplied; that option revalidates
+the resolved configuration and every manifest content hash before accepting a
+completed run.
 
 ## Experiments
 

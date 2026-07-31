@@ -9,6 +9,7 @@ import json
 import shutil
 import sys
 import time
+import tomllib
 from pathlib import Path
 from typing import Any, Sequence, TextIO
 
@@ -79,6 +80,37 @@ def _promote_artifacts(output: Path, data: Path) -> dict[str, str]:
     return hashes
 
 
+def _validate_resume(
+    output: Path,
+    config: Any,
+) -> str:
+    resolved = output / "resolved-config.toml"
+    manifest_path = output / "manifest.json"
+    if not resolved.exists():
+        raise ValueError("resume target has no resolved configuration")
+    with resolved.open("rb") as stream:
+        recorded_config = tomllib.load(stream)
+    expected_config = json.loads(json.dumps(config.resolved()))
+    if recorded_config != expected_config:
+        raise ValueError("resume configuration does not match the existing run")
+    if not manifest_path.exists():
+        raise ValueError("resume target has no completed run manifest")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    hashes = manifest.get("output_hashes")
+    if not isinstance(hashes, dict) or not hashes:
+        raise ValueError("resume manifest has no output content hashes")
+    for name, expected in hashes.items():
+        artifact = output / name
+        if not artifact.is_file():
+            raise ValueError(f"resume artifact is missing: {name}")
+        if _digest(artifact) != expected:
+            raise ValueError(f"resume artifact failed its content-hash check: {name}")
+    status = manifest.get("status")
+    if status not in {"completed", "failed"}:
+        raise ValueError(f"resume manifest has invalid terminal status: {status!r}")
+    return status
+
+
 def public_main(identifier: str, argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog=f"python -m nee.experiments.{MODULES[identifier]}")
     parser.add_argument("--config", type=Path, required=True)
@@ -95,11 +127,9 @@ def public_main(identifier: str, argv: Sequence[str] | None = None) -> int:
     if output.exists():
         if not args.resume:
             raise FileExistsError(f"immutable run directory exists: {output}")
-        resolved = output / "resolved-config.toml"
-        if not resolved.exists():
-            raise ValueError("resume target has no resolved configuration")
-        print(f"resume validation complete: {output}")
-        return 0
+        status = _validate_resume(output, config)
+        print(f"resume validation complete: {output} ({status})")
+        return 0 if status == "completed" else 2
     output.mkdir(parents=True)
     (output / "figures").mkdir()
     dump_resolved_config(config, output / "resolved-config.toml")

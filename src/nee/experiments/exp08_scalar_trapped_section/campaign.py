@@ -146,6 +146,37 @@ def _verified_data(
     return verified_bundle, grid, angular, mesh, verified
 
 
+def _face_mismatches(state: ESEState, bundle: InitialDataBundle) -> dict[str, float]:
+    mismatches: dict[str, float] = {}
+    for state_name, data_name in (
+        ("metric", "metric"),
+        ("q", "q"),
+        ("shear", "shear"),
+        ("omega", "omega"),
+        ("weighted_omega", "weighted_omega"),
+        ("phi", "phi"),
+        ("scalar_p", "scalar_p"),
+    ):
+        mismatches[f"outgoing.{state_name}"] = float(
+            np.max(np.abs(getattr(state, state_name)[:, 0] - bundle.outgoing[data_name]))
+        )
+    for state_name, data_name in (
+        ("metric", "metric"),
+        ("q", "q"),
+        ("shear", "shear"),
+        ("phi", "phi"),
+        ("zeta_up", "zeta_up"),
+        ("shift", "shift"),
+        ("weighted_chib", "weighted_chib"),
+        ("weighted_omegab", "weighted_omegab"),
+        ("incoming_scalar", "incoming_scalar"),
+    ):
+        mismatches[f"incoming.{state_name}"] = float(
+            np.max(np.abs(getattr(state, state_name)[:, :, 0] - bundle.incoming[data_name]))
+        )
+    return mismatches
+
+
 def _iterate(
     *,
     state: ESEState,
@@ -154,6 +185,7 @@ def _iterate(
     angular: Any,
     mesh: Any,
     config: ExperimentConfig,
+    boundary: BoundaryData,
 ) -> tuple[ESEState, list[dict[str, Any]], list[Array], dict[str, list[Array]]]:
     records: list[dict[str, Any]] = []
     updates: list[Array] = []
@@ -169,6 +201,14 @@ def _iterate(
             bundle,
             metric_substeps=config.solver.metric_substeps,
         )
+        boundary.verify_unchanged()
+        face_mismatches = _face_mismatches(state, bundle)
+        maximum_face_mismatch = max(face_mismatches.values(), default=0.0)
+        if maximum_face_mismatch > 5.0e-12:
+            raise FloatingPointError(
+                "a fixed characteristic trace changed during the Picard sweep: "
+                f"{maximum_face_mismatch:.6e}"
+            )
         change_map = update_map(state, previous)
         values = components(grid, state, previous, context, mesh)
         maps = l2_maps(grid, state, mesh, values)
@@ -188,6 +228,9 @@ def _iterate(
             "maximum_update_map": float(np.max(change_map)),
             "construction_residual": residual,
             "minimum_lapse": float(np.min(state.omega)),
+            "maximum_fixed_face_mismatch": maximum_face_mismatch,
+            "fixed_face_mismatches": face_mismatches,
+            "boundary_hash_verified": True,
         }
         records.append(record)
         print(
@@ -247,6 +290,7 @@ def run_configuration(output: Path, *, control: bool, quick: bool) -> dict[str, 
         angular=angular,
         mesh=mesh,
         config=base_config,
+        boundary=boundary,
     )
 
     continued_config = numerical_config(control=control, continued=True, quick=quick)
@@ -270,6 +314,7 @@ def run_configuration(output: Path, *, control: bool, quick: bool) -> dict[str, 
         angular=extended_angular,
         mesh=extended_mesh,
         config=continued_config,
+        boundary=extended_boundary,
     )
     public_state = from_numerical(extended, extended_grid)
     state_hash = save_state(
@@ -307,6 +352,26 @@ def run_configuration(output: Path, *, control: bool, quick: bool) -> dict[str, 
         "prolongation": prolongation,
         "independent_audit": independent,
         "sign_audit": sign,
+        "mandatory_audit": {
+            "analytic_face_identities": extended_bundle.metadata[
+                "analytic_connection_sample_errors"
+            ],
+            "corner_mismatches": extended_bundle.metadata["corner_mismatches"],
+            "boundary_hashes_verified_each_sweep": all(
+                record["boundary_hash_verified"]
+                for record in (*base_records, *continued_records)
+            ),
+            "maximum_fixed_face_mismatch": max(
+                record["maximum_fixed_face_mismatch"]
+                for record in (*base_records, *continued_records)
+            ),
+            "positive_lapse_every_sweep": all(
+                record["minimum_lapse"] > 0.0
+                for record in (*base_records, *continued_records)
+            ),
+            "independent_sphere_point_count": sign["sphere_point_count"],
+            "independent_residual_complete": bool(independent),
+        },
         "candidate": bool(
             sign["protected_trapped_count"] > 0
             and continued_records[-1]["update"] < 1.0e-4
@@ -314,6 +379,7 @@ def run_configuration(output: Path, *, control: bool, quick: bool) -> dict[str, 
         "certificate": False,
         "certificate_limitation": "coordinate-refinement certificate gates are not part of this two-band sign run",
         "final_state_hash": state_hash,
+        "terminal_status": "completed",
     }
     write_json(output / "summary.json", summary)
     return summary
