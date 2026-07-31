@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import math
 import platform
 import sys
 from dataclasses import replace
@@ -20,7 +21,12 @@ from typing import Any
 import numpy as np
 
 
+from nee.diagnostics.independent_audit import PrimitiveFields
+from nee.diagnostics.mapped_audit import evaluate_mapped_overgrid
 from nee.numerics import pulse_campaign as q1
+from nee.numerics.lgl import CharacteristicLGLMesh
+from nee.numerics.sphere import PointSphereGrid
+from nee.numerics.vacuum_state_io import load_state
 
 
 def _run_one(
@@ -176,6 +182,82 @@ def _run_spectral_case(
         q1.calibrate_low_band_profiles = previous_calibrator
 
 
+def _audit_mesh() -> tuple[PointSphereGrid, CharacteristicLGLMesh]:
+    grid = PointSphereGrid.create(
+        550, neighbor_count=40, degree=4, spectral_degree=21
+    )
+    coordinates = CharacteristicLGLMesh.create(
+        np.linspace(0.0, math.log(2.0), 3),
+        8,
+        np.asarray(
+            [
+                0.0,
+                0.022248595461286987,
+                0.044497190922573975,
+                0.072248595461287,
+                0.1,
+            ]
+        ),
+        8,
+        0.5,
+    )
+    return grid, coordinates
+
+
+def _mapped_audit(output: Path, label: str) -> dict[str, Any]:
+    target = output / "results" / "Q1" / label
+    state, u, v = load_state(target / "final-state.npz")
+    grid, coordinates = _audit_mesh()
+    if not np.array_equal(u, coordinates.u) or not np.array_equal(
+        v, coordinates.v
+    ):
+        raise ValueError("pulse state nodes do not match its declared LGL mesh")
+    maximum_s = float(coordinates.s.nodes[-1])
+    result = evaluate_mapped_overgrid(
+        grid,
+        PrimitiveFields(
+            metric=state.metric,
+            log_omega=np.log(state.omega),
+            shift=state.shift,
+            phi=None,
+        ),
+        coordinates,
+        retained_degree=10,
+        protected_s_values=tuple(
+            fraction * maximum_s for fraction in (0.2, 0.4, 0.6, 0.8)
+        ),
+    )
+    (target / "independent-four-metric-audit.json").write_text(
+        json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
+    return result
+
+
+def _exact_zero_control_audit() -> dict[str, Any]:
+    grid, coordinates = _audit_mesh()
+    radius = coordinates.v[None, None, :] - coordinates.u[None, :, None]
+    scalar_shape = (grid.count, len(coordinates.u), len(coordinates.v))
+    maximum_s = float(coordinates.s.nodes[-1])
+    return evaluate_mapped_overgrid(
+        grid,
+        PrimitiveFields(
+            metric=(
+                radius[..., None, None] ** 2
+                * grid.projector[:, None, None]
+            ),
+            log_omega=np.zeros(scalar_shape),
+            shift=np.zeros(scalar_shape + (3,)),
+            phi=None,
+        ),
+        coordinates,
+        retained_degree=10,
+        protected_s_values=tuple(
+            fraction * maximum_s for fraction in (0.2, 0.4, 0.6, 0.8)
+        ),
+    )
+
+
 def run_standard(
     output: Path, *, iterations: int = 6
 ) -> dict[str, Any]:
@@ -196,11 +278,21 @@ def run_standard(
         strength=0.0,
         iterations=iterations,
     )
+    strong_audit = _mapped_audit(output, "strong-pulse")
+    numerical_control_audit = _mapped_audit(output, "zero-control")
+    exact_control_audit = _exact_zero_control_audit()
     aggregate = {
         "schema": "nee-vacuum-strong-pulse-1",
         "experiment": 4,
         "strong_pulse": strong,
         "zero_control": control,
+        "strong_pulse_independent_four_metric_residual": strong_audit,
+        "numerical_zero_control_independent_four_metric_residual": (
+            numerical_control_audit
+        ),
+        "exact_zero_control_independent_four_metric_residual": (
+            exact_control_audit
+        ),
     }
     (output / "aggregate-summary.json").write_text(
         json.dumps(aggregate, indent=2, sort_keys=True, allow_nan=False) + "\n"

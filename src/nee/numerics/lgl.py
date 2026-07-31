@@ -323,6 +323,12 @@ class CharacteristicLGLMesh:
     u: Array
     v: Array
 
+    @property
+    def delta(self) -> float:
+        """Exponent in ``s=(v/v1)^delta`` for mapped audit code."""
+
+        return 0.5
+
     @classmethod
     def create(
         cls,

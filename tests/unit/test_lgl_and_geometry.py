@@ -1,6 +1,10 @@
 import numpy as np
 
-from nee.numerics.lgl import CompositeLGLMesh, LGLSegment
+from nee.numerics.lgl import (
+    CharacteristicLGLMesh,
+    CompositeLGLMesh,
+    LGLSegment,
+)
 from nee.numerics.sphere import (
     PointSphereGrid,
     tangent_inverse,
@@ -29,6 +33,18 @@ def test_composite_interface_derivative_average() -> None:
     values = mesh.nodes**4
     derivative = mesh.differentiate(values, interface_rule="average")
     np.testing.assert_allclose(derivative, 4.0 * mesh.nodes**3, atol=3e-12)
+
+
+def test_characteristic_lgl_mesh_declares_square_root_exponent() -> None:
+    mesh = CharacteristicLGLMesh.create(
+        np.asarray([0.0, 0.5]),
+        3,
+        np.asarray([0.0, 0.25]),
+        3,
+        0.5,
+    )
+
+    assert mesh.delta == 0.5
 
 
 def test_tracefree_projection_is_tangent_symmetric_and_traceless() -> None:
