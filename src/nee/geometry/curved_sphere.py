@@ -678,6 +678,7 @@ def solve(
     radius, log_omega = face_blend(exact, u, xi, mass)
     records: list[dict[str, float | None]] = []
     previous_update = math.inf
+    positivity_stabilized = False
     for iteration in range(1, iterations + 1):
         radius_rhs, lapse_rhs = rhs(
             radius,
@@ -688,20 +689,47 @@ def solve(
             exact["v0"],
             exact["v0_prime"],
         )
-        radius_next, log_next = volterra_step(
+        raw_radius_next, raw_log_next = volterra_step(
             radius_rhs, lapse_rhs, exact, u, xi, mass
         )
-        if float(np.min(radius_next)) <= 0.0:
-            raise FloatingPointError(
-                f"curved Picard radius became nonpositive at epsilon={epsilon}"
+        relaxation = 1.0
+        while True:
+            radius_next = (
+                (1.0 - relaxation) * radius
+                + relaxation * raw_radius_next
             )
-        scale_r = np.maximum(np.abs(radius_next), np.longdouble(1.0))
-        update = float(
-            np.sqrt(
-                np.mean(((radius_next - radius) / scale_r) ** 2)
-                + np.mean((log_next - log_omega) ** 2)
+            log_next = (
+                (1.0 - relaxation) * log_omega
+                + relaxation * raw_log_next
             )
-        )
+            scale_r = np.maximum(
+                np.abs(radius_next), np.longdouble(1.0)
+            )
+            update = float(
+                np.sqrt(
+                    np.mean(((radius_next - radius) / scale_r) ** 2)
+                    + np.mean((log_next - log_omega) ** 2)
+                )
+            )
+            finite_positive = bool(
+                np.all(np.isfinite(radius_next))
+                and np.all(np.isfinite(log_next))
+                and np.min(radius_next) > 0.0
+            )
+            nonincreasing = (
+                not positivity_stabilized
+                or not math.isfinite(previous_update)
+                or update <= previous_update
+            )
+            if finite_positive and nonincreasing:
+                break
+            positivity_stabilized = True
+            relaxation *= 0.5
+            if relaxation < 2.0**-30:
+                raise FloatingPointError(
+                    "curved Picard positivity backtracking exhausted at "
+                    f"epsilon={epsilon}, iteration={iteration}"
+                )
         contraction = (
             update / previous_update
             if math.isfinite(previous_update)
@@ -712,6 +740,7 @@ def solve(
                 "iteration": float(iteration),
                 "update": update,
                 "contraction": contraction,
+                "relaxation": relaxation,
             }
         )
         radius, log_omega = radius_next, log_next
