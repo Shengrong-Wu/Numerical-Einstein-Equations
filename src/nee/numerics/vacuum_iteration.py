@@ -107,6 +107,11 @@ def _quadratic_stage_value(
     value = float(alpha)
     if value < -1.0e-14 or value > 1.0 + 1.0e-14:
         raise ValueError("RK stage fraction lies outside its u interval")
+    # Keep the established operation order at the four classical RK stages.
+    # The general quadratic expression is needed only for subdivided CFL
+    # stages and introduces avoidable roundoff at these exact nodes.
+    if value in (0.0, 0.5, 1.0):
+        return stage_value(values, midpoints, index, value, axis)
     left = np.take(values, index, axis=axis)
     middle = np.take(midpoints, index, axis=axis)
     right = np.take(values, index + 1, axis=axis)

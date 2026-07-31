@@ -77,9 +77,13 @@ def vacuum_step(
     **kwargs: Any,
 ) -> tuple[PicardState, dict[str, Any]]:
     validate_state(state, grid.frames)
+    # The numerical kernel reads q and shear as derived views of the complete
+    # weighted forms. Passing a copied public state preserves that operation
+    # order and prevents a redundant decompose/recompose roundoff cycle.
+    working = state.copy()
     candidate, context = vacuum_iteration.picard_step(
         grid,
-        to_numerical(state),
+        working,
         outgoing,
         u,
         v,
@@ -107,11 +111,12 @@ def scalar_step(
         raw={},
         metadata={},
     )
+    working = state.copy()
     candidate, context = scalar_iteration.picard_step(
         grid,
         angular,
         mesh,
-        to_numerical(state, scalar=True),
+        working,
         bundle,
         **kwargs,
     )
