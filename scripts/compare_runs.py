@@ -95,6 +95,17 @@ def compare_npz(reference: Path, candidate: Path) -> dict[str, Any]:
             if expected.dtype.kind not in "iufcb" or actual.dtype.kind not in "iufcb":
                 continue
             compared_arrays += 1
+            if expected.dtype.kind in "ib" or actual.dtype.kind in "ib":
+                if not np.array_equal(expected, actual):
+                    failures.append(
+                        {
+                            "array": name,
+                            "exact_mismatch_count": int(
+                                np.count_nonzero(expected != actual)
+                            ),
+                        }
+                    )
+                continue
             difference = np.abs(expected - actual)
             absolute = float(np.max(difference)) if difference.size else 0.0
             scale = np.maximum(np.maximum(np.abs(expected), np.abs(actual)), 1.0e-300)
