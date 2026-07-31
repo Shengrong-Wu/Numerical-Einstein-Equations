@@ -1,0 +1,70 @@
+schema_version = 1
+[experiment]
+identifier = "exp07"
+title = "Nonspherical Einstein--scalar characteristic data"
+equation_system = "scalar_field"
+[physics]
+central_cap = 0.04
+stress_caps = [0.01, 0.02, 0.1]
+rotation_angle = 0.731
+[initial_data]
+profile = "smooth_harmonic"
+lapse_radial_power = 0.25
+lapse_angular_amplitude = 0.01
+shift_amplitude = 0.05
+shear_amplitude = 0.1
+scalar_power = 0.1
+boundary_substeps = 8
+coordinate_tau_degrees = [6, 8, 8]
+coordinate_s_degrees = [9, 11, 11]
+coordinate_elements = [2, 2, 3]
+angular_retained_degrees = [6, 8, 10]
+angular_work_degrees = [12, 16, 20]
+angular_point_counts = [200, 350, 550]
+[coordinates]
+u_min = -1.0
+u_max = -0.5
+v_min = 0.0
+v_max = 0.04
+u_map = "tau_negative_log"
+v_map = "power_0.1"
+u_breakpoints = [-1.0, -0.7071067811865476, -0.5]
+v_breakpoints = [0.0, 0.0000390625, 0.04]
+u_degrees = [8, 8]
+v_degrees = [11, 11]
+[angular]
+construction = "fibonacci"
+point_count = 350
+neighbor_count = 40
+seed = 0
+retained_degree = 8
+work_degree = 16
+differentiation_degree = 17
+[solver]
+maximum_sweeps = 6
+tolerance = 1e-8
+relaxation = 1.0
+slab_direction = "none"
+rk_substeps = 4
+sdc_sweeps = 1
+metric_substeps = 2
+boundary_substeps = 8
+stopping_norm = "weighted_maximum"
+[projection]
+nonlinear_products = "work_band"
+retained_projection = "least_squares"
+filter = "none"
+filter_strength = 0.0
+[audit]
+coordinate_overgrid_increment = 4
+angular_overgrid_degree = 1
+sphere_point_count = 562
+derivative_halo_u = 2
+derivative_halo_v = 2
+endpoint_mask_u = 2
+endpoint_mask_v = 2
+[output]
+checkpoints = false
+checkpoint_every = 1
+save_residual_maps = true
+save_figures = true

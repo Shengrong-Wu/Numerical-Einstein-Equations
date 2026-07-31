@@ -1,0 +1,68 @@
+schema_version = 1
+[experiment]
+identifier = "exp08"
+title = "Scalar-pulse trapped-section angular control"
+equation_system = "scalar_field"
+[physics]
+kappa = 0.25
+delta = 0.1
+v_max = 0.04
+[initial_data]
+scalar_amplitude = 2.0
+profile_scale = 0.01
+shear_amplitude = 0.1
+shear_profile = "quadrupole"
+incoming_scalar_branch = "negative"
+base_tau_elements = 12
+continued_tau_elements = 13
+tau_degree = 8
+s_elements = 3
+s_degree = 11
+continued_u_max = -0.0144360760729319
+[coordinates]
+u_min = -1.0
+u_max = -0.02
+v_min = 0.0
+v_max = 0.04
+u_map = "tau_negative_log"
+v_map = "power_0.1"
+u_breakpoints = [-1.0, -0.7218038036465944, -0.5210007309586914, -0.3760603093086394, -0.2714417616594907, -0.1959276960343527, -0.1414213562373095, -0.10207847284895, -0.0736806299728077, -0.0531829589694499, -0.0383876620733297, -0.0277083604976295, -0.02]
+v_breakpoints = [0.0, 6.774035123372111e-7, 0.0006936611966333042, 0.04]
+u_degrees = [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8]
+v_degrees = [11, 11, 11]
+[angular]
+construction = "fibonacci"
+point_count = 300
+neighbor_count = 40
+seed = 0
+retained_degree = 7
+work_degree = 14
+differentiation_degree = 15
+[solver]
+maximum_sweeps = 14
+tolerance = 1e-8
+relaxation = 1.0
+slab_direction = "u"
+rk_substeps = 4
+sdc_sweeps = 1
+metric_substeps = 4
+boundary_substeps = 16
+stopping_norm = "weighted_maximum"
+[projection]
+nonlinear_products = "work_band"
+retained_projection = "least_squares"
+filter = "none"
+filter_strength = 0.0
+[audit]
+coordinate_overgrid_increment = 4
+angular_overgrid_degree = 3
+sphere_point_count = 1000
+derivative_halo_u = 3
+derivative_halo_v = 3
+endpoint_mask_u = 3
+endpoint_mask_v = 3
+[output]
+checkpoints = false
+checkpoint_every = 1
+save_residual_maps = true
+save_figures = true

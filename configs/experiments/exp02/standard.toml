@@ -1,0 +1,61 @@
+schema_version = 1
+[experiment]
+identifier = "exp02"
+title = "Schwarzschild static horizon approach and Kruskal crossing"
+equation_system = "vacuum"
+[physics]
+mass = 1.0
+static_epsilons = [0.1, 0.01, 0.0001, 0.000001]
+u_offset = 0.75
+v_offset = 1.0
+[initial_data]
+families = ["static", "kruskal"]
+coordinate_counts = [17, 33, 65]
+lambert_branch = 0
+[coordinates]
+u_min = -1.0
+u_max = -0.5
+v_min = 0.0
+v_max = 0.1
+u_map = "affine"
+v_map = "affine"
+u_breakpoints = [-1.0, -0.5]
+v_breakpoints = [0.0, 0.1]
+u_degrees = [64]
+v_degrees = [64]
+[angular]
+construction = "fibonacci"
+point_count = 50
+neighbor_count = 32
+seed = 0
+retained_degree = 5
+work_degree = 6
+differentiation_degree = 7
+[solver]
+maximum_sweeps = 8
+tolerance = 1e-12
+relaxation = 1.0
+slab_direction = "none"
+rk_substeps = 4
+sdc_sweeps = 1
+metric_substeps = 2
+boundary_substeps = 4
+stopping_norm = "weighted_maximum"
+[projection]
+nonlinear_products = "work_band"
+retained_projection = "least_squares"
+filter = "none"
+filter_strength = 0.0
+[audit]
+coordinate_overgrid_increment = 4
+angular_overgrid_degree = 2
+sphere_point_count = 62
+derivative_halo_u = 4
+derivative_halo_v = 4
+endpoint_mask_u = 4
+endpoint_mask_v = 4
+[output]
+checkpoints = false
+checkpoint_every = 1
+save_residual_maps = true
+save_figures = true

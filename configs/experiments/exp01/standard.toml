@@ -1,0 +1,62 @@
+schema_version = 1
+[experiment]
+identifier = "exp01"
+title = "Regular exact Schwarzschild and Kerr vacuum solutions"
+equation_system = "vacuum"
+[physics]
+mass = 1.0
+kerr_rotations = [0.0, 0.3, 0.7, 0.9]
+reference_radius = 4.0
+[initial_data]
+families = ["schwarzschild", "kerr"]
+domains = ["short", "long"]
+coordinate_counts = [17, 33, 65]
+angular_point_counts = [30, 50, 86]
+angular_retained_degrees = [3, 5, 7]
+[coordinates]
+u_min = -1.0
+u_max = 0.0
+v_min = 0.0
+v_max = 1.0
+u_map = "affine"
+v_map = "affine"
+u_breakpoints = [-1.0, 0.0]
+v_breakpoints = [0.0, 1.0]
+u_degrees = [64]
+v_degrees = [64]
+[angular]
+construction = "fibonacci"
+point_count = 86
+neighbor_count = 32
+seed = 0
+retained_degree = 7
+work_degree = 8
+differentiation_degree = 9
+[solver]
+maximum_sweeps = 8
+tolerance = 1e-12
+relaxation = 1.0
+slab_direction = "none"
+rk_substeps = 4
+sdc_sweeps = 1
+metric_substeps = 2
+boundary_substeps = 4
+stopping_norm = "weighted_maximum"
+[projection]
+nonlinear_products = "work_band"
+retained_projection = "least_squares"
+filter = "none"
+filter_strength = 0.0
+[audit]
+coordinate_overgrid_increment = 4
+angular_overgrid_degree = 2
+sphere_point_count = 98
+derivative_halo_u = 4
+derivative_halo_v = 4
+endpoint_mask_u = 4
+endpoint_mask_v = 4
+[output]
+checkpoints = false
+checkpoint_every = 1
+save_residual_maps = true
+save_figures = true

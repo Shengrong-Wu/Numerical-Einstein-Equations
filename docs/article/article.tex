@@ -1,0 +1,718 @@
+\documentclass[11pt]{article}
+
+\input{../setup.tex}
+
+\title{Picard Iteration for the Characteristic Initial Value Problem in Einstein Equations}
+\author{Shengrong Wu}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\begin{abstract}
+    We present a first-order Picard iteration for vacuum and
+    Einstein--scalar-field equations in double-null gauge. The numerical
+    realization combines characteristic constraint solves, LGL spectral
+    elements, pole-free spherical operators, Galerkin projection, and
+    independent geometric residual audits.
+\end{abstract}
+\tableofcontents
+
+\section{Introduction}
+Characteristic evolution exposes the transport structure of the Einstein
+equations while retaining a genuinely geometric angular problem.  This
+article fixes the conventions, derives the iteration hierarchy, and states
+the discretization and residual definitions used by the accompanying
+numerical experiments.
+
+\section{Equations and Theoretical Analysis}
+\subsection{Double null foliation and equations}
+In this section, we introduce the equations for Lorentzian metric under double null foliation. Let $(\mathcal{M},g)$ be a $4$-dimensional Lorentzian manifold. With double null coordinates $(u,v,\theta^A)$, the metric can be written as 
+\begin{equation}
+    g=-2\Omega^2(du\otimes dv+dv\otimes du)+g_{AB}(d\theta^A-b^Adu)\otimes (d\theta^B-b^Bdu),
+\end{equation}
+and we use $(g_{AB},b^A,\Omega)$ to represent the metric. The level sets of $u$ and $v$ are denoted by $H_u$ and $\Hb_{v}$ respectively, and their spherical intersection $H_u\cap\Hb_v$ is denoted by $S_{u,v}$.
+With double null frame 
+\[e_3=\Omega^{-1}(\partial_u+b),\ e_4=\Omega^{-1}\partial_v,\ e_A=\partial_{\theta^A},\]
+we can define Ricci coefficients, or connection components
+\begin{equation}\label{Ricci_coefficients_definition}
+    \begin{aligned}
+    \chi_{A B}=g\left(D_A e_4, e_B\right), &\qquad \underline{\chi}_{A B}=g\left(D_A e_3, e_B\right), \\
+    \eta_A=-\frac{1}{2} g\left(D_3 e_A, e_4\right), &\qquad \underline{\eta}_A=-\frac{1}{2} g\left(D_4 e_A, e_3\right), \\
+    {\omega}=-\frac{1}{4} g\left(D_4 e_3, e_4\right), &\qquad \underline{\omega}=-\frac{1}{4} g\left(D_3 e_4, e_3\right),\\
+    \zeta_A=\frac{1}{2}g\left(D_A e_4,e_3\right)&=-\frac{1}{4}\Omega^{-2}(\Lie_vb^B)g_{AB}.
+    \end{aligned}
+\end{equation}
+Their transport equations are listed below:
+\begin{equation}\label{eq:Ricci_coefficients_propagation_1}
+    \begin{aligned}
+        \nabla_4 \operatorname{tr} \chi+\frac{1}{2}(\operatorname{tr} \chi)^2=&-\operatorname{Ric}_{44}-|\hat{\chi}|^2-2 \omega \operatorname{tr} \chi, \\
+     \nabla_3 \operatorname{tr} \underline{\chi}+\frac{1}{2}(\operatorname{tr} \underline{\chi})^2=&-\operatorname{Ric}_{33}-|\underline{\hat{\chi}}|^2-2 \underline{\omega} \operatorname{tr} \underline{\chi},
+    \end{aligned}
+\end{equation}
+\begin{equation}\label{eq:Ricci_coefficients_propagation_2}
+    \begin{aligned}
+        \nabla_3 \hat{\chi}_{A B}+\frac{1}{2} \operatorname{tr} \underline{\chi} \hat{\chi}_{A B}=&\widehat{\operatorname{Ric}}_{A B}+2 \underline{\omega} \hat{\chi}_{A B}+(\snab  \hat{\otimes} \eta)_{A B}+(\eta \hat{\otimes} \eta)_{A B}-\frac{1}{2} \operatorname{tr} \chi \underline{\hat{\chi}}_{A B}, \\
+     \nabla_4 \underline{\hat{\chi}}_{A B}+\frac{1}{2} \operatorname{tr} \chi \underline{\hat{\chi}}_{A B}=&\widehat{\operatorname{Ric}}_{A B}+2 \omega \underline{\hat{\chi}}_{A B}+(\snab\hat{\otimes} \underline{\eta})_{A B}+(\underline{\eta} {\hat{\otimes}} \underline{\eta})_{A B}-\frac{1}{2} \operatorname{tr} \underline{\chi} \hat{\chi}_{A B},
+    \end{aligned}
+\end{equation}
+\begin{equation}
+    \begin{aligned}
+        \nabla_3 \operatorname{tr} \chi=&-\frac{1}{2} \operatorname{tr} \chi \operatorname{tr} \underline{\chi}+\sg^{A B} R_{3 A B 4}+2 \underline{\omega} \operatorname{tr} \chi+2 \sdiv \eta+2|\eta|^2-\hat{\chi} \cdot \underline{\hat{\chi}}\\
+        =&-\tr\chi\tr\chib+2\omegab\tr\chi+2\sdiv\eta+2\left|\eta\right|^2-2K+R+\Rc_{34}, \\
+        \nabla_4 \operatorname{tr} \underline{\chi}=&-\frac{1}{2} \operatorname{tr} \chi \operatorname{tr} \underline{\chi}+\sg^{A B} R_{3 A B 4}+2 \omega \operatorname{tr} \underline{\chi}+2 \sdiv \underline{\eta}+2|\underline{\eta}|^2-\hat{\chi} \cdot \underline{\hat{\chi}}\\
+        =&-\tr\chi\tr\chib+2\omega\tr\chib+2\sdiv\etab+2\left|\etab\right|^2-2K+R+\Rc_{34}.
+    \end{aligned}
+\end{equation} 
+\begin{equation}\label{eq:Ricci_coefficients_propagation_3}
+    \begin{aligned}
+        \nabla_4 \eta=&-\chi \cdot(\eta-\underline{\eta})-\frac{1}{2} R_{A 434}, \\
+        \nabla_3 \underline{\eta}=&-\underline{\chi} \cdot(\underline{\eta}-\eta)-\frac{1}{2} R_{A 343}, \\
+        \nabla_4 \underline{\omega}=&\frac{1}{4}\left(\operatorname{Ric}_{34}+\sg^{A B} R_{3 A B 4}\right)+2 \underline{\omega} \omega+\frac{1}{2}|\eta|^2-\eta \cdot \underline{\eta}\\
+        =&2\omega\omegab-\frac{1}{2}  K+\frac{1}{2} \Rc_{34}+\frac{1}{4} R +\frac{1}{4}\chih\cdot\chibh-\frac{1}{8}\tr\chi\,\tr\chib+\frac{1}{2}\left|\eta\right|^2-\eta\cdot\etab, \\
+        \nabla_3 \omega=&\frac{1}{4}\left(\operatorname{Ric}_{34}+\sg^{A B} R_{3 A B 4}\right)+2 \underline{\omega} \omega+\frac{1}{2}|\underline{\eta}|^2-\eta \cdot \underline{\eta}\\
+        =&2\omega\omegab-\frac{1}{2}  K+\frac{1}{2} \Rc_{34}+\frac{1}{4} R +\frac{1}{4}\chih\cdot\chibh-\frac{1}{8}\tr\chi\,\tr\chib+\frac{1}{2}\left|\underline\eta\right|^2-\eta\cdot\etab.
+    \end{aligned}
+\end{equation}
+Moreover, we have equations for $\zeta$:
+\begin{equation}\label{eq:Ricci_coefficients_propagation_4}
+    \begin{aligned}
+        &\Omega\Rc_{3A}=\Omega\nabla_3\zeta+\frac{3}{2}\Omega\tr\chib\zeta+\Omega\chibh\cdot\zeta+\Omega\tr\chib\nabla\log\Omega\\
+        &\qquad\qquad\qquad+2\nabla(\Omega\omegab)+\dv(\Omega\chibh)-\frac{1}{2}\nabla(\Omega\tr\chib),\\
+        &\Omega\Rc_{4A}=-\Omega\nabla_4\zeta-\frac{3}{2}\Omega\tr\chi\zeta-\Omega\chih\cdot\zeta+\Omega\tr\chi\nabla\log\Omega\\
+        &\qquad\qquad\qquad+2\nabla(\Omega\omega)+\dv(\Omega\chih)-\frac{1}{2}\nabla(\Omega\tr\chi).
+    \end{aligned}
+\end{equation}
+Here $K$ stands for Gaussian curvature of topological sphere $S_{u,v}$. Gauss-Codazzi equations imply 
+\begin{equation}\label{eq:Gauss-Codazzi_1}
+        \begin{aligned}
+         K=&\frac{1}{2} \sg^{A B} R_{3 A 4 B}+\frac{1}{2} R+\frac{1}{2} \operatorname{Ric}_{34}+\frac{1}{2} \hat{\chi} \cdot \underline{\hat{\chi}}-\frac{1}{4} \operatorname{tr} \chi \operatorname{tr} \underline{\chi}, 
+        \end{aligned}
+        \end{equation}
+\begin{equation}\label{eq:Gauss-Codazzi_2}
+            \begin{aligned} 
+            \snab^B \hat{\chi}_{A B}-\frac{1}{2} \snab_A \operatorname{tr} \chi=&-\frac{1}{2} R_{A 434}+\operatorname{Ric}_{4 A}+\frac{1}{2} \operatorname{tr} \chi \zeta_A-\zeta^B \hat{\chi}_{A B}, \\
+            \snab^B \underline{\hat{\chi}}_{A B}-\frac{1}{2} \snab_A \operatorname{tr} \underline{\chi}=&-\frac{1}{2} R_{A 343}+\operatorname{Ric}_{3 A}-\frac{1}{2} \operatorname{tr} \underline{\chi} \zeta_A+\zeta^B \underline{\hat{\chi}}_{A B}.
+            \end{aligned}
+        \end{equation}
+\begin{equation}\label{eq:curl-eta-etab}
+            \begin{aligned}
+                \snab_A \eta_B-\snab_B \eta_A=&R_{4[A B] 3}+\underline{\hat{\chi}}^C{ }_{[A} \hat{\chi}_{B] C}, \\
+         \snab_A \underline{\eta}_B-\snab_B \underline{\eta}_A=&-R_{4[A B] 3}-\underline{\hat{\chi}}^C{ }_{[A} \hat{\chi}_{B] C}, \\
+            \end{aligned}
+        \end{equation}
+For Weyl curvature,
+\begin{equation*}
+    W_{\mu\nu\theta\lambda}=R_{\mu\nu\theta\lambda}-\frac{1}{2}\left(\Rc_{\mu\theta}g_{\nu\lambda}+g_{\mu\theta}\Rc_{\nu\lambda}-\Rc_{\nu\theta}g_{\mu\lambda}-g_{\nu\theta}\Rc_{\mu\lambda}\right)+\frac{R}{6}\left(g_{\mu\theta}g_{\nu\lambda}-g_{\nu\theta}g_{\mu\lambda}\right),
+\end{equation*}
+we define the curvature components
+\begin{equation}
+\begin{aligned}
+\beta_A & =\frac{1}{2} W\left(e_A, e_4, e_3, e_4\right), & & \underline{\beta}_A=\frac{1}{2} W\left(e_A, e_3, e_3, e_4\right), \\
+\rho & =\frac{1}{4} W\left(e_4, e_3, e_4, e_3\right), & & \sigma=\frac{1}{4}{ }^* W\left(e_4, e_3, e_4, e_3\right).
+\end{aligned}
+\end{equation}
+Then previous equations imply the following algebraic relations,
+\begin{equation}
+    K=-\rho+\frac{1}{2}R+\Rc_{34}+\frac{1}{2}\chibh\cdot\chih-\frac{1}{4}\tr\chib\tr\chi,
+\end{equation}
+\begin{equation}
+    \cl\eta=-\cl\etab=\sigma+\frac{1}{2}\chibh\wedge\chih,
+\end{equation}
+\begin{equation}\label{Codazzi_eq_chi}
+    \dv\chih-\frac{1}{2}\nabla\tr\chi=-\beta+\frac{1}{2}\Rc_{4\cdot}+\frac{1}{2}\tr\chi\zeta-\zeta\cdot\chih,
+\end{equation}
+\begin{equation}\label{Codazzi_eq_chib}
+    \dv\chibh-\frac{1}{2}\nabla\tr\chib=\betab+\frac{1}{2}\Rc_{3\cdot}-\frac{1}{2}\tr\chib\zeta+\zeta\cdot\chibh.
+\end{equation}
+After introducing the reduced curvature
+\begin{equation}
+    \beta^r_A=\beta_A-\frac{1}{2}\Rc_{4A},\, \betab^r_A=\betab_A+\frac{1}{2}\Rc_{3A}, \,\sigma^r=\sigma+\frac{1}{2}\chibh\wedge\chih,
+\end{equation}
+we can write the equations for curvature components
+\begin{equation}
+    \begin{aligned}
+        &\Omega\nabla_3 K+\Omega\tr\chib K=\dv \left(\Omega\betab^r\right)+\frac{1}{2}\dv\left(\eta\Omega\tr\chib\right)-\dv\left(\eta\cdot\Omega\chibh\right),\\
+         &\Omega\nabla_4 K+\Omega\tr\chi K=-\dv \left(\Omega\beta^r\right)+\frac{1}{2}\dv\left(\etab\Omega\tr\chi\right)-\dv\left(\etab\cdot\Omega\chih\right),
+    \end{aligned}
+\end{equation}
+\begin{equation}
+    \begin{aligned}
+        \nabla_3\beta^r&+\left(\tr\chib-2\omegab\right) \beta^r=-\nabla K+{}^*\nabla\sigma+2\chih\cdot\betab\\
+        &\qquad+\frac{1}{2}\left(\nabla(\chih\cdot\chibh)-{}^*\nabla(\chih\wedge\chibh)\right)-\frac{1}{4}\nabla\left(\tr\chi\tr\chib\right)\\
+        &\qquad+3(\eta\rho+{}^*\eta\sigma)+\nabla_A\left(g^{CD}\Rc_{CD}\right)-\nabla^B \Rc_{BA}-\frac{1}{2}\tr\chib \Rc_{4A},\\
+        \nabla_4\betab^r&+\left(\tr\chi -2\omega\right)\betab^r=\nabla K+{}^*\nabla\sigma+2\chibh\cdot\beta\\
+        &\qquad-\frac{1}{2}\left(\nabla(\chih\cdot\chibh)+{}^*\nabla(\chih\wedge\chibh)\right)+\frac{1}{4}\nabla\left(\tr\chi\tr\chib\right)\\
+        &\qquad-3\left(\etab\rho-{}^*\etab\sigma\right) -\nabla_A(g^{CD}\Rc_{CD})+\nabla^B \Rc_{BA}+\frac{1}{2}\tr\chi \Rc_{3A}.
+    \end{aligned}
+\end{equation}
+Using \eqref{eq:Ricci_coefficients_propagation_3}, we derive 
+\begin{equation}
+  \begin{aligned}
+      \Omega\nabla_3\cl\etab+\Omega\tr\chib\cl\etab=&\cl(\Omega\betab^r)+\epsilon^{AC}\nabla_A\left(\Omega\chib\cdot\eta\right)_C-\epsilon^{AC}\nabla_A(\Omega\Rc)_{C3},\\
+      \Omega\nabla_4\cl\eta+\Omega\tr\chi\cl\eta=&-\cl(\Omega\beta^r)+\epsilon^{AC}\nabla_A\left(\Omega\chi\cdot\etab\right)_C-\epsilon^{AC}\nabla_A(\Omega\Rc)_{C4},
+  \end{aligned}
+\end{equation}
+and
+\begin{equation}
+    \begin{aligned}
+        &\Omega\nabla_3\left(\dv \etab-K\right)+\Omega\tr\chib\left(\dv \etab-K\right)=4\dv(\Omega\chibh\cdot\zeta)-\dv(\Omega\Rc_3),\\
+        &\Omega\nabla_4\left(\dv \eta-K\right)+\Omega\tr\chi\left(\dv \eta-K\right)=-4\dv(\Omega\chih\cdot\zeta)-\dv(\Omega\Rc_4).
+    \end{aligned}
+\end{equation}
+For a scalar function $\phi$, there is equation
+\begin{equation}\label{eq:ese-wave-eq}
+    -\Omega^2\square\phi=\Omega e_3(\Omega e_4\phi)+\frac{1}{2}\Omega\tr\chi\Omega e_3\phi+\frac{1}{2}\Omega\tr\chib\Omega e_4\phi-\Omega^2\Delta\phi-2\Omega^2\eta\cdot\nabla\phi.
+\end{equation}
+
+\subsection{Local existence}
+We now introduce some results on Einstein vacuum equations. Similar results can be derived for other Einstein field equations and we omit them due to length of the article.
+
+We first state the existence theorem for characteristic initial value problem of Einstein vacuum equations from \cite{luk-12}.
+\begin{theorem}
+    Given initial null hypersurface $H_0,\Hb_0$ and regular initial metric $(g,\Omega,b)$ on it, we define $\chi_{AB}=\frac{1}{2}\Lie_{e_4}g_{AB}$ on $H_0$ and $\chib_{AB}=\frac{1}{2}\Lie_{e_3}g_{AB}$ on $\Hb_0$. Suppose 
+    \[e_4(\tr\chi)+\frac{1}{2}(\tr\chi)^2+|\chih|^2+2\omega\tr\chi=0,\ e_3(\tr\chib)+\frac{1}{2}(\tr\chib)^2+|\chibh|^2+2\omegab\tr\chib,\]
+    hold on $H_0,\Hb_0$ respectively, then there is a future open neighborhood of $H_0\cup \Hb_0$ and metric $(g,b,\Omega)$ on it solving the Einstein vacuum equations and satisfying the initial data.
+\end{theorem}
+This theorem reveals the local existence, and we further remark that for larger region, such as $(0,1)^2\times\mathbb{S}^2$, as long as the a priori estimates hold in it, the solution can be extended to the region.
+
+\subsection{Residual control}
+In this paper, we target to deal with asymmetric Einstein equations, which in general do not have explicit solutions. To measure the computational error, we use Ricci residues. For Einstein equation 
+\[G_{\mu\nu}:=\Rc_{\mu\nu}-\frac{1}{2}Rg_{\mu\nu}=T_{\mu\nu},\]
+we measure $\|G-T\|_{L^2(S_{u,v})}$ to evaluate the approximation. The theorems below reveals that in our case the difference of metrics is controlled by the difference of curvature residues.
+
+
+\begin{theorem}
+    We consider metric $\oc{g}_{AB},\oc{b},\oc{\Omega}$ on $(0, 1)\times (0,1)\times \mathbb{S}^2$ such that
+    \[\oc{\Rc}_{44}(0,v)=0,\ \oc{\Rc}_{33}(u,0)=0,\ \oc{\Rc}_{4A}(0,v)=0,\ \oc{\Rc}_{3A}(u,0)=0,\]
+    % \[\oc{\Rc}_{AB}(u,0)=0,\ \oc{\Rc_{34}}(u,0)=0,\ \oc{R}(u,0)=0,\]
+    and estimates 
+    \begin{equation}
+        \|\oc{\Rc}_{AB},\oc{\Rc}_3,\oc{\Rc}_4,\oc{\Rc}_{34},\oc{\Rc}_{33},\oc{\Rc}_{44}\|_{L^\infty_uL^\infty_vH^3(S)}\leq \epsilon.
+    \end{equation}
+    We assume moreover 
+    \begin{equation}
+        \| \partial_{\mathbb{S}}\oc{g}, \partial_{\mathbb{S}}\oc{b}, \partial_{\mathbb{S}}\oc\Omega, \oc{\psi}\|_{L^\infty_u L^\infty_v H^4(S)} \leq C_0,
+    \end{equation}
+    where $\psi$ stands for Ricci coefficients in interest.
+    Then for $\epsilon=\epsilon(C_0)$ sufficiently small, there exists $(g,b,\Omega)$ solving EVE on $( 0,1)\times (0,1)\times \mathbb{S}^2$ with initial data 
+    \[(g,b,\Omega)=(\oc{g},\oc{b},\oc\Omega),\ {\rm on}\ \Hb_0\cup H_{0},\]
+    and estimates
+    \begin{equation}
+        \|g-\oc{g},b-\oc{b},\Omega-\oc{\Omega}\|_{L^\infty_u L^\infty_v H^4(S)}\leq \epsilon^{1/2}.
+    \end{equation}
+\end{theorem}
+
+The methods of deriving the equations of difference and doing estimates are similar to section 7 of \cite{an-26},
+so we only write the proof in sketch. 
+
+Define auxiliary functions $\omega^\dagger,\omegab^\dagger$ by
+\[\nabla_3\omega^\dagger=\frac{1}{2}\cl\zeta,\ \omega^\dagger|_{H_{-1}}=0,\ \nabla_4\omegab^\dagger=\frac{1}{2}\cl\zeta,\ \omegab^\dagger|_{\Hb_0}=0.\]
+We make bootstrap assumption
+\begin{equation*}
+    \begin{aligned}
+        &\|\wt{\beta},\wt{K},\nabla\wt\eta,\nabla\wt{\etab},\nabla\wt{\chi},\nabla\wt{\omega},\nabla\wt{\omega^\dagger}\|_{L^2_vH^3(S)}\\
+        &\qquad+\|\wt{K},\wt{\betab},\nabla\wt{\eta},\nabla\wt\etab,\nabla\wt{\chib},\nabla\wt{\omegab},\nabla\wt{\omegab^\dagger}\|_{L^2_uH^3(S)}\leq B\exp(D(v+u))\epsilon.
+    \end{aligned}
+\end{equation*}
+We will prove that we can choose $D$ sufficiently large so that the bootstrap constant $B$ can be improved to $B\leq 1$.
+
+The motivation is direct. Let $\partial_uf\leq C_0f,\partial_vf\leq C_0f$, and suppose
+$$f(u,v)\leq B\exp(D(v+u))\epsilon,$$ then we integrate it 
+\begin{equation*}
+    \begin{aligned}
+        f(u,v)-f(0,v)\leq&C_0\int_{0}^u f(u^\prime,v) du^\prime\\
+        \leq  & \frac{C_0B}{D}\left(\exp(D(u+v))-\exp(Dv)\right)\epsilon \leq \frac{C_0B}{D} \exp(D(u+v))\epsilon,\\
+        f(u,v)-f(u,0)\leq & C_0\int_{0}^v f(u,v^\prime) dv^\prime\\
+        \leq & \frac{C_0B}{D}\left(\exp(D(u+v))-\exp(Du)\right)\epsilon \leq \frac{C_0B}{D} \exp(D(u+v))\epsilon.
+    \end{aligned}
+\end{equation*}
+If we choose $D^{1/2}\geq C_0B$, the bootstrap assumption will be closed. Absorbing the bootstrap constant by the parameter $D$ actually shows the increasing rate is controlled exponentially. Even though the norms increase quickly, they will not exceed $O(\epsilon)\leq o(\epsilon^{1/2})$ in finite region.
+
+In summary, we conclude 
+\begin{lemma}
+    Suppose $\|f\|_{L^2(S_{u,v})}\leq B\exp(D(v+u))\epsilon$, then we have
+    \begin{equation}
+        \|f\|_{L^2_uL^2(S)}+\|f\|_{L^2_vL^2(S)} \leq D^{-1/2}\exp(D(v+u))\epsilon,
+    \end{equation}
+    when $D$ is sufficiently large.
+
+    Suppose either $\|h\|_{L^2_uL^2(S)}\leq B\exp(D(u+v))\epsilon$ or $\|h\|_{L^2_vL^2(S)}\leq B\exp(D(u+v))\epsilon$, then we have    
+    \begin{equation}
+        \|h\|_{L^2_uL^2_vL^2(S)} \leq D^{-1/2}\exp(D(v+u))\epsilon,
+    \end{equation}
+    when $D$ is sufficiently large.
+\end{lemma}
+
+We use notation
+\[\psi_1\in\{\eta,\etab,\chi,\omega\},\ \psi_2\in\{\eta,\etab,\chib,\omegab\}\]
+Because 
+\[\Lie_v b=-2\Omega^2(\eta-\etab),\ \Lie_vg=2\Omega\chi,\ \Lie_v\log\Omega=-2\Omega\omega,\]
+we obtain that
+\begin{equation}
+    \|\wt{b},\wt{g},\wt{\log\Omega}\|_{H^4(S_{u,v})}\lesssim \|\wt{\eta},\wt{\etab},\wt{\chi},\wt{\omega},\wt{\Omega},\wt{g}\|_{L^2_vH^4(S)}\lesssim B\exp(D(u+v))\epsilon.
+\end{equation}
+For Bianchi pair $(\Psi_1,\Psi_2)$ in interest, we consider equations 
+\begin{equation*}
+    \begin{aligned}
+        \Omega\nabla_3\wt{\Psi_1} &+\mathcal{D}\wt{\Psi_2}=\wt{\psi\Psi}+\wt{\psi\nabla\psi}+\wt{\psi^3}+\wt{b}\cdot\nabla\oc{\Psi_1}+\wt{\partial g}\oc{\Psi_2}+\wt{g}\oc{\nabla\Psi_2}+\oc\psi\oc\Rc+\oc{\nabla\Rc},\\
+        \Omega\nabla_4\wt{\Psi_2} &-{}^*\mathcal{D}\wt{\Psi_1}=\wt{\psi\Psi}+\wt{\psi\nabla\psi}+\wt{\psi^3}+\wt{\partial g}\oc{\Psi_1}+\wt{g}\oc{\nabla\Psi_1}+\oc\psi\oc\Rc+\oc{\nabla\Rc}.
+    \end{aligned}
+\end{equation*}
+Energy estimates give that 
+\begin{equation*}
+    \begin{aligned}
+        &\|\wt\Psi_1\|^2_{L^2_vH^3(S)}+\|\wt\Psi_2\|^2_{L^2_uH^3(S)}\\
+        &\qquad\qquad\lesssim \epsilon^2+\|\wt{\partial g},\wt{g},\wt{\psi},\wt{\nabla\psi},\wt\Psi,\wt{b}\|^2_{L^2_uL^2_vH^3(S)}\lesssim (1+D^{-1/2})\exp(2D(u+v))\epsilon^2.
+    \end{aligned}
+\end{equation*}
+Applying the estimate to pairs
+\[(\beta,(K,\cl\eta)),\ ((K,\cl\etab),\betab),\ (\nabla\tr\chib,0),\ (0,\nabla\tr\chi),\]
+\[ (\dv\etab-K,0),\ (0,\dv\eta-K),\ (\nabla\omega+{}^*\nabla\omega^\dagger-\frac{1}{2}\beta,0),\ (0,-\nabla\omegab+{}^*\nabla\omegab^\dagger-\frac{1}{2}\betab),\]
+will finish the proof. 
+\begin{remark}
+    The conditions 
+    \[\oc{\Rc}_{44}(-1,v)=0,\ \oc{\Rc}_{33}(u,0)=0,\]
+    guarantee that $(\oc{g},\oc{b},\oc{\Omega})$ is a valid initial data set for characteristic initial value problem of Einstein vacuum equation, and 
+    \[\oc{\Rc}_{4A}(-1,v)=0,\ \oc{\Rc}_{3A}(u,0)=0,\]
+    ensure that $\oc\zeta$ along $H_{-1}$ and $\Hb_0$ is equal to the $\zeta$ of corresponding EVE solution. 
+\end{remark}
+
+
+
+\section{Picard Iteration Design and Numerical Strategies}
+In this section, we introduce the iteration design and numerical strategies.
+\subsection{Picard iteration for Einstein equations}
+In this section, we first consider Einstein scalar-field equations
+\[\Rc=d\phi\otimes d\phi,\ \square_g\phi =0.\]
+
+We work in region 
+$$Q=\{-1<u<u_0,\ 0<v<v_0(u)\}.$$ 
+The first task is to construct a valid initial data for ESE.
+We directly prescribe $g,b,\Omega$ along $\Hb_0$. The only requirement is 
+\[-\Omega\nabla_3(\Omega\tr\chib)-\frac{1}{2}(\Omega\tr\chib)^2-\left|\Omega\chibh\right|^2-4\Omega\omegab\Omega\tr\chib\geq 0\]
+Then $\Omega e_3\phi(u,0)$ can be assigned via equation
+\[\Omega e_3\phi=\left(-\Omega\nabla_3(\Omega\tr\chib)-\frac{1}{2}(\Omega\tr\chib)^2-\left|\Omega\chibh\right|^2-4\Omega\omegab\Omega\tr\chib\right)^{1/2}.\]
+After defining $\phi(-1,0)$ and $\zeta(-1,0)$, we derive $\phi(u,0)$ from $\Omega e_3\phi(u,0)$ and $\zeta(u,0)$ via
+\[\Omega\nabla_3\zeta+\frac{3}{2}\Omega\tr\chib\zeta+\Omega\chibh\cdot\zeta=-2\nabla(\Omega\omegab)-\dv(\Omega\chibh)+\frac{1}{2}\nabla(\Omega\tr\chib)-\Omega\tr\chib\nabla\log\Omega+\Omega e_3\phi\nabla\phi.\]
+Thus $\eta=\zeta+\nabla\log\Omega$ and $\etab=-\zeta+\nabla\log\Omega$ are also prescribed.
+We then define $\Omega\tr\chi(-1,0)$ and $\Omega\chih(-1,0)$, and compute $\Omega\chi(u,0)$ by 
+\[\Omega\nabla_3(\Omega\tr\chi)+\Omega\tr\chib\Omega\tr\chi=\Omega^2\left(2\dv\eta+2\left|\eta\right|^2-2K(g)+|\nabla\phi|^2\right),\]
+\[\Omega\nabla_3(\Omega\chih)+\frac{1}{2}\Omega\tr\chib\,\Omega\chih=\Omega^2\left(\nabla\hat\otimes\eta+\eta\hat\otimes\eta\right)-\frac{1}{2}\Omega\tr\chi\,\Omega\chibh+\frac{1}{2}\Omega^2\nabla\phi\hat\otimes\nabla\phi.\]
+We also directly assign $\Omega e_4\phi(-1,0)$ and $\Omega\omega(-1,0)$, and compute them along $\Hb_0$ via
+\[\Omega e_3(\Omega e_4\phi)+\frac{1}{2}\Omega\tr\chi\Omega e_3\phi+\frac{1}{2}\Omega\tr\chib\Omega e_4\phi-\Omega^2\Delta\phi-2\Omega^2\eta\cdot\nabla\phi=0,\]
+\[\frac{1}{2}\Omega e_3\phi\Omega e_4\phi+\frac{1}{2}\Omega^2\left|\nabla\phi\right|^2=2\Omega\nabla_3(\Omega\omega)+\Omega^2K-\frac{1}{2}\Omega\chih\cdot\Omega\chibh+\frac{1}{4}\Omega\tr\chi\Omega\tr\chib-\Omega^2|\etab|^2+2\Omega^2\eta\cdot\etab.\]
+Along $H_{-1}$, we prescribe $\Omega e_4\phi(-1,v)$ and $\Omega\omega(-1,v)$ to compute $\phi,\Omega$. Consider a symmetric and $g(-1,0)$-trace-free tensor $X_{AB}(-1,v)$.
+We then prescribe $g,\Omega\chi$ along $H_{-1}$ by solving:
+\begin{equation}
+    \left\{\begin{aligned}
+         & \Omega\chih_{AB}=\frac{1}{2}\left(X_{AC}\left(g(-1,0)\right)^{CD}{g}_{DB}+X_{BC}\left(g(-1,0)\right)^{CD}{g}_{DA}\right),\\
+        &\partial_v (\Omega\tr\chi)=-\frac{1}{2}{\left(\Omega\tr\chi\right)}^2-4\Omega\omega\Omega\tr\chi-(\Omega e_4\phi)^2-\Omega\chih_{AB}\Omega\chih_{CD}g^{AC}g^{BD},\\
+        &\Lie_v g_{AB}=\Omega\tr\chi g_{AB}+2\Omega\chih_{AB}.
+    \end{aligned}\right.
+\end{equation}
+
+With these initial data, we can start the iteration.
+The quantities to be iterated are 
+\[g^{(i)},(b^{(i)})^A,\log\Omega^{(i)},(\Omega\chi)^{(i)}_{AB},(\Omega\chib)^{(i)}_{AB},(\zeta^{(i)})^A,(\Omega\omega)^{(i)},(\Omega\omegab)^{(i)},(\Omega e_3\phi)^{(i)}, (\Omega e_4\phi)^{(i)},\nabla_A\phi^{(i)} .\]
+
+Initially, we set $g^{(0)}=g|_{v=0}$, $\Omega^{(0)}=\Omega|_{v=0}$, $\zeta^{(0)}=\zeta|_{v=0}$,
+\[
+ (b^{(0)})^A(u,v)=b^A(u,0)-\int_0^v4(\Omega^{(0)})^2
+ (\zeta^{(0)})^A(u,v')\,\dd v',
+\]
+$\chih^{(0)}=\chih|_{v=0}$, $\tr\chi^{(0)}=\tr\chi|_{v=0}$, $\chibh^{(0)}=\chibh|_{v=0}$, $\tr\chib^{(0)}=\tr\chib|_{v=0}$, $\omega^{(0)}=\omega|_{v=0}$, $\omegab^{(0)}=\omegab|_{v=0}$, $(e_3\phi)^{(0)}=e_3\phi|_{v=0}$, $(e_4\phi)^{(0)}=e_4\phi|_{v=0}$, $(\nabla_A\phi)^{(0)}=\nabla_A\phi|_{v=0}$.
+For all $i$, we always require 
+\[\eta^{(i)}_A=(\zeta^{(i)})^B g^{(i)}_{AB}+\nabla_A\log\Omega^{(i)},\ \etab^{(i)}_A=-(\zeta^{(i)})^B g^{(i)}_{AB}+\nabla_A\log\Omega^{(i)}\]
+
+\noindent\textbf{1. Construction of $(\Omega\chih)^{(i+1/2)}$, $\partial_v\phi^{(i+1)}$, and $\nabla_A\phi^{(i+1)}$}
+
+We use \eqref{eq:Ricci_coefficients_propagation_2} to define $(\Omega\chih)^{(i+1/2)}$,
+\begin{equation}
+    \left\{
+    \begin{aligned}
+        & \Lie_{\partial_u+b^{(i)}}(\Omega\chih^{(i+1/2)})_{AB}-\frac{1}{2}(\Omega\tr\chib)^{(i)}(\Omega\chih^{(i+1/2)})_{AB}\\
+        &\qquad\qquad -(\Omega\chibh^{(i)})_A^{\quad C}(\Omega\chih^{(i+1/2)})_{CB}-(\Omega\chibh^{(i)})_B^{\quad C}(\Omega\chih^{(i+1/2)})_{CA} \\
+        &\qquad =(\Omega^{(i)})^2\left(\left(\nabla^{(i)}{\hat\otimes}\eta^{(i)}+\eta^{(i)}{\hat\otimes}\eta^{(i)}+\frac{1}{2}\nabla\phi^{(i)}\hat\otimes\nabla\phi^{(i)}\right)_{AB}-\frac{1}{2}(\tr\chi)^{(i)}{\chibh^{(i)}}_{AB}\right),\\
+        &{\Omega\chih^{(i+1/2)}}_{AB}(-1,v)=\frac{1}{2}\left(\Omega\chih_{AC}g^{CD}{g^{(i)}}_{DB}+\Omega\chih_{BC}g^{CD}{g^{(i)}}_{DA}\right)(-1,v).
+    \end{aligned}
+    \right.
+\end{equation}
+Using \eqref{eq:ese-wave-eq}, we define $\partial_v\phi^{(i+1)}$ by
+\begin{equation}
+    \left\{\begin{aligned}
+        &(\Omega e_3)^{(i)}(\partial_v\phi^{(i+1)})+\frac{1}{2}(\Omega\tr\chib)^{(i)}(\partial_v\phi^{(i+1)})\\
+        &\qquad =(\Omega^{(i)})^2\Delta^{(i)}\phi^{(i)}-\frac{1}{2}(\Omega\tr\chi)^{(i)}(\Omega e_3)^{(i)}\phi^{(i)}+2(\Omega^{(i)})^2\eta^{(i)}\nabla\phi^{(i)},\\
+        &\partial_v\phi^{(i+1)}(-1,v)=\partial_v\phi(-1,v).
+    \end{aligned}\right.
+\end{equation}
+It follows that
+\[\nabla_A\phi^{(i+1)}(u,v)=\nabla_A\phi(u,0)+\partial_A\left(\int_0^v\partial_v\phi^{(i+1)}\right).\]
+
+
+\noindent\textbf{2. Construction of $(\Omega\omegab)^{(i+1/2)}$}
+
+We use \eqref{eq:Ricci_coefficients_propagation_3} to define $(\Omega\omegab)^{(i+1/2)}$,
+\begin{equation}
+    \left\{
+    \begin{aligned}
+        &4\partial_v(\Omega\omegab)^{(i+1/2)}=\Omega\chih^{(i+1/2)}_{AB}\Omega\chibh^{(i)}_{CD}(g^{(i)})^{AC}(g^{(i)})^{BD}+\frac{1}{2}(\Omega\tr\chi)^{(i)}(\Omega\tr\chib)^{(i)}\\
+        &\qquad-4(\Omega^{(i)})^2\eta^{(i)}\cdot\etab^{(i)}+(\partial_u+b^{(i)})(\Omega\tr\chi)^{(i)}-2(\Omega^{(i)})^2\dv^{(i)}\eta^{(i)}\\
+        &\qquad+(\partial_v\phi)^{(i+1)}(\Omega e_3\phi)^{(i)},\\
+        &(\Omega\omegab)^{(i+1/2)}(u,0)=\Omega\omegab(u,0).
+    \end{aligned}\right.
+\end{equation}
+
+\noindent\textbf{3. Construction of $\Omega^{(i+1)}$, $\nabla_A\log\Omega^{(i+1)}$, and $(\Omega\omega)^{(i+1)}$}
+
+With $(\Omega\omegab)^{(i+1/2)}$, we can integrate it to obtain $\Omega^{(i+1)}$
+\begin{equation} 
+    \left\{
+    \begin{aligned}
+        &\left(\partial_u+b^{(i)}\right)\log \Omega^{(i+1)}=-2(\Omega\omegab)^{(i+1/2)},\\
+        &\log\Omega^{(i+1)}(-1,v)=\log\Omega(-1,v),
+    \end{aligned}
+    \right.
+\end{equation}
+\begin{equation}
+    \nabla_A\log\Omega^{(i+1)}=\partial_A \log\Omega^{(i+1)}.
+\end{equation}
+We construct $(\Omega\omega)^{(i+1)}$ by integration instead of differentiation, 
+\begin{equation} 
+    \left\{\begin{aligned}
+        4\left(\partial_u+b^{(i)}\right)&(\Omega\omega)^{(i+1)}=\Omega\chih^{(i+1/2)}_{AB}\Omega\chibh^{(i)}_{CD}(g^{(i)})^{AC}(g^{(i)})^{BD}+\frac{1}{2}(\Omega\tr\chi)^{(i)}(\Omega\tr\chib)^{(i)}\\
+        &-4(\Omega^{(i)})^2\eta^{(i)}\cdot\etab^{(i)}+(\partial_u+b^{(i)})(\Omega\tr\chi)^{(i)}-2(\Omega^{(i)})^2\dv^{(i)}\eta^{(i)}\\
+        &+(\partial_v\phi)^{(i+1)}(\Omega e_3\phi)^{(i)}-8(\Omega^{(i)})^2(\zeta^{(i)})^A\nabla_A\log\Omega^{(i+1)},\\
+        (\Omega\omega)^{(i+1)}&(-1,v)=\Omega\omega(-1,v).
+    \end{aligned}\right.
+\end{equation}
+We note that the construction of $(\Omega\omega)^{(i+1)}$ is equivalent to $(\Omega\omega)^{(i+1)}=-\frac{1}{2}\partial_v\log\Omega^{(i+1)}$, because 
+\begin{equation}
+   \begin{aligned}
+     4(\Omega e_3)^{(i)}(\Omega\omega)^{(i+1)}=&-2\partial_v(\Omega e_3)^{(i)}\log\Omega^{(i+1)}+2\Lie_v b^{(i)}\nabla\log\Omega^{(i+1)}\\
+     =&4\partial_v(\Omega\omegab)^{(i+1/2)}-8(\Omega^{(i)})^2(\zeta^{(i)})^A\nabla_A\log\Omega^{(i+1)}.
+   \end{aligned}
+\end{equation}
+
+\noindent\textbf{4. Construction of $\zeta^{(i+1)}$, $b^{(i+1)}$, and $(\Omega\omegab)^{(i+1)}$}
+
+From \eqref{eq:Ricci_coefficients_propagation_4}, we define $\zeta^{(i+1)}$,
+\begin{equation} 
+    \left\{\begin{aligned}
+        &\Lie_v(\zeta^{(i+1)})^A=-2(\Omega\tr\chi)^{(i)}(\zeta^{(i)})^A-2(g^{(i)})^{AC}\left((\Omega\chih)^{(i+1/2)}\right)_{CB}(\zeta^{(i)})^B\\
+        &\qquad+2(g^{(i)})^{AB}\partial_B(\Omega\omega)^{(i+1)} +(\dv)^{(i)}(\Omega\chih)^{(i+1/2)}_B(g^{(i)})^{BA} \\
+        &\qquad-\frac{1}{2}(g^{(i)})^{AB}\partial_B(\Omega\tr\chi)^{(i)}+(\Omega\tr\chi)^{(i)}(g^{(i)})^{AB}\partial_B\log\Omega^{(i+1)}\\
+        &\qquad-(\partial_v\phi)^{(i+1)}\partial_B\phi^{(i)}(g^{(i)})^{AB},\\
+        &(\zeta^{(i+1)})^A(u,0)=\zeta^A(u,0).
+    \end{aligned}\right.
+\end{equation}
+We remark that it is necessary to treat $\zeta^{(i+1)}$ as a vector field instead of a 1-form in order to define $b^{(i+1)}$,
+\begin{equation} 
+    \left\{\begin{aligned}
+        &\Lie_v (b^{(i+1)})^A=-4(\Omega^{(i+1)})^2(\zeta^{(i+1)})^A,\\
+        &(b^{(i+1)})^A(u,0)=b^A(u,0).
+    \end{aligned}\right.
+\end{equation}
+
+\noindent\textbf{5. Construction of $g^{(i+1)}$ and $(\Omega\chi)^{(i+1)}$}
+
+It remains to define $g^{(i+1)}$. We consider the following $(g,\tr\chi,\chih)$ system,
+\begin{equation}
+    \left\{
+    \begin{aligned}
+        &\Lie_v(g^{(i+1)})_{AB}=(\Omega\tr\chi)^{(i+1)}(g^{(i+1)})_{AB}+2{(\Omega\chih)^{(i+1)}}_{AB},\\
+        &\partial_v\left(\Omega\tr\chi\right)^{(i+1)}=-\frac{1}{2}\left((\Omega\tr\chi)^{(i+1)}\right)^2-4(\Omega\omega)^{(i+1)}(\Omega\tr\chi)^{(i+1)}\\
+        &\qquad\qquad- {(\Omega\chih)^{(i+1)}}_{AB}{(\Omega\chih)^{(i+1)}}_{CD}{g^{(i+1)}}^{AC}{g^{(i+1)}}^{BD}-(\partial_v\phi^{(i+1)})^2,\\
+        &(\Omega\chih)^{(i+1)}_{AB}=\frac{1}{2}\left((\Omega\chih)^{(i+1/2)}_{AC}{(g^{(i)})}^{CD}{g^{(i+1)}}_{DB}
+        +(\Omega\chih)^{(i+1/2)}_{BC}{(g^{(i)})}^{CD}{g^{(i+1)}}_{DA}\right),\\
+        &(g^{(i+1)})_{AB}(u,0)=g_{AB}(u,0),\ \ (\Omega\tr\chi)^{(i+1)}(u,0)=\Omega\tr\chi(u,0).
+    \end{aligned}
+    \right.
+\end{equation}
+
+\noindent\textbf{6. Construction of $(\Omega\chib)^{(i+1)}$ and $(\Omega e_3\phi)^{(i+1)}$}
+
+There are two equivalent ways to define $(\Omega\chib)^{(i+1)}$. The first one is using $\Omega\chib_{AB}=\frac{1}{2}\Lie_{\Omega e_3}g_{AB}$. We use the second way, which is using equation
+\begin{equation}
+    \left\{\begin{aligned}
+        &\Lie_{v}(\Omega\chib)^{(i+1)}_{AB}= \Lie_{\partial_u+b^{(i+1)}}(\Omega\chi)^{(i+1)}_{AB}-2(\Omega^{(i+1)})^2\left(\nabla^{(i+1)}_A\zeta^{(i+1)}_B+\nabla^{(i+1)}_B\zeta^{(i+1)}_A\right)\\
+        &\qquad\qquad-4(\Omega^{(i+1)})^2\left(\zeta^{(i+1)}_A\nabla_B\log\Omega^{(i+1)}+\zeta^{(i+1)}_B\nabla_A\log\Omega^{(i+1)}\right),\\
+        &(\Omega\chib)^{(i+1)}_{AB}(u,0)= \Omega\chib_{AB}(u,0).
+    \end{aligned}\right.
+\end{equation}
+We remark that
+\begin{equation}
+    \begin{aligned}
+        &\Omega\nabla_4(\Omega\chib)_{AB}-\Omega\nabla_3(\Omega\chi)_{AB}\\
+        =&\Lie_{v}(\Omega\chib)_{AB}-(\Omega\chi)_{A}^{\ C}(\Omega\chib)_{CB}-(\Omega\chi)_{B}^{\ C}(\Omega\chib)_{CA}\\
+        &-\Lie_{\partial_u+b}(\Omega\chi)_{AB}+(\Omega\chib)_{A}^{\ C}(\Omega\chi)_{CB}+(\Omega\chib)_{B}^{\ C}(\Omega\chi)_{AC}\\
+        =&\Lie_{v}(\Omega\chib)_{AB}-\Lie_{\partial_u+b}(\Omega\chi)_{AB}.
+    \end{aligned}
+\end{equation}
+Theoretically, $(\Omega\chib)_{AB}^{(i+1)}=\frac{1}{2}\Lie_{\partial_u+b^{(i+1)}}g^{(i+1)}_{AB}.$ Similarly, we construct $(\Omega e_3\phi)^{(i+1)}$ by
+\begin{equation}
+    \left\{\begin{aligned}
+        &\partial_v(\Omega e_3\phi)^{(i+1)}=(\partial_u+b^{(i+1)})\partial_v\phi^{(i+1)}-4(\Omega^{(i+1)})^2(\zeta^{(i+1)})^A\nabla_A\phi^{(i+1)},\\
+        &(\Omega e_3\phi)^{(i+1)}(u,0)=\Omega e_3\phi(u,0).
+    \end{aligned}\right.
+\end{equation}
+
+For Einstein vacuum equation
+\[\Rc_{\mu\nu}=0,\]
+removing all $\phi$-terms of ESE gives the iterative construction directly, so we omit the repeation of construction. 
+
+
+\subsection{Curvature residues}
+Computing curvature usually involves second order derivatives, which would heavily reduce the numerical precision. 
+Especially, $\lim_{v\rightarrow 0}R_{4A4B}(-1,v)$ can be infinite for short pulse perturbation and $\Rc_{44}$ is hard to compute in this way, even though it is theoretically zero in our construction.
+See \cite{an-25} for the example of short pulse with infinite $R_{4A4B}$.
+We use intrinsic equations of Lorentzian manifold to compute the Ricci curvature:
+\[\Omega^2\Rc_{33}=-\Omega\nabla_3(\Omega\tr\chib)-4\Omega\omegab\Omega\tr\chib-\frac{1}{2}(\Omega\tr\chib)^2-|\Omega\chibh|^2,\]
+\[\Omega\Rc_{3A}=\Omega\nabla_3\zeta+\frac{3}{2}\Omega\tr\chib\zeta+\Omega\chibh\cdot\zeta+2\nabla(\Omega\omegab)+\dv(\Omega\chibh)-\frac{1}{2}\nabla(\Omega\tr\chib)+\Omega\tr\chib\nabla\log\Omega,\]
+\[\Omega\Rc_{4A}=-\Omega\nabla_4\zeta-\frac{3}{2}\Omega\tr\chi\zeta-\Omega\chih\cdot\zeta+2\nabla(\Omega\omega)+\dv(\Omega\chih)-\frac{1}{2}\nabla(\Omega\tr\chi)+\Omega\tr\chi\nabla\log\Omega,\]
+\[\Omega^2\widehat{\Rc}_{AB}=\Omega\nabla_3(\Omega\chih)+\frac{1}{2}\Omega\tr\chib\,\Omega\chih-\Omega^2\left(\nabla\hat\otimes\eta+\eta\hat\otimes\eta\right)+\frac{1}{2}\Omega\tr\chi\,\Omega\chibh,\]
+\[ \Omega^2g^{AB}\Rc_{AB}=\Omega\nabla_3(\Omega\tr\chi)+\Omega\tr\chi\Omega\tr\chib-2\Omega^2\dv\eta-2\Omega^2|\eta|^2+2\Omega^2K,\]
+\[\Omega^2\Rc_{34}=4\Omega\nabla_4(\Omega\omegab)-\Omega\chih\cdot\Omega\chibh-\frac{1}{2}\Omega\tr\chi\Omega\tr\chib+4\Omega^2\eta\cdot\etab -\Omega\nabla_3(\Omega\tr\chi)+2\Omega^2\dv\eta.\]
+We only need the first order derivatives of the iterated quantities in this way.
+
+\subsection{Legendre--Gauss--Lobatto spectral elements}
+
+In the experiments, we will add non-spherical symmetric perturbation to the Einstein scalar-field or vacuum systems. To make the metric less regular, the perturbation is required to be of size $O(v^\delta)$.
+To deal with the non-smoothness, the characteristic coordinates are first replaced by coordinates in which the
+corner profiles are smoother.  In particular, we use
+\[
+    \tau=-\log(-u),\qquad
+    s=\left(\frac{v}{v_{\max}}\right)^\delta ,
+    \qquad
+    u=-e^{-\tau},\qquad
+    v=v_{\max}s^{1/\delta}.
+\]
+Thus a profile proportional to $v^\delta$ is linear in $s$.  This change of
+variables does not regularize the physical solution; it only represents its
+fractional behavior by a smooth function of the computational coordinate.
+Physical derivatives and integrals are recovered by
+\[
+    \partial_u=\frac{1}{-u}\partial_\tau,\qquad
+    \partial_v=\left(\frac{dv}{ds}\right)^{-1}\partial_s,\qquad
+    \int_0^v F(v')\,dv'
+    =\int_0^s F(v(s'))\frac{dv}{ds'}\,ds'.
+\]
+
+We divide each computational coordinate interval into elements.  On an
+element of degree $p$, let $\{\xi_j\}_{j=0}^p$ be the
+Legendre--Gauss--Lobatto nodes, characterized by
+\[
+    (1-\xi_j^2)P_p'(\xi_j)=0,
+\]
+including the two endpoints.  A component $F$ is represented by its Lagrange
+interpolant
+\[
+    I_pF(\xi)=\sum_{j=0}^p F(\xi_j)\ell_j(\xi).
+\]
+The element differentiation and indefinite-integration matrices are
+\[
+    D_{ij}=\ell_j'(\xi_i),\qquad
+    Q_{ij}=\int_{-1}^{\xi_i}\ell_j(\xi)\,d\xi.
+\]
+Consequently, interpolation of intermediate Runge--Kutta stages,
+differentiation, and cumulative integration are all obtained from the same
+element polynomial.  Neighboring elements share their endpoint value, while
+the two derivative traces at an interior interface are combined into a
+single interface derivative.  This composite construction permits local
+refinement in either characteristic direction without replacing the
+underlying transport hierarchy.
+
+\subsection{Tensor spherical-harmonic Galerkin discretization}
+The angular variables are represented on a quasi-uniform, pole-free point set
+on $\mathbb S^2$.  Geometric vectors and tensors are stored as ambient
+Cartesian tensors and projected to the tangent bundle.  This avoids the
+coordinate singularities of a polar chart.  For a scalar field, we use the
+real spherical-harmonic expansion
+\[
+    f_L(\vartheta)
+    =\sum_{\ell=0}^{L}\sum_{m=-\ell}^{\ell}
+      f_{\ell m}Y_{\ell m}(\vartheta).
+\]
+The coefficients are obtained by an overdetermined least-squares analysis of
+the nodal values, and angular derivatives are computed by differentiating the
+harmonic basis.
+
+Vectors and symmetric two-tensors are not expanded componentwise as
+unrelated scalars.  We use the electric and magnetic vector harmonics
+\[
+    Y_A^{E,\ell m}\sim\nabla_A Y_{\ell m},\qquad
+    Y_A^{B,\ell m}\sim\epsilon_A{}^B\nabla_B Y_{\ell m},
+\]
+and the trace, electric, and magnetic tensor harmonics
+\[
+    \gamma_{AB}Y_{\ell m},\qquad
+    Y_{AB}^{E,\ell m}\sim
+       \left(\nabla_A\nabla_B Y_{\ell m}\right)^{\mathrm{TF}},
+    \qquad
+    Y_{AB}^{B,\ell m}\sim
+       \epsilon_{(A}{}^C\nabla_{B)}\nabla_CY_{\ell m}.
+\]
+These typed spaces preserve tangency, symmetry, and the tensorial
+transformation law.  Trace-free quantities are projected with respect to the
+current section metric,
+\[
+    T_{AB}^{\mathrm{TF}}
+    =T_{AB}-\frac12(\tr_\gamma T)\gamma_{AB},
+\]
+rather than with respect to a fixed background metric.
+
+Let $\mathcal V_L$ denote the retained harmonic space and let
+$\mathcal V_W$, with $W>L$, be a work space used to form angular products.
+For a semidiscrete unknown $U_L\in\mathcal V_L$, every nonlinear right-hand
+side is defined by
+\[
+    \partial U_L=\Pi_L F(U_L),
+\]
+where $F(U_L)$ is evaluated in the work space and $\Pi_L$ is the appropriate
+scalar, vector, or tensor Galerkin projection.  The retained/work separation
+reduces angular aliasing while keeping the evolved state in one declared
+finite-dimensional geometric space.
+
+
+\section{Results for Einstein Vacuum Equations}
+
+\subsection{Crossed characteristic shears}
+
+We test genuinely nonspherical vacuum data on
+\[
+ \mathcal Q=\left\{-1<u<-\frac12,\quad 0<v<\frac12\right\}\times\mathbb S^2 .
+\]
+At the corner set
+\[
+\begin{aligned}
+ g(-1,0)&=\oc\gamma,\qquad
+ \Omega(-1,0)=1,\qquad
+ \Omega\tr\chi(-1,0)=2,\\
+ \Omega\tr\chib(-1,0)&=-2,\qquad
+ \zeta(-1,0)=0.
+\end{aligned}
+\]
+We impose $\Omega(-1,v)=\Omega(u,0)=1$ and
+$b(u,0)=0.1\partial_\phi$.  Writing $n\in\mathbb S^2$ and
+$P=I-n\otimes n$, define
+\[
+\begin{gathered}
+ A_1=\diag(-\tfrac12,-\tfrac12,1),\qquad
+ A_2=\diag(1,-1,0),\qquad f_j(n)=n^{\mathsf T}A_jn,\\
+ X_1=\frac{\sqrt2}{3}\tf_{\oc\gamma}\snab^2f_1,\qquad
+ X_2=\frac{1}{2\sqrt2}\tf_{\oc\gamma}\snab^2f_2,\qquad
+ \tf_{\oc\gamma}\snab^2f_j=2PA_jP+f_jP .
+\end{gathered}
+\]
+For a corner trace-free tensor $X$, let
+\[
+ \mathcal T_X[g]
+ =\tf_g\!\left[\frac12\left(
+ X\oc\gamma^{-1}g+(X\oc\gamma^{-1}g)^{\mathsf T}\right)\right].
+\]
+The free shears on the two characteristic faces are
+\begin{equation}
+ \Omega\chih(-1,v)=v^{1/2}\mathcal T_{X_1}[g(-1,v)],
+ \qquad
+ \Omega\chibh(u,0)=(u+1)^{1/2}\mathcal T_{X_2}[g(u,0)] .
+ \label{eq:article-crossed-shears}
+\end{equation}
+The remaining metric and expansion data are generated by the null
+constraints
+\begin{equation}
+\begin{aligned}
+ \partial_v(\Omega\tr\chi)
+ &=-\tfrac12(\Omega\tr\chi)^2-\abs{\Omega\chih}_g^2,&
+ \partial_vg&=(\Omega\tr\chi)g+2\Omega\chih,\\
+ (\partial_u+b)(\Omega\tr\chib)
+ &=-\tfrac12(\Omega\tr\chib)^2-\abs{\Omega\chibh}_g^2,&
+ (\Lie_{\partial_u}+\Lie_b)g
+ &=(\Omega\tr\chib)g+2\Omega\chibh .
+\end{aligned}
+\label{eq:article-crossed-constraints}
+\end{equation}
+The torsion is obtained from the corresponding $\nabla_4\zeta$ and
+$\nabla_3\zeta$ equations, while $\Omega\tr\chi$ on $\Hb_0$ is derived
+from its incoming null-structure equation.  Hence the iteration receives
+constraint-generated characteristic data rather than independently sampled
+connection coefficients.
+
+Using the evolved endpoint metrics and area forms, the immutable boundary
+artifact gives
+\begin{equation}
+\begin{aligned}
+ \norm{\chih(-1,\tfrac12)}_{L^2(S,g(-1,1/2))}
+ &=2.727749,\\
+ \norm{\chibh(-\tfrac12,0)}_{L^2(S,g(-1/2,0))}
+ &=0.785641 .
+\end{aligned}
+\label{eq:article-crossed-shear-norms}
+\end{equation}
+Thus the perturbation is nontrivial on both initial null hypersurfaces.
+
+The computation uses six degree-ten LGL elements in
+$t=\sqrt{2(u+1)}$ and $s=\sqrt{2v}$, giving $61\times61$ coordinate
+nodes, together with $300$ sphere points, retained harmonic degree $L=8$,
+work degree $W=14$, and differentiation degree $D=15$.  All six
+characteristic slabs converge below the $10^{-8}$ Picard tolerance.
+
+For every $(u,v)$ define the six sphere residuals
+\[
+\begin{aligned}
+ r_{33}&=\norm{\Omega^2\Rc_{33}}_{L^2(S,g)},&
+ r_{34}&=\norm{\Omega^2\Rc_{34}}_{L^2(S,g)},\\
+ r_{3A}&=\norm{\Omega\Rc_{3A}}_{L^2(S,g)},&
+ r_{4A}&=\norm{\Omega\Rc_{4A}}_{L^2(S,g)},\\
+ r_{AB}&=\norm{\Omega^2\widehat{\Rc}_{AB}}_{L^2(S,g)},&
+ r_R&=\norm{\Omega^2R}_{L^2(S,g)} .
+\end{aligned}
+\]
+Table~\ref{tab:article-crossed-residuals} reports each
+$L^\infty_{u,v}L^2(S)$ residue separately.  The protected interior removes
+the square-root endpoint elements and derivative halos; it is the accuracy
+statistic used for the nonsingular interior.
+\begin{table}[htbp]
+\centering
+\caption{Componentwise $L^\infty_{u,v}L^2(S)$ Ricci residuals.}
+\label{tab:article-crossed-residuals}
+\begin{tabular}{c|cc}
+\toprule
+residue & open numerical grid & protected interior\\
+\midrule
+$r_{33}$ & $1.371\times10^{3}$ & $1.689\times10^{-3}$\\
+$r_{34}$ & $3.903$             & $1.111\times10^{-3}$\\
+$r_{3A}$ & $1.498\times10^{1}$ & $1.154\times10^{-3}$\\
+$r_{4A}$ & $1.740$             & $3.156\times10^{-4}$\\
+$r_{AB}$ & $6.119$             & $4.734\times10^{-4}$\\
+$r_R$    & $9.185$             & $1.319\times10^{-3}$\\
+\bottomrule
+\end{tabular}
+\end{table}
+The large open-grid value of $r_{33}$ is confined to the unprotected
+$u=-1$ endpoint layer, where the physical $\partial_u=t^{-1}\partial_t$
+derivative is singular.  On the protected grid, $20$ nodes lie between
+$10^{-3}$ and $10^{-2}$ and $124$ between $10^{-4}$ and $10^{-3}$.
+
+\begin{figure}[htbp]
+\centering
+\IfFileExists{../experiments/exp05/results/convergence-regions.png}{%
+\includegraphics[width=\textwidth]{../experiments/exp05/results/convergence-regions.png}}{%
+\fbox{\parbox{0.9\textwidth}{The convergence-region figure is generated by
+the Experiment~5 standard run and may be curated here after its audit.}}}
+\caption{Spectrum of
+$r=r_{33}+r_{34}+r_{3A}+r_{4A}+r_{AB}+r_R$.
+Colors show the elementwise spectral interpolation of $\log_{10}r$.
+White contours mark $10^{-4}$, $10^{-3}$, $10^{-2}$, and $10^{-1}$;
+thin lines mark coordinate-element interfaces.}
+\label{fig:article-crossed-residual-spectrum}
+\end{figure}
+\clearpage
+
+\section{Results for Einstein Scalar-field Equations}
+
+\section{Conclusion}
+
+\bibliographystyle{plain}
+\bibliography{ref}
+
+\end{document}

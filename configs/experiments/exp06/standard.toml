@@ -1,0 +1,60 @@
+schema_version = 1
+[experiment]
+identifier = "exp06"
+title = "Regular exact Fisher/JNW Einstein--scalar field"
+equation_system = "scalar_field"
+[physics]
+sigma = 1.0
+nu_values = [0.99, 0.8, 0.5, 0.2]
+vacuum_limit_nu = 1.0
+[initial_data]
+family = "fisher_jnw"
+coordinate_elements = [2, 4, 8]
+coordinate_degree = 6
+[coordinates]
+u_min = -1.0
+u_max = -0.5
+v_min = 0.0
+v_max = 0.5
+u_map = "tau_negative_log"
+v_map = "affine"
+u_breakpoints = [-1.0, -0.9170040432046712, -0.8408964152537145, -0.7711054127039705, -0.7071067811865476, -0.6484197773255048, -0.5946035575013605, -0.5452538663326288, -0.5]
+v_breakpoints = [0.0, 0.0625, 0.125, 0.1875, 0.25, 0.3125, 0.375, 0.4375, 0.5]
+u_degrees = [6, 6, 6, 6, 6, 6, 6, 6]
+v_degrees = [6, 6, 6, 6, 6, 6, 6, 6]
+[angular]
+construction = "fibonacci"
+point_count = 100
+neighbor_count = 24
+seed = 0
+retained_degree = 3
+work_degree = 6
+differentiation_degree = 7
+[solver]
+maximum_sweeps = 8
+tolerance = 1e-12
+relaxation = 1.0
+slab_direction = "none"
+rk_substeps = 4
+sdc_sweeps = 1
+metric_substeps = 2
+boundary_substeps = 4
+stopping_norm = "weighted_maximum"
+[projection]
+nonlinear_products = "work_band"
+retained_projection = "least_squares"
+filter = "none"
+filter_strength = 0.0
+[audit]
+coordinate_overgrid_increment = 4
+angular_overgrid_degree = 1
+sphere_point_count = 112
+derivative_halo_u = 2
+derivative_halo_v = 2
+endpoint_mask_u = 2
+endpoint_mask_v = 2
+[output]
+checkpoints = false
+checkpoint_every = 1
+save_residual_maps = true
+save_figures = true

@@ -1,0 +1,60 @@
+schema_version = 1
+[experiment]
+identifier = "exp04"
+title = "Vacuum strong short pulse and zero control"
+equation_system = "vacuum"
+[physics]
+pulse_strength = 1.0
+control_strength = 0.0
+v1 = 0.5
+cap = 0.005
+[initial_data]
+profile = "low_band_hemisphere"
+shear_divisor = 3.2
+[coordinates]
+u_min = -1.0
+u_max = -0.5
+v_min = 0.0
+v_max = 0.005
+u_map = "tau_negative_log"
+v_map = "square_root"
+u_breakpoints = [-1.0, -0.7071067811865476, -0.5]
+v_breakpoints = [0.0, 0.0002475, 0.00099, 0.00260992977306435, 0.005]
+u_degrees = [8, 8]
+v_degrees = [8, 8, 8, 8]
+[angular]
+construction = "fibonacci"
+point_count = 550
+neighbor_count = 40
+seed = 0
+retained_degree = 10
+work_degree = 20
+differentiation_degree = 21
+[solver]
+maximum_sweeps = 6
+tolerance = 1e-9
+relaxation = 1.0
+slab_direction = "none"
+rk_substeps = 4
+sdc_sweeps = 12
+metric_substeps = 2
+boundary_substeps = 4
+stopping_norm = "weighted_maximum"
+[projection]
+nonlinear_products = "work_band"
+retained_projection = "least_squares"
+filter = "none"
+filter_strength = 0.0
+[audit]
+coordinate_overgrid_increment = 4
+angular_overgrid_degree = 4
+sphere_point_count = 562
+derivative_halo_u = 2
+derivative_halo_v = 1
+endpoint_mask_u = 2
+endpoint_mask_v = 1
+[output]
+checkpoints = false
+checkpoint_every = 1
+save_residual_maps = true
+save_figures = true

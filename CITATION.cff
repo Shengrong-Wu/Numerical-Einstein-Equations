@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using this metadata."
+title: "Picard Iteration for the Characteristic Initial Value Problem of the Einstein Equations"
+type: software
+authors:
+  - family-names: Wu
+    given-names: Shengrong
+version: 0.1.0
+date-released: 2026-07-31
+
