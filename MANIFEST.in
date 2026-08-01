@@ -1,6 +1,5 @@
 include README.md
 include CITATION.cff
-include LICENSE
 recursive-include configs *.toml
 recursive-include docs *.bib *.md *.pdf *.png *.tex
 recursive-include scripts *.py
@@ -8,6 +7,3 @@ recursive-include tests *.py
 prune results
 prune build
 prune dist
-exclude AGENT.md
-global-exclude *.py[cod]
-global-exclude __pycache__
