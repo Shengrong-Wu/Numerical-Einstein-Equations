@@ -8,7 +8,7 @@ kappa = 0.25
 delta = 0.1
 v_max = 0.01
 [initial_data]
-scalar_amplitude = 2.0
+scalar_amplitude = -2.0
 profile_scale = 0.01
 shear_amplitude = 0.1
 shear_profile = "quadrupole"

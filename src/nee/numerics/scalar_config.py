@@ -7,6 +7,7 @@ particular grid, angular band, or characteristic datum in the solvers.
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -106,8 +107,8 @@ class ExperimentConfig:
             raise ValueError(
                 "incoming_scalar_branch must be 'positive' or 'negative'"
             )
-        if not d.outgoing_scalar_amplitude >= 0.0:
-            raise ValueError("outgoing_scalar_amplitude must be nonnegative")
+        if not math.isfinite(d.outgoing_scalar_amplitude):
+            raise ValueError("outgoing_scalar_amplitude must be finite")
         if not d.outgoing_profile_scale >= 0.0:
             raise ValueError("outgoing_profile_scale must be nonnegative")
         if d.boundary_substeps < 1:

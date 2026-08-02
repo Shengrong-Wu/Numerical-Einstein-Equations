@@ -19,7 +19,7 @@ class TrappedSectionParameters:
     kappa: float = 0.25
     delta: float = 0.1
     pulse_scale: float = 0.01
-    scalar_amplitude: float = 2.0
+    scalar_amplitude: float = -2.0
     shear_amplitude: float = 0.1
     v_max: float = 0.04
     base_tau_elements: int = 12
@@ -31,8 +31,10 @@ class TrappedSectionParameters:
             raise ValueError("delta must lie in (0,1]")
         if self.pulse_scale <= 0.0 or self.v_max <= 0.0:
             raise ValueError("pulse_scale and v_max must be positive")
-        if self.scalar_amplitude < 0.0 or self.shear_amplitude < 0.0:
-            raise ValueError("pulse amplitudes must be nonnegative")
+        if not np.isfinite(self.scalar_amplitude):
+            raise ValueError("scalar_amplitude must be finite")
+        if self.shear_amplitude < 0.0:
+            raise ValueError("shear_amplitude must be nonnegative")
         if self.base_tau_elements < 1:
             raise ValueError("base_tau_elements must be positive")
 

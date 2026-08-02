@@ -98,7 +98,7 @@ def numerical_config(*, control: bool, continued: bool, quick: bool) -> Experime
             corner_outgoing_scalar=corner_scalar,
             incoming_scalar_branch="negative",
             outgoing_scalar_power=0.1,
-            outgoing_scalar_amplitude=2.0,
+            outgoing_scalar_amplitude=-2.0,
             outgoing_profile_scale=0.01,
             shear_vector_amplitude=0.1,
             shear_profile_power=0.1,

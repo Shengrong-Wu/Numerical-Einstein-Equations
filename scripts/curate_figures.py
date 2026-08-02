@@ -22,6 +22,17 @@ def _json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _exp08_completed() -> bool:
+    paths = (
+        ROOT / "results/exp08/summary.json",
+        ROOT / "results/exp08-angular-control/summary.json",
+    )
+    return all(
+        path.exists() and _json(path).get("terminal_status") == "completed"
+        for path in paths
+    )
+
+
 def crossed_pulse_regions() -> None:
     source = ROOT / "results/exp05/data/level-3/residual-maps.npz"
     destination = ROOT / "docs/experiments/exp05/results/convergence-regions.png"
@@ -123,8 +134,15 @@ def trapped_sign_comparison() -> None:
 
 def main() -> None:
     crossed_pulse_regions()
-    pulse_updates()
-    trapped_sign_comparison()
+    if _exp08_completed():
+        pulse_updates()
+        trapped_sign_comparison()
+    else:
+        for name in ("picard-updates.png", "trapped-sign-comparison.png"):
+            (ROOT / "docs/experiments/exp08/results" / name).unlink(
+                missing_ok=True
+            )
+        print("skipping Experiment 8 figures: production runs are not completed")
 
 
 if __name__ == "__main__":

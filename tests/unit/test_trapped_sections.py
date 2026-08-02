@@ -4,6 +4,7 @@ from nee.diagnostics.trapped_sections import trapped_sections
 from nee.initial_data.scalar_pulse import (
     TrappedSectionParameters,
     incoming_spherical_data,
+    outgoing_scalar_data,
     prolong_exact_prefix,
     pulse_profile,
 )
@@ -22,6 +23,16 @@ def test_pulse_profile_has_exact_corner_and_is_increasing() -> None:
     values = pulse_profile(np.array([0.0, 1e-8, 1e-4, 0.04]), TrappedSectionParameters())
     assert values[0] == 0.0
     assert np.all(np.diff(values) > 0.0)
+
+
+def test_outgoing_scalar_perturbation_is_negative() -> None:
+    parameters = TrappedSectionParameters()
+    v = np.array([0.0, 0.01, 0.04])
+    values = outgoing_scalar_data(v, parameters)
+    perturbation = values - values[0]
+    expected = -2.0 * (v / (v + 0.01)) ** 0.1
+    expected[0] = 0.0
+    np.testing.assert_allclose(perturbation, expected, rtol=0.0, atol=1.0e-15)
 
 
 def test_incoming_analytic_face_identities() -> None:

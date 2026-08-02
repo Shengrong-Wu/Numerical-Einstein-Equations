@@ -31,6 +31,7 @@ def test_trapped_section_control_changes_only_angular_resolution() -> None:
     assert standard.coordinates == control.coordinates
     assert standard.physics == control.physics
     assert standard.initial_data == control.initial_data
+    assert standard.initial_data["scalar_amplitude"] == -2.0
     assert (standard.angular.retained_degree, standard.angular.work_degree) == (5, 10)
     assert (control.angular.retained_degree, control.angular.work_degree) == (7, 14)
 

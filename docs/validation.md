@@ -14,12 +14,18 @@ platform runtime counter to GiB.
 | Experiment 5 standard | 0 / completed | 3087.59 | 2.37 | 492 MiB |
 | Experiment 6 standard | 0 / completed | 3211.11 | 1.49 | 512 MiB |
 | Experiment 7 standard | 2 / failed | 2312.45 | 1.83 | 857 MiB |
-| Experiment 8 standard | 0 / completed | 1895.46 | 2.36 | 310 MiB |
-| Experiment 8 angular control | 0 / completed | 3590.13 | 3.61 | 537 MiB |
+| Experiment 8 standard, negative pulse | 2 / failed | 53.21 | -- | 4.2 MiB |
+| Experiment 8 angular control, negative pulse | 2 / failed | 95.57 | -- | 7.3 MiB |
 
 Experiment 7 exits nonzero because two extreme stress inputs make the incoming
 scalar constraint radicand negative. This is an explicit invalid-data gate; 22
 other cases complete.
+
+For the requested signed perturbation
+\(e_4\phi(-1,v)-e_4\phi(-1,0)=-2(v/(v+0.01))^{0.1}\), both Experiment 8
+boundary constructions are finite, but both angular bands overflow in the
+coupled outgoing Raychaudhuri/metric march before base sweep 1 completes. No
+continued or trapped-section artifacts exist for these failed runs.
 
 The finalized Experiment 3 artifact set includes its separately regenerated
 and hashed characteristic boundary. An independent repeat preserved 198 arrays
@@ -60,7 +66,8 @@ their tolerances were not widened.
 - Experiment 7 passes coordinate/angular refinement of the protected current
   audit, while its two invalid stress probes and diagnostic replay exception
   remain visible.
-- Experiment 8 finds overlapping negative-expansion cells at both angular
-  bands, but neither continuation settles below \(10^{-4}\), the protected
-  residuals remain large, and no coordinate refinement is available. It is not
-  a candidate or certificate.
+- With the negative Experiment 8 scalar perturbation, both tested angular
+  bands fail before completing the first base Picard sweep. The finite boundary
+  data and positive initial outgoing expansion do not contain a trapped
+  section; the subsequent overflow supplies neither a candidate nor a
+  certificate.
