@@ -1,0 +1,254 @@
+
+\section{Equations and Theoretical Analysis}
+\subsection{Double null foliation and equations}
+In this section, we introduce the equations for Lorentzian metric under double null foliation. Let $(\mathcal{M},g)$ be a $4$-dimensional Lorentzian manifold. With double null coordinates $(u,v,\theta^A)$, the metric can be written as 
+\begin{equation}
+    g=-2\Omega^2(du\otimes dv+dv\otimes du)+g_{AB}(d\theta^A-b^Adu)\otimes (d\theta^B-b^Bdu),
+\end{equation}
+and we use $(g_{AB},b^A,\Omega)$ to represent the metric. The level sets of $u$ and $v$ are denoted by $H_u$ and $\Hb_{v}$ respectively, and their spherical intersection $H_u\cap\Hb_v$ is denoted by $S_{u,v}$.
+With double null frame 
+\[e_3=\Omega^{-1}(\partial_u+b),\ e_4=\Omega^{-1}\partial_v,\ e_A=\partial_{\theta^A},\]
+we can define Ricci coefficients, or connection components
+\begin{equation}\label{Ricci_coefficients_definition}
+    \begin{aligned}
+    \chi_{A B}=g\left(D_A e_4, e_B\right), &\qquad \underline{\chi}_{A B}=g\left(D_A e_3, e_B\right), \\
+    \eta_A=-\frac{1}{2} g\left(D_3 e_A, e_4\right), &\qquad \underline{\eta}_A=-\frac{1}{2} g\left(D_4 e_A, e_3\right), \\
+    {\omega}=-\frac{1}{4} g\left(D_4 e_3, e_4\right), &\qquad \underline{\omega}=-\frac{1}{4} g\left(D_3 e_4, e_3\right),\\
+    \zeta_A=\frac{1}{2}g\left(D_A e_4,e_3\right)&=-\frac{1}{4}\Omega^{-2}(\Lie_vb^B)g_{AB}.
+    \end{aligned}
+\end{equation}
+Their transport equations are listed below:
+\begin{equation}\label{eq:Ricci_coefficients_propagation_1}
+    \begin{aligned}
+        \nabla_4 \operatorname{tr} \chi+\frac{1}{2}(\operatorname{tr} \chi)^2=&-\operatorname{Ric}_{44}-|\hat{\chi}|^2-2 \omega \operatorname{tr} \chi, \\
+     \nabla_3 \operatorname{tr} \underline{\chi}+\frac{1}{2}(\operatorname{tr} \underline{\chi})^2=&-\operatorname{Ric}_{33}-|\underline{\hat{\chi}}|^2-2 \underline{\omega} \operatorname{tr} \underline{\chi},
+    \end{aligned}
+\end{equation}
+\begin{equation}\label{eq:Ricci_coefficients_propagation_2}
+    \begin{aligned}
+        \nabla_3 \hat{\chi}_{A B}+\frac{1}{2} \operatorname{tr} \underline{\chi} \hat{\chi}_{A B}=&\widehat{\operatorname{Ric}}_{A B}+2 \underline{\omega} \hat{\chi}_{A B}+(\snab  \hat{\otimes} \eta)_{A B}+(\eta \hat{\otimes} \eta)_{A B}-\frac{1}{2} \operatorname{tr} \chi \underline{\hat{\chi}}_{A B}, \\
+     \nabla_4 \underline{\hat{\chi}}_{A B}+\frac{1}{2} \operatorname{tr} \chi \underline{\hat{\chi}}_{A B}=&\widehat{\operatorname{Ric}}_{A B}+2 \omega \underline{\hat{\chi}}_{A B}+(\snab\hat{\otimes} \underline{\eta})_{A B}+(\underline{\eta} {\hat{\otimes}} \underline{\eta})_{A B}-\frac{1}{2} \operatorname{tr} \underline{\chi} \hat{\chi}_{A B},
+    \end{aligned}
+\end{equation}
+\begin{equation}
+    \begin{aligned}
+        \nabla_3 \operatorname{tr} \chi=&-\frac{1}{2} \operatorname{tr} \chi \operatorname{tr} \underline{\chi}+\sg^{A B} R_{3 A B 4}+2 \underline{\omega} \operatorname{tr} \chi+2 \sdiv \eta+2|\eta|^2-\hat{\chi} \cdot \underline{\hat{\chi}}\\
+        =&-\tr\chi\tr\chib+2\omegab\tr\chi+2\sdiv\eta+2\left|\eta\right|^2-2K+R+\Rc_{34}, \\
+        \nabla_4 \operatorname{tr} \underline{\chi}=&-\frac{1}{2} \operatorname{tr} \chi \operatorname{tr} \underline{\chi}+\sg^{A B} R_{3 A B 4}+2 \omega \operatorname{tr} \underline{\chi}+2 \sdiv \underline{\eta}+2|\underline{\eta}|^2-\hat{\chi} \cdot \underline{\hat{\chi}}\\
+        =&-\tr\chi\tr\chib+2\omega\tr\chib+2\sdiv\etab+2\left|\etab\right|^2-2K+R+\Rc_{34}.
+    \end{aligned}
+\end{equation} 
+\begin{equation}\label{eq:Ricci_coefficients_propagation_3}
+    \begin{aligned}
+        \nabla_4 \eta=&-\chi \cdot(\eta-\underline{\eta})-\frac{1}{2} R_{A 434}, \\
+        \nabla_3 \underline{\eta}=&-\underline{\chi} \cdot(\underline{\eta}-\eta)-\frac{1}{2} R_{A 343}, \\
+        \nabla_4 \underline{\omega}=&\frac{1}{4}\left(\operatorname{Ric}_{34}+\sg^{A B} R_{3 A B 4}\right)+2 \underline{\omega} \omega+\frac{1}{2}|\eta|^2-\eta \cdot \underline{\eta}\\
+        =&2\omega\omegab-\frac{1}{2}  K+\frac{1}{2} \Rc_{34}+\frac{1}{4} R +\frac{1}{4}\chih\cdot\chibh-\frac{1}{8}\tr\chi\,\tr\chib+\frac{1}{2}\left|\eta\right|^2-\eta\cdot\etab, \\
+        \nabla_3 \omega=&\frac{1}{4}\left(\operatorname{Ric}_{34}+\sg^{A B} R_{3 A B 4}\right)+2 \underline{\omega} \omega+\frac{1}{2}|\underline{\eta}|^2-\eta \cdot \underline{\eta}\\
+        =&2\omega\omegab-\frac{1}{2}  K+\frac{1}{2} \Rc_{34}+\frac{1}{4} R +\frac{1}{4}\chih\cdot\chibh-\frac{1}{8}\tr\chi\,\tr\chib+\frac{1}{2}\left|\underline\eta\right|^2-\eta\cdot\etab.
+    \end{aligned}
+\end{equation}
+Moreover, we have equations for $\zeta$:
+\begin{equation}\label{eq:Ricci_coefficients_propagation_4}
+    \begin{aligned}
+        &\Omega\Rc_{3A}=\Omega\nabla_3\zeta+\frac{3}{2}\Omega\tr\chib\zeta+\Omega\chibh\cdot\zeta+\Omega\tr\chib\nabla\log\Omega\\
+        &\qquad\qquad\qquad+2\nabla(\Omega\omegab)+\dv(\Omega\chibh)-\frac{1}{2}\nabla(\Omega\tr\chib),\\
+        &\Omega\Rc_{4A}=-\Omega\nabla_4\zeta-\frac{3}{2}\Omega\tr\chi\zeta-\Omega\chih\cdot\zeta+\Omega\tr\chi\nabla\log\Omega\\
+        &\qquad\qquad\qquad+2\nabla(\Omega\omega)+\dv(\Omega\chih)-\frac{1}{2}\nabla(\Omega\tr\chi).
+    \end{aligned}
+\end{equation}
+Here $K$ stands for Gaussian curvature of topological sphere $S_{u,v}$. Gauss-Codazzi equations imply 
+\begin{equation}\label{eq:Gauss-Codazzi_1}
+        \begin{aligned}
+         K=&\frac{1}{2} \sg^{A B} R_{3 A 4 B}+\frac{1}{2} R+\frac{1}{2} \operatorname{Ric}_{34}+\frac{1}{2} \hat{\chi} \cdot \underline{\hat{\chi}}-\frac{1}{4} \operatorname{tr} \chi \operatorname{tr} \underline{\chi}, 
+        \end{aligned}
+        \end{equation}
+\begin{equation}\label{eq:Gauss-Codazzi_2}
+            \begin{aligned} 
+            \snab^B \hat{\chi}_{A B}-\frac{1}{2} \snab_A \operatorname{tr} \chi=&-\frac{1}{2} R_{A 434}+\operatorname{Ric}_{4 A}+\frac{1}{2} \operatorname{tr} \chi \zeta_A-\zeta^B \hat{\chi}_{A B}, \\
+            \snab^B \underline{\hat{\chi}}_{A B}-\frac{1}{2} \snab_A \operatorname{tr} \underline{\chi}=&-\frac{1}{2} R_{A 343}+\operatorname{Ric}_{3 A}-\frac{1}{2} \operatorname{tr} \underline{\chi} \zeta_A+\zeta^B \underline{\hat{\chi}}_{A B}.
+            \end{aligned}
+        \end{equation}
+\begin{equation}\label{eq:curl-eta-etab}
+            \begin{aligned}
+                \snab_A \eta_B-\snab_B \eta_A=&R_{4[A B] 3}+\underline{\hat{\chi}}^C{ }_{[A} \hat{\chi}_{B] C}, \\
+         \snab_A \underline{\eta}_B-\snab_B \underline{\eta}_A=&-R_{4[A B] 3}-\underline{\hat{\chi}}^C{ }_{[A} \hat{\chi}_{B] C}, \\
+            \end{aligned}
+        \end{equation}
+For Weyl curvature,
+\begin{equation*}
+    W_{\mu\nu\theta\lambda}=R_{\mu\nu\theta\lambda}-\frac{1}{2}\left(\Rc_{\mu\theta}g_{\nu\lambda}+g_{\mu\theta}\Rc_{\nu\lambda}-\Rc_{\nu\theta}g_{\mu\lambda}-g_{\nu\theta}\Rc_{\mu\lambda}\right)+\frac{R}{6}\left(g_{\mu\theta}g_{\nu\lambda}-g_{\nu\theta}g_{\mu\lambda}\right),
+\end{equation*}
+we define the curvature components
+\begin{equation}
+\begin{aligned}
+\beta_A & =\frac{1}{2} W\left(e_A, e_4, e_3, e_4\right), & & \underline{\beta}_A=\frac{1}{2} W\left(e_A, e_3, e_3, e_4\right), \\
+\rho & =\frac{1}{4} W\left(e_4, e_3, e_4, e_3\right), & & \sigma=\frac{1}{4}{ }^* W\left(e_4, e_3, e_4, e_3\right).
+\end{aligned}
+\end{equation}
+Then previous equations imply the following algebraic relations,
+\begin{equation}
+    K=-\rho+\frac{1}{2}R+\Rc_{34}+\frac{1}{2}\chibh\cdot\chih-\frac{1}{4}\tr\chib\tr\chi,
+\end{equation}
+\begin{equation}
+    \cl\eta=-\cl\etab=\sigma+\frac{1}{2}\chibh\wedge\chih,
+\end{equation}
+\begin{equation}\label{Codazzi_eq_chi}
+    \dv\chih-\frac{1}{2}\nabla\tr\chi=-\beta+\frac{1}{2}\Rc_{4\cdot}+\frac{1}{2}\tr\chi\zeta-\zeta\cdot\chih,
+\end{equation}
+\begin{equation}\label{Codazzi_eq_chib}
+    \dv\chibh-\frac{1}{2}\nabla\tr\chib=\betab+\frac{1}{2}\Rc_{3\cdot}-\frac{1}{2}\tr\chib\zeta+\zeta\cdot\chibh.
+\end{equation}
+After introducing the reduced curvature
+\begin{equation}
+    \beta^r_A=\beta_A-\frac{1}{2}\Rc_{4A},\, \betab^r_A=\betab_A+\frac{1}{2}\Rc_{3A}, \,\sigma^r=\sigma+\frac{1}{2}\chibh\wedge\chih,
+\end{equation}
+we can write the equations for curvature components
+\begin{equation}
+    \begin{aligned}
+        &\Omega\nabla_3 K+\Omega\tr\chib K=\dv \left(\Omega\betab^r\right)+\frac{1}{2}\dv\left(\eta\Omega\tr\chib\right)-\dv\left(\eta\cdot\Omega\chibh\right),\\
+         &\Omega\nabla_4 K+\Omega\tr\chi K=-\dv \left(\Omega\beta^r\right)+\frac{1}{2}\dv\left(\etab\Omega\tr\chi\right)-\dv\left(\etab\cdot\Omega\chih\right),
+    \end{aligned}
+\end{equation}
+\begin{equation}
+    \begin{aligned}
+        \nabla_3\beta^r&+\left(\tr\chib-2\omegab\right) \beta^r=-\nabla K+{}^*\nabla\sigma+2\chih\cdot\betab\\
+        &\qquad+\frac{1}{2}\left(\nabla(\chih\cdot\chibh)-{}^*\nabla(\chih\wedge\chibh)\right)-\frac{1}{4}\nabla\left(\tr\chi\tr\chib\right)\\
+        &\qquad+3(\eta\rho+{}^*\eta\sigma)+\nabla_A\left(g^{CD}\Rc_{CD}\right)-\nabla^B \Rc_{BA}-\frac{1}{2}\tr\chib \Rc_{4A},\\
+        \nabla_4\betab^r&+\left(\tr\chi -2\omega\right)\betab^r=\nabla K+{}^*\nabla\sigma+2\chibh\cdot\beta\\
+        &\qquad-\frac{1}{2}\left(\nabla(\chih\cdot\chibh)+{}^*\nabla(\chih\wedge\chibh)\right)+\frac{1}{4}\nabla\left(\tr\chi\tr\chib\right)\\
+        &\qquad-3\left(\etab\rho-{}^*\etab\sigma\right) -\nabla_A(g^{CD}\Rc_{CD})+\nabla^B \Rc_{BA}+\frac{1}{2}\tr\chi \Rc_{3A}.
+    \end{aligned}
+\end{equation}
+Using \eqref{eq:Ricci_coefficients_propagation_3}, we derive 
+\begin{equation}
+  \begin{aligned}
+      \Omega\nabla_3\cl\etab+\Omega\tr\chib\cl\etab=&\cl(\Omega\betab^r)+\epsilon^{AC}\nabla_A\left(\Omega\chib\cdot\eta\right)_C-\epsilon^{AC}\nabla_A(\Omega\Rc)_{C3},\\
+      \Omega\nabla_4\cl\eta+\Omega\tr\chi\cl\eta=&-\cl(\Omega\beta^r)+\epsilon^{AC}\nabla_A\left(\Omega\chi\cdot\etab\right)_C-\epsilon^{AC}\nabla_A(\Omega\Rc)_{C4},
+  \end{aligned}
+\end{equation}
+and
+\begin{equation}
+    \begin{aligned}
+        &\Omega\nabla_3\left(\dv \etab-K\right)+\Omega\tr\chib\left(\dv \etab-K\right)=4\dv(\Omega\chibh\cdot\zeta)-\dv(\Omega\Rc_3),\\
+        &\Omega\nabla_4\left(\dv \eta-K\right)+\Omega\tr\chi\left(\dv \eta-K\right)=-4\dv(\Omega\chih\cdot\zeta)-\dv(\Omega\Rc_4).
+    \end{aligned}
+\end{equation}
+For a scalar function $\phi$, there is equation
+\begin{equation}\label{eq:ese-wave-eq}
+    -\Omega^2\square\phi=\Omega e_3(\Omega e_4\phi)+\frac{1}{2}\Omega\tr\chi\Omega e_3\phi+\frac{1}{2}\Omega\tr\chib\Omega e_4\phi-\Omega^2\Delta\phi-2\Omega^2\eta\cdot\nabla\phi.
+\end{equation}
+
+\subsection{Local existence}
+We now introduce some results on Einstein vacuum equations. Similar results can be derived for other Einstein field equations and we omit them due to length of the article.
+
+We first state the existence theorem for characteristic initial value problem of Einstein vacuum equations from \cite{luk-12}.
+\begin{theorem}
+    Given initial null hypersurface $H_0,\Hb_0$ and regular initial metric $(g,\Omega,b)$ on it, we define $\chi_{AB}=\frac{1}{2}\Lie_{e_4}g_{AB}$ on $H_0$ and $\chib_{AB}=\frac{1}{2}\Lie_{e_3}g_{AB}$ on $\Hb_0$. Suppose 
+    \[e_4(\tr\chi)+\frac{1}{2}(\tr\chi)^2+|\chih|^2+2\omega\tr\chi=0,\ e_3(\tr\chib)+\frac{1}{2}(\tr\chib)^2+|\chibh|^2+2\omegab\tr\chib,\]
+    hold on $H_0,\Hb_0$ respectively, then there is a future open neighborhood of $H_0\cup \Hb_0$ and metric $(g,b,\Omega)$ on it solving the Einstein vacuum equations and satisfying the initial data.
+\end{theorem}
+This theorem reveals the local existence, and we further remark that for larger region, such as $(0,1)^2\times\mathbb{S}^2$, as long as the a priori estimates hold in it, the solution can be extended to the region.
+
+\subsection{Residual control}
+In this paper, we target to deal with asymmetric Einstein equations, which in general do not have explicit solutions. To measure the computational error, we use Ricci residues. For Einstein equation 
+\[G_{\mu\nu}:=\Rc_{\mu\nu}-\frac{1}{2}Rg_{\mu\nu}=T_{\mu\nu},\]
+we measure $\|G-T\|_{L^2(S_{u,v})}$ to evaluate the approximation. The theorems below reveals that in our case the difference of metrics is controlled by the difference of curvature residues.
+
+
+\begin{theorem}
+    We consider metric $\oc{g}_{AB},\oc{b},\oc{\Omega}$ on $(0, 1)\times (0,1)\times \mathbb{S}^2$ such that
+    \[\oc{\Rc}_{44}(0,v)=0,\ \oc{\Rc}_{33}(u,0)=0,\ \oc{\Rc}_{4A}(0,v)=0,\ \oc{\Rc}_{3A}(u,0)=0,\]
+    % \[\oc{\Rc}_{AB}(u,0)=0,\ \oc{\Rc_{34}}(u,0)=0,\ \oc{R}(u,0)=0,\]
+    and estimates 
+    \begin{equation}
+        \|\oc{\Rc}_{AB},\oc{\Rc}_3,\oc{\Rc}_4,\oc{\Rc}_{34},\oc{\Rc}_{33},\oc{\Rc}_{44}\|_{L^\infty_uL^\infty_vH^3(S)}\leq \epsilon.
+    \end{equation}
+    We assume moreover 
+    \begin{equation}
+        \| \partial_{\mathbb{S}}\oc{g}, \partial_{\mathbb{S}}\oc{b}, \partial_{\mathbb{S}}\oc\Omega, \oc{\psi}\|_{L^\infty_u L^\infty_v H^4(S)} \leq C_0,
+    \end{equation}
+    where $\psi$ stands for Ricci coefficients in interest.
+    Then for $\epsilon=\epsilon(C_0)$ sufficiently small, there exists $(g,b,\Omega)$ solving EVE on $( 0,1)\times (0,1)\times \mathbb{S}^2$ with initial data 
+    \[(g,b,\Omega)=(\oc{g},\oc{b},\oc\Omega),\ {\rm on}\ \Hb_0\cup H_{0},\]
+    and estimates
+    \begin{equation}
+        \|g-\oc{g},b-\oc{b},\Omega-\oc{\Omega}\|_{L^\infty_u L^\infty_v H^4(S)}\leq \epsilon^{1/2}.
+    \end{equation}
+\end{theorem}
+
+The methods of deriving the equations of difference and doing estimates are similar to section 7 of \cite{an-26},
+so we only write the proof in sketch. 
+
+Define auxiliary functions $\omega^\dagger,\omegab^\dagger$ by
+\[\nabla_3\omega^\dagger=\frac{1}{2}\cl\zeta,\ \omega^\dagger|_{H_{-1}}=0,\ \nabla_4\omegab^\dagger=\frac{1}{2}\cl\zeta,\ \omegab^\dagger|_{\Hb_0}=0.\]
+We make bootstrap assumption
+\begin{equation*}
+    \begin{aligned}
+        &\|\wt{\beta},\wt{K},\nabla\wt\eta,\nabla\wt{\etab},\nabla\wt{\chi},\nabla\wt{\omega},\nabla\wt{\omega^\dagger}\|_{L^2_vH^3(S)}\\
+        &\qquad+\|\wt{K},\wt{\betab},\nabla\wt{\eta},\nabla\wt\etab,\nabla\wt{\chib},\nabla\wt{\omegab},\nabla\wt{\omegab^\dagger}\|_{L^2_uH^3(S)}\leq B\exp(D(v+u))\epsilon.
+    \end{aligned}
+\end{equation*}
+We will prove that we can choose $D$ sufficiently large so that the bootstrap constant $B$ can be improved to $B\leq 1$.
+
+The motivation is direct. Let $\partial_uf\leq C_0f,\partial_vf\leq C_0f$, and suppose
+$$f(u,v)\leq B\exp(D(v+u))\epsilon,$$ then we integrate it 
+\begin{equation*}
+    \begin{aligned}
+        f(u,v)-f(0,v)\leq&C_0\int_{0}^u f(u^\prime,v) du^\prime\\
+        \leq  & \frac{C_0B}{D}\left(\exp(D(u+v))-\exp(Dv)\right)\epsilon \leq \frac{C_0B}{D} \exp(D(u+v))\epsilon,\\
+        f(u,v)-f(u,0)\leq & C_0\int_{0}^v f(u,v^\prime) dv^\prime\\
+        \leq & \frac{C_0B}{D}\left(\exp(D(u+v))-\exp(Du)\right)\epsilon \leq \frac{C_0B}{D} \exp(D(u+v))\epsilon.
+    \end{aligned}
+\end{equation*}
+If we choose $D^{1/2}\geq C_0B$, the bootstrap assumption will be closed. Absorbing the bootstrap constant by the parameter $D$ actually shows the increasing rate is controlled exponentially. Even though the norms increase quickly, they will not exceed $O(\epsilon)\leq o(\epsilon^{1/2})$ in finite region.
+
+In summary, we conclude 
+\begin{lemma}
+    Suppose $\|f\|_{L^2(S_{u,v})}\leq B\exp(D(v+u))\epsilon$, then we have
+    \begin{equation}
+        \|f\|_{L^2_uL^2(S)}+\|f\|_{L^2_vL^2(S)} \leq D^{-1/2}\exp(D(v+u))\epsilon,
+    \end{equation}
+    when $D$ is sufficiently large.
+
+    Suppose either $\|h\|_{L^2_uL^2(S)}\leq B\exp(D(u+v))\epsilon$ or $\|h\|_{L^2_vL^2(S)}\leq B\exp(D(u+v))\epsilon$, then we have    
+    \begin{equation}
+        \|h\|_{L^2_uL^2_vL^2(S)} \leq D^{-1/2}\exp(D(v+u))\epsilon,
+    \end{equation}
+    when $D$ is sufficiently large.
+\end{lemma}
+
+We use notation
+\[\psi_1\in\{\eta,\etab,\chi,\omega\},\ \psi_2\in\{\eta,\etab,\chib,\omegab\}\]
+Because 
+\[\Lie_v b=-2\Omega^2(\eta-\etab),\ \Lie_vg=2\Omega\chi,\ \Lie_v\log\Omega=-2\Omega\omega,\]
+we obtain that
+\begin{equation}
+    \|\wt{b},\wt{g},\wt{\log\Omega}\|_{H^4(S_{u,v})}\lesssim \|\wt{\eta},\wt{\etab},\wt{\chi},\wt{\omega},\wt{\Omega},\wt{g}\|_{L^2_vH^4(S)}\lesssim B\exp(D(u+v))\epsilon.
+\end{equation}
+For Bianchi pair $(\Psi_1,\Psi_2)$ in interest, we consider equations 
+\begin{equation*}
+    \begin{aligned}
+        \Omega\nabla_3\wt{\Psi_1} &+\mathcal{D}\wt{\Psi_2}=\wt{\psi\Psi}+\wt{\psi\nabla\psi}+\wt{\psi^3}+\wt{b}\cdot\nabla\oc{\Psi_1}+\wt{\partial g}\oc{\Psi_2}+\wt{g}\oc{\nabla\Psi_2}+\oc\psi\oc\Rc+\oc{\nabla\Rc},\\
+        \Omega\nabla_4\wt{\Psi_2} &-{}^*\mathcal{D}\wt{\Psi_1}=\wt{\psi\Psi}+\wt{\psi\nabla\psi}+\wt{\psi^3}+\wt{\partial g}\oc{\Psi_1}+\wt{g}\oc{\nabla\Psi_1}+\oc\psi\oc\Rc+\oc{\nabla\Rc}.
+    \end{aligned}
+\end{equation*}
+Energy estimates give that 
+\begin{equation*}
+    \begin{aligned}
+        &\|\wt\Psi_1\|^2_{L^2_vH^3(S)}+\|\wt\Psi_2\|^2_{L^2_uH^3(S)}\\
+        &\qquad\qquad\lesssim \epsilon^2+\|\wt{\partial g},\wt{g},\wt{\psi},\wt{\nabla\psi},\wt\Psi,\wt{b}\|^2_{L^2_uL^2_vH^3(S)}\lesssim (1+D^{-1/2})\exp(2D(u+v))\epsilon^2.
+    \end{aligned}
+\end{equation*}
+Applying the estimate to pairs
+\[(\beta,(K,\cl\eta)),\ ((K,\cl\etab),\betab),\ (\nabla\tr\chib,0),\ (0,\nabla\tr\chi),\]
+\[ (\dv\etab-K,0),\ (0,\dv\eta-K),\ (\nabla\omega+{}^*\nabla\omega^\dagger-\frac{1}{2}\beta,0),\ (0,-\nabla\omegab+{}^*\nabla\omegab^\dagger-\frac{1}{2}\betab),\]
+will finish the proof. 
+\begin{remark}
+    The conditions 
+    \[\oc{\Rc}_{44}(-1,v)=0,\ \oc{\Rc}_{33}(u,0)=0,\]
+    guarantee that $(\oc{g},\oc{b},\oc{\Omega})$ is a valid initial data set for characteristic initial value problem of Einstein vacuum equation, and 
+    \[\oc{\Rc}_{4A}(-1,v)=0,\ \oc{\Rc}_{3A}(u,0)=0,\]
+    ensure that $\oc\zeta$ along $H_{-1}$ and $\Hb_0$ is equal to the $\zeta$ of corresponding EVE solution. 
+\end{remark}
+
