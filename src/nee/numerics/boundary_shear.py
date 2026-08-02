@@ -1,7 +1,7 @@
 """Temporary smooth datum ``hat(chi)^0(v)=v X`` for a controlled test.
 
 The fixed tensor is the normalized trace-free round Hessian of ``z^2``.
-It is smooth on the whole sphere, symmetric, round-metric trace-free, and
+It is smooth on the whole sphere, symmetric, round-g trace-free, and
 has continuum maximum norm one.  The production experiments continue to use
 ``smooth_pulse``; this module is selected only by an explicit CLI
 flag.
@@ -47,17 +47,17 @@ def solve_linear_fixed_boundary(
     v: Array,
     minimum_eigenvalue: float = 1.0e-7,
 ) -> dict[str, Array | float]:
-    """Solve the outgoing constraints with reference shear ``v X``."""
+    """Solve the outgoing constraints with reference Omega_chih ``v X``."""
 
     if len(v) < 9 or abs(float(v[0])) > 1.0e-15 or np.any(np.diff(v) <= 0.0):
         raise ValueError("v must be a strictly increasing grid beginning at zero")
     tensor = fixed_tracefree_tensor(sphere)
     count = len(v)
-    metric = np.zeros((sphere.count, count, 3, 3), dtype=float)
+    g = np.zeros((sphere.count, count, 3, 3), dtype=float)
     expansion = np.zeros((sphere.count, count), dtype=float)
-    shear = np.zeros_like(metric)
-    reference = np.zeros_like(metric)
-    metric[:, 0] = sphere.projector
+    Omega_chih = np.zeros_like(g)
+    reference = np.zeros_like(g)
+    g[:, 0] = sphere.projector
     expansion[:, 0] = 2.0
 
     def reference_shear(value: float) -> Array:
@@ -69,8 +69,8 @@ def solve_linear_fixed_boundary(
         current_shear = transferred_shear(
             sphere, reference_shear(value), current_metric
         )
-        inverse = tangent_inverse(sphere, current_metric)
-        norm_sq = tensor_norm_sq(current_shear, inverse)
+        inverse_g = tangent_inverse(sphere, current_metric)
+        norm_sq = tensor_norm_sq(current_shear, inverse_g)
         return (
             current_expansion[:, None, None] * current_metric
             + 2.0 * current_shear,
@@ -80,7 +80,7 @@ def solve_linear_fixed_boundary(
     for j in range(count - 1):
         step = float(v[j + 1] - v[j])
         value = float(v[j])
-        current_metric = metric[:, j]
+        current_metric = g[:, j]
         current_expansion = expansion[:, j]
         with np.errstate(over="raise", invalid="raise", divide="raise"):
             try:
@@ -118,37 +118,37 @@ def solve_linear_fixed_boundary(
         eigenvalue = minimum_tangent_eigenvalue(sphere, next_metric)
         if eigenvalue <= minimum_eigenvalue:
             raise BoundaryDegeneracy(float(v[j]), float(v[j + 1]), eigenvalue)
-        metric[:, j + 1] = next_metric
+        g[:, j + 1] = next_metric
         expansion[:, j + 1] = next_expansion
 
-    inverse = tangent_inverse(sphere, metric)
+    inverse_g = tangent_inverse(sphere, g)
     for j, value in enumerate(v):
         reference[:, j] = reference_shear(float(value))
-        shear[:, j] = transferred_shear(
-            sphere, reference[:, j], metric[:, j]
+        Omega_chih[:, j] = transferred_shear(
+            sphere, reference[:, j], g[:, j]
         )
     reference_norm = np.sqrt(
         np.maximum(np.einsum("nvij,nvij->nv", reference, reference), 0.0)
     )
-    physical_norm = np.sqrt(np.maximum(tensor_norm_sq(shear, inverse), 0.0))
-    trace = np.einsum("nvij,nvji->nv", inverse, shear)
+    physical_norm = np.sqrt(np.maximum(tensor_norm_sq(Omega_chih, inverse_g), 0.0))
+    trace = np.einsum("nvij,nvji->nv", inverse_g, Omega_chih)
     reference_trace = np.einsum("nvij,nij->nv", reference, sphere.projector)
     tensor_norm = np.sqrt(
         np.maximum(np.einsum("nij,nij->n", tensor, tensor), 0.0)
     )
-    zeta, shift, zeta_source, zeta_iterations, zeta_update = solve_boundary_zeta(
-        sphere, metric, expansion, shear, v
+    zeta, b, zeta_source, zeta_iterations, zeta_update = solve_boundary_zeta(
+        sphere, g, expansion, Omega_chih, v
     )
     return {
-        "metric": metric,
-        "inverse": inverse,
-        "expansion": expansion,
-        "shear": shear,
+        "g": g,
+        "inverse_g": inverse_g,
+        "Omega_trchi": expansion,
+        "Omega_chih": Omega_chih,
         "reference_shear": reference,
-        "zeta_up": zeta,
-        "shift": shift,
+        "zeta": zeta,
+        "b": b,
         "zeta_source": zeta_source,
-        "minimum_eigenvalue": minimum_tangent_eigenvalue(sphere, metric),
+        "minimum_eigenvalue": minimum_tangent_eigenvalue(sphere, g),
         "minimum_reference_l1": float(
             np.min(np.trapezoid(reference_norm, v, axis=1))
         ),

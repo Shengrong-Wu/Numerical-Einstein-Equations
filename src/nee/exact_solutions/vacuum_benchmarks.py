@@ -3,11 +3,11 @@
 All exact states and characteristic faces are regenerated from the documented
 Schwarzschild and Kerr formulae.
 
-The numerical kernel derives ``q = Omega**(-1) tr(chi)`` and the trace-free
+The numerical kernel stores the theory-native weighted trace and trace-free
 part of ``Omega chi``. Summaries additionally report the full
 weighted forms
 
-    Xout = Omega chi = shear + 0.5 * Omega**2 * q * metric,
+    Xout = Omega chi = Omega_chih + 0.5 * Omega_trchi * g,
     Xin  = Omega chib,
 
 to make the stored full-form state explicit.
@@ -138,33 +138,32 @@ def _spherical_state_from_radius(
     omega_sq: Array,
     radius_u: Array,
     radius_v: Array,
-    weighted_omega: Array,
-    weighted_omegab: Array,
+    Omega_omega: Array,
+    Omega_omegab: Array,
 ) -> FirstOrderState:
     scalar = np.broadcast_to(
         np.ones((grid.count, 1, 1)),
         (grid.count, radius.shape[0], radius.shape[1]),
     )
     projector = sphere_broadcast(grid, 2)
-    metric = radius[None, ..., None, None] ** 2 * projector
-    omega = scalar * np.sqrt(omega_sq)[None]
-    weighted_expansion = scalar * (2.0 * radius_v / radius)[None]
-    q = weighted_expansion / omega**2
-    weighted_chib = (
+    g = radius[None, ..., None, None] ** 2 * projector
+    Omega = scalar * np.sqrt(omega_sq)[None]
+    Omega_trchi = scalar * (2.0 * radius_v / radius)[None]
+    Omega_chib = (
         radius[None, ..., None, None]
         * radius_u[None, ..., None, None]
         * projector
     )
     return FirstOrderState(
-        metric=metric.copy(),
-        omega=omega.copy(),
-        zeta_up=np.zeros((*omega.shape, 3)),
-        shift=np.zeros((*omega.shape, 3)),
-        q=q.copy(),
-        shear=np.zeros_like(metric),
-        weighted_chib=weighted_chib.copy(),
-        weighted_omega=scalar * weighted_omega[None],
-        weighted_omegab=scalar * weighted_omegab[None],
+        g=g.copy(),
+        Omega=Omega.copy(),
+        zeta=np.zeros((*Omega.shape, 3)),
+        b=np.zeros((*Omega.shape, 3)),
+        Omega_trchi=Omega_trchi.copy(),
+        Omega_chih=np.zeros_like(g),
+        Omega_chib=Omega_chib.copy(),
+        Omega_omega=scalar * Omega_omega[None],
+        Omega_omegab=scalar * Omega_omegab[None],
     )
 
 
@@ -299,10 +298,10 @@ def kruskal_state(
     radius_u = -coefficient * V
     radius_v = -coefficient * U
     omega_sq = 8.0 * mass**3 / radius * np.exp(-y)
-    weighted_omega = -coefficient * U * (radius + 2.0 * mass) / (
+    Omega_omega = -coefficient * U * (radius + 2.0 * mass) / (
         8.0 * mass * radius
     )
-    weighted_omegab = -coefficient * V * (radius + 2.0 * mass) / (
+    Omega_omegab = -coefficient * V * (radius + 2.0 * mass) / (
         8.0 * mass * radius
     )
     state = _spherical_state_from_radius(
@@ -311,8 +310,8 @@ def kruskal_state(
         omega_sq,
         radius_u,
         radius_v,
-        weighted_omega,
-        weighted_omegab,
+        Omega_omega,
+        Omega_omegab,
     )
     return state, {
         "minimum_radius": float(np.min(radius)),
@@ -325,9 +324,9 @@ def kruskal_state(
 
 
 def _full_weighted_outgoing(state: FirstOrderState) -> Array:
-    return state.shear + 0.5 * (
-        state.omega**2 * state.q
-    )[..., None, None] * state.metric
+    return state.Omega_chih + 0.5 * (
+        state.Omega_trchi
+    )[..., None, None] * state.g
 
 
 def _state_arrays(state: FirstOrderState) -> dict[str, Array]:
@@ -335,7 +334,7 @@ def _state_arrays(state: FirstOrderState) -> dict[str, Array]:
         item.name: np.asarray(getattr(state, item.name))
         for item in fields(FirstOrderState)
     }
-    values["weighted_chi"] = _full_weighted_outgoing(state)
+    values["Omega_chi"] = _full_weighted_outgoing(state)
     return values
 
 
@@ -343,11 +342,11 @@ def finite_difference_closures(
     state: FirstOrderState, u: Array, v: Array
 ) -> dict[str, float]:
     edge_order = 2 if min(len(u), len(v)) >= 3 else 1
-    metric_v = np.gradient(state.metric, v, axis=2, edge_order=edge_order)
-    metric_u = np.gradient(state.metric, u, axis=1, edge_order=edge_order)
+    metric_v = np.gradient(state.g, v, axis=2, edge_order=edge_order)
+    metric_u = np.gradient(state.g, u, axis=1, edge_order=edge_order)
     outgoing = 2.0 * _full_weighted_outgoing(state)
-    incoming = 2.0 * state.weighted_chib
-    scale = np.maximum(np.abs(state.metric), 1.0)
+    incoming = 2.0 * state.Omega_chib
+    scale = np.maximum(np.abs(state.g), 1.0)
     return {
         "metric_C4_max_relative": float(
             np.max(np.abs(metric_v - outgoing) / scale)
@@ -404,10 +403,10 @@ def run_picard_case(
             "seconds": time.perf_counter() - started,
             "picard_update": update_norm(next_state, state),
             "metric_error": relative_field_error(
-                next_state, exact, "metric"
+                next_state, exact, "g"
             ),
             "lapse_error": relative_field_error(
-                next_state, exact, "omega"
+                next_state, exact, "Omega"
             ),
             "outgoing_form_error": {
                 "absolute_max": float(
@@ -420,7 +419,7 @@ def run_picard_case(
                 )
             },
             "incoming_form_error": relative_field_error(
-                next_state, exact, "weighted_chib"
+                next_state, exact, "Omega_chib"
             ),
         }
         print(json.dumps({"case": case_id, **record}), flush=True)
@@ -674,7 +673,7 @@ def singularity_map_audit(
 
     The inherited rectangular Picard driver cannot evolve a u-dependent
     physical v boundary.  This audit therefore regenerates the exact Kruskal
-    state on the mapped grid and independently verifies both physical metric
+    state on the mapped grid and independently verifies both physical g
     closures using the declared Jacobian.  The limitation is explicit in the
     summary and is not promoted to a completed Picard certification.
     """
@@ -735,7 +734,7 @@ def singularity_map_audit(
         "limitation": (
             "The inherited numerical backend Picard implementation assumes a "
             "rectangular physical (u,v) grid.  This run verifies the exact "
-            "curved-map data and both Jacobian-corrected metric closures, "
+            "curved-map data and both Jacobian-corrected g closures, "
             "but it does not claim an interior Picard solve."
         ),
         "provenance": {

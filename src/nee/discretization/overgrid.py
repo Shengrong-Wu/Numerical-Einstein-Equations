@@ -254,24 +254,24 @@ def resample_primitives(
             coordinate, source_grid, target_grid, harmonic_degree
         )
 
-    metric, condition = transfer(fields.metric)
-    log_omega, _ = transfer(fields.log_omega)
-    shift, _ = transfer(fields.shift)
+    g, condition = transfer(fields.g)
+    log_Omega, _ = transfer(fields.log_Omega)
+    b, _ = transfer(fields.b)
     phi = None
     if fields.phi is not None:
         phi, _ = transfer(fields.phi)
-    metric = _project_tensor(target_grid, metric)
-    shift = _project_vector(target_grid, shift)
+    g = _project_tensor(target_grid, g)
+    b = _project_vector(target_grid, b)
     local = np.einsum(
         "nia,n...ij,njb->n...ab",
         target_grid.frames,
-        metric,
+        g,
         target_grid.frames,
     )
     minimum_eigenvalue = float(np.min(np.linalg.eigvalsh(local)))
     if minimum_eigenvalue <= 0.0:
         raise FloatingPointError(
-            "overgrid metric interpolation left the positive cone: "
+            "overgrid g interpolation left the positive cone: "
             f"{minimum_eigenvalue:.12g}"
         )
     return OvergridResult(
@@ -279,9 +279,9 @@ def resample_primitives(
         u=target_u,
         v=target_v,
         fields=PrimitiveFields(
-            metric=metric,
-            log_omega=log_omega,
-            shift=shift,
+            g=g,
+            log_Omega=log_Omega,
+            b=b,
             phi=phi,
         ),
         diagnostics={
@@ -405,22 +405,22 @@ def resample_primitives_power(
             harmonic_degree,
         )
 
-    metric, condition = transfer(fields.metric)
-    log_omega, _ = transfer(fields.log_omega)
-    shift, _ = transfer(fields.shift)
+    g, condition = transfer(fields.g)
+    log_Omega, _ = transfer(fields.log_Omega)
+    b, _ = transfer(fields.b)
     phi = None if fields.phi is None else transfer(fields.phi)[0]
-    metric = _project_tensor(target_grid, metric)
-    shift = _project_vector(target_grid, shift)
+    g = _project_tensor(target_grid, g)
+    b = _project_vector(target_grid, b)
     local = np.einsum(
         "nia,n...ij,njb->n...ab",
         target_grid.frames,
-        metric,
+        g,
         target_grid.frames,
     )
     minimum_eigenvalue = float(np.min(np.linalg.eigvalsh(local)))
     if minimum_eigenvalue <= 0.0:
         raise FloatingPointError(
-            "mapped overgrid metric interpolation left the positive cone: "
+            "mapped overgrid g interpolation left the positive cone: "
             f"{minimum_eigenvalue:.12g}"
         )
     return OvergridResult(
@@ -428,9 +428,9 @@ def resample_primitives_power(
         u=coordinates.u,
         v=coordinates.v,
         fields=PrimitiveFields(
-            metric=metric,
-            log_omega=log_omega,
-            shift=shift,
+            g=g,
+            log_Omega=log_Omega,
+            b=b,
             phi=phi,
         ),
         diagnostics={

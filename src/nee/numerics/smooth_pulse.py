@@ -1,6 +1,6 @@
-"""Smooth two-hemisphere outgoing shear datum for the vacuum experiment.
+"""Smooth two-hemisphere outgoing Omega_chih datum for the vacuum experiment.
 
-The two round-metric trace-free tensors are squares of stereographic
+The two round-g trace-free tensors are squares of stereographic
 translation fields.  ``X_upper`` has its only zero at the south pole and is
 uniformly nonzero on the closed upper hemisphere; ``X_lower`` is the reflected
 construction.  Their time profiles have disjoint supports in ``[0,v1/2)`` and
@@ -70,7 +70,7 @@ def scaled_calibration(
     """Return the datum ``hat(chi)0 / divisor`` without recalibrating shapes."""
 
     if not math.isfinite(divisor) or divisor <= 0.0:
-        raise ValueError("the shear divisor must be positive and finite")
+        raise ValueError("the Omega_chih divisor must be positive and finite")
     return HemisphereProfileCalibration(
         v1=calibration.v1,
         split=calibration.split,
@@ -251,13 +251,13 @@ def reference_shear(
     return first[0] * tensors[0] + second[0] * tensors[1]
 
 
-def transferred_shear(sphere: PointSphereGrid, chi0: Array, metric: Array) -> Array:
-    mixed = np.matmul(np.matmul(chi0, sphere.projector), metric)
+def transferred_shear(sphere: PointSphereGrid, chi0: Array, g: Array) -> Array:
+    mixed = np.matmul(np.matmul(chi0, sphere.projector), g)
     return 0.5 * (mixed + np.swapaxes(mixed, -1, -2))
 
 
-def minimum_tangent_eigenvalue(sphere: PointSphereGrid, metric: Array) -> float:
-    local = np.einsum("nia,n...ij,njb->n...ab", sphere.frames, metric, sphere.frames)
+def minimum_tangent_eigenvalue(sphere: PointSphereGrid, g: Array) -> float:
+    local = np.einsum("nia,n...ij,njb->n...ab", sphere.frames, g, sphere.frames)
     if not np.all(np.isfinite(local)):
         return -math.inf
     return float(np.min(np.linalg.eigvalsh(local)))
@@ -265,31 +265,31 @@ def minimum_tangent_eigenvalue(sphere: PointSphereGrid, metric: Array) -> float:
 
 def solve_boundary_zeta(
     sphere: PointSphereGrid,
-    metric: Array,
+    g: Array,
     expansion: Array,
-    shear: Array,
+    Omega_chih: Array,
     v: Array,
     tolerance: float = 1.0e-13,
     maximum_iterations: int = 48,
 ) -> tuple[Array, Array, Array, int, float]:
     """Solve the vacuum ``zeta`` constraint with fixed boundary ``g,chi``."""
 
-    _, difference, inverse = gaussian_curvature(sphere, metric)
-    div_shear = tensor_divergence(sphere, shear, difference, inverse)
+    _, difference, inverse_g = gaussian_curvature(sphere, g)
+    div_shear = tensor_divergence(sphere, Omega_chih, difference, inverse_g)
     grad_expansion = scalar_gradient(sphere, expansion)
     free_source = (
-        np.einsum("nvij,nvj->nvi", inverse, div_shear)
-        - 0.5 * np.einsum("nvij,nvj->nvi", inverse, grad_expansion)
+        np.einsum("nvij,nvj->nvi", inverse_g, div_shear)
+        - 0.5 * np.einsum("nvij,nvj->nvi", inverse_g, grad_expansion)
     )
     zeta = np.zeros(expansion.shape + (3,), dtype=float)
     source = free_source.copy()
     update = math.inf
     completed = 0
     for iteration in range(maximum_iterations):
-        shear_zeta = np.einsum("nvij,nvj->nvi", shear, zeta)
+        shear_zeta = np.einsum("nvij,nvj->nvi", Omega_chih, zeta)
         source = (
             -2.0 * expansion[..., None] * zeta
-            - 2.0 * np.einsum("nvij,nvj->nvi", inverse, shear_zeta)
+            - 2.0 * np.einsum("nvij,nvj->nvi", inverse_g, shear_zeta)
             + free_source
         )
         new_zeta = cumulative_polynomial_quadrature(source, v, axis=1)
@@ -302,7 +302,7 @@ def solve_boundary_zeta(
                         np.einsum(
                             "nvi,nvij,nvj->nv",
                             difference_zeta,
-                            metric,
+                            g,
                             difference_zeta,
                         ),
                         0.0,
@@ -314,15 +314,15 @@ def solve_boundary_zeta(
         completed = iteration + 1
         if update <= tolerance:
             break
-    shear_zeta = np.einsum("nvij,nvj->nvi", shear, zeta)
+    shear_zeta = np.einsum("nvij,nvj->nvi", Omega_chih, zeta)
     source = (
         -2.0 * expansion[..., None] * zeta
-        - 2.0 * np.einsum("nvij,nvj->nvi", inverse, shear_zeta)
+        - 2.0 * np.einsum("nvij,nvj->nvi", inverse_g, shear_zeta)
         + free_source
     )
-    shift = cumulative_polynomial_quadrature(-4.0 * zeta, v, axis=1)
-    shift = np.einsum("nij,nvj->nvi", sphere.projector, shift)
-    return zeta, shift, source, completed, update
+    b = cumulative_polynomial_quadrature(-4.0 * zeta, v, axis=1)
+    b = np.einsum("nij,nvj->nvi", sphere.projector, b)
+    return zeta, b, source, completed, update
 
 
 def solve_outgoing_boundary(
@@ -331,7 +331,7 @@ def solve_outgoing_boundary(
     calibration: HemisphereProfileCalibration,
     minimum_eigenvalue: float = 1.0e-7,
 ) -> dict[str, Array | float]:
-    """Solve the H_-1 metric and Raychaudhuri constraints with RK4."""
+    """Solve the H_-1 g and Raychaudhuri constraints with RK4."""
 
     if len(v) < 9 or abs(float(v[0])) > 1.0e-15 or np.any(np.diff(v) <= 0.0):
         raise ValueError("v must be a strictly increasing grid beginning at zero")
@@ -339,11 +339,11 @@ def solve_outgoing_boundary(
         raise ValueError("the v grid extends beyond the calibrated pulse")
     tensors = hemisphere_tensors(sphere)
     count = len(v)
-    metric = np.zeros((sphere.count, count, 3, 3), dtype=float)
+    g = np.zeros((sphere.count, count, 3, 3), dtype=float)
     expansion = np.zeros((sphere.count, count), dtype=float)
-    shear = np.zeros_like(metric)
-    reference = np.zeros_like(metric)
-    metric[:, 0] = sphere.projector
+    Omega_chih = np.zeros_like(g)
+    reference = np.zeros_like(g)
+    g[:, 0] = sphere.projector
     expansion[:, 0] = 2.0
 
     def rhs(
@@ -351,8 +351,8 @@ def solve_outgoing_boundary(
     ) -> tuple[Array, Array]:
         chi0 = reference_shear(tensors, value, calibration)
         current_shear = transferred_shear(sphere, chi0, current_metric)
-        inverse = tangent_inverse(sphere, current_metric)
-        norm_sq = tensor_norm_sq(current_shear, inverse)
+        inverse_g = tangent_inverse(sphere, current_metric)
+        norm_sq = tensor_norm_sq(current_shear, inverse_g)
         return (
             current_expansion[:, None, None] * current_metric + 2.0 * current_shear,
             -0.5 * current_expansion**2 - norm_sq,
@@ -361,7 +361,7 @@ def solve_outgoing_boundary(
     for j in range(count - 1):
         step = float(v[j + 1] - v[j])
         value = float(v[j])
-        current_metric = metric[:, j]
+        current_metric = g[:, j]
         current_expansion = expansion[:, j]
         with np.errstate(over="raise", invalid="raise", divide="raise"):
             try:
@@ -395,17 +395,17 @@ def solve_outgoing_boundary(
         eigenvalue = minimum_tangent_eigenvalue(sphere, next_metric)
         if eigenvalue <= minimum_eigenvalue:
             raise BoundaryDegeneracy(float(v[j]), float(v[j + 1]), eigenvalue)
-        metric[:, j + 1] = next_metric
+        g[:, j + 1] = next_metric
         expansion[:, j + 1] = next_expansion
 
-    inverse = tangent_inverse(sphere, metric)
+    inverse_g = tangent_inverse(sphere, g)
     for j, value in enumerate(v):
         reference[:, j] = reference_shear(tensors, float(value), calibration)
-        shear[:, j] = transferred_shear(sphere, reference[:, j], metric[:, j])
+        Omega_chih[:, j] = transferred_shear(sphere, reference[:, j], g[:, j])
     reference_norm = np.sqrt(
         np.maximum(np.einsum("nvij,nvij->nv", reference, reference), 0.0)
     )
-    physical_norm = np.sqrt(np.maximum(tensor_norm_sq(shear, inverse), 0.0))
+    physical_norm = np.sqrt(np.maximum(tensor_norm_sq(Omega_chih, inverse_g), 0.0))
     reference_integral = np.trapezoid(reference_norm, v, axis=1)
     physical_integral = np.trapezoid(physical_norm, v, axis=1)
     upper = sphere.points[:, 2] >= 0.0
@@ -425,21 +425,21 @@ def solve_outgoing_boundary(
         v,
         axis=1,
     )
-    trace = np.einsum("nvij,nvji->nv", inverse, shear)
+    trace = np.einsum("nvij,nvji->nv", inverse_g, Omega_chih)
     reference_trace = np.einsum("nvij,nij->nv", reference, sphere.projector)
-    zeta, shift, zeta_source, zeta_iterations, zeta_update = solve_boundary_zeta(
-        sphere, metric, expansion, shear, v
+    zeta, b, zeta_source, zeta_iterations, zeta_update = solve_boundary_zeta(
+        sphere, g, expansion, Omega_chih, v
     )
     return {
-        "metric": metric,
-        "inverse": inverse,
-        "expansion": expansion,
-        "shear": shear,
+        "g": g,
+        "inverse_g": inverse_g,
+        "Omega_trchi": expansion,
+        "Omega_chih": Omega_chih,
         "reference_shear": reference,
-        "zeta_up": zeta,
-        "shift": shift,
+        "zeta": zeta,
+        "b": b,
         "zeta_source": zeta_source,
-        "minimum_eigenvalue": minimum_tangent_eigenvalue(sphere, metric),
+        "minimum_eigenvalue": minimum_tangent_eigenvalue(sphere, g),
         "minimum_reference_l1": float(np.min(reference_integral)),
         "minimum_physical_l1": float(np.min(physical_integral)),
         "minimum_upper_first_l1": float(np.min(first_integral[upper])),

@@ -18,20 +18,20 @@ from .result import SweepResult
 
 def _trace_errors(state: PicardState, boundary: BoundaryData) -> dict[str, float]:
     aliases = {
-        "metric": "sphere_metric",
-        "sphere_metric": "sphere_metric",
-        "shift": "shift",
-        "omega": "lapse",
-        "lapse": "lapse",
-        "zeta_up": "torsion",
-        "torsion": "torsion",
-        "weighted_chib": "incoming_null_form",
-        "incoming_null_form": "incoming_null_form",
-        "weighted_omega": "outgoing_weighted_omega",
-        "weighted_omegab": "incoming_weighted_omega",
+        "g": "g",
+        "g": "g",
+        "b": "b",
+        "Omega": "Omega",
+        "Omega": "Omega",
+        "zeta": "zeta",
+        "zeta": "zeta",
+        "Omega_chib": "Omega_chib",
+        "Omega_chib": "Omega_chib",
+        "Omega_omega": "Omega_omega",
+        "Omega_omegab": "Omega_omegab",
         "phi": "scalar",
-        "scalar_p": "scalar_e4",
-        "incoming_scalar": "scalar_e3",
+        "Omega_e4phi": "Omega_e4phi",
+        "Omega_e3phi": "Omega_e3phi",
     }
     errors: dict[str, float] = {}
     for side, values, state_index, boundary_index in (

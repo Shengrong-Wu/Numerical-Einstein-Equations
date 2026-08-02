@@ -85,7 +85,7 @@ def incoming_spherical_data(
         "phi": np.sqrt(2.0 * kappa) * np.log(radius),
         "incoming_weighted_trace": -2.0 / radius,
         "incoming_weighted_lapse": kappa / (4.0 * radius),
-        "incoming_scalar": -np.sqrt(2.0 * kappa) / radius,
+        "Omega_e3phi": -np.sqrt(2.0 * kappa) / radius,
         "outgoing_weighted_trace": outgoing_trace,
         "outgoing_inverse_lapse_trace": outgoing_trace / omega_sq,
         "outgoing_scalar": (

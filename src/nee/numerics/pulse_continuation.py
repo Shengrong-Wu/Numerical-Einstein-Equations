@@ -691,7 +691,7 @@ def continuation_resume_solver_parameters(
     return {
         "boundary": {
             "c": args.c,
-            "shear_divisor": args.shear_divisor,
+            "Omega_chih_divisor": args.Omega_chih_divisor,
             "mode": "low-band-hemisphere",
             "v1": args.v1,
         },
@@ -775,15 +775,15 @@ def sliced_boundary(
 
 
 OUTGOING_STATE_BOUNDARY_SPECIFICATIONS = (
-    ("metric", "metric", None, True),
-    ("q", "expansion", None, True),
-    ("shear", "shear", None, True),
-    ("omega", "omega", 1.0, True),
-    ("weighted_omega", "weighted_omega", 0.0, True),
-    ("weighted_omegab", "weighted_omegab", None, False),
-    ("weighted_chib", "weighted_chib", None, False),
-    ("zeta_up", "zeta_up", None, False),
-    ("shift", "shift", None, False),
+    ("g", "g", None, True),
+    ("Omega_trchi", "Omega_trchi", None, True),
+    ("Omega_chih", "Omega_chih", None, True),
+    ("Omega", "Omega", 1.0, True),
+    ("Omega_omega", "Omega_omega", 0.0, True),
+    ("Omega_omegab", "Omega_omegab", None, False),
+    ("Omega_chib", "Omega_chib", None, False),
+    ("zeta", "zeta", None, False),
+    ("b", "b", None, False),
 )
 
 
@@ -849,11 +849,11 @@ def canonicalize_continuation_boundary(
     stage must use one canonical boundary whose old columns are copied from
     the accepted state and whose new columns are the freshly solved data.
     Material recomputation changes fail closed; roundoff-sized changes are
-    recorded and canonicalized.  The inverse prefix is recomputed from the
-    accepted metric rather than copied from a possibly stale boundary array.
+    recorded and canonicalized.  The inverse_g prefix is recomputed from the
+    accepted g rather than copied from a possibly stale boundary array.
     """
 
-    old_count = old.q.shape[2]
+    old_count = old.Omega_trchi.shape[2]
     if not 0 < old_count <= v_count:
         raise ValueError("canonical boundary has an invalid accepted prefix")
     result: dict[str, Array | float] = {
@@ -914,18 +914,18 @@ def canonicalize_continuation_boundary(
             np.array_equal(recomputed[:, :old_count], accepted)
         )
 
-    accepted_inverse = tangent_inverse(grid, old.metric[:, 0])
-    if "inverse" in boundary:
+    accepted_inverse = tangent_inverse(grid, old.g[:, 0])
+    if "inverse_g" in boundary:
         try:
             recomputed_inverse = np.broadcast_to(
-                np.asarray(boundary["inverse"], dtype=float),
+                np.asarray(boundary["inverse_g"], dtype=float),
                 (grid.count, v_count, 3, 3),
             ).copy()
         except ValueError as error:
-            raise ValueError("outgoing inverse has an invalid shape") from error
+            raise ValueError("outgoing inverse_g has an invalid shape") from error
     else:
         recomputed_inverse = tangent_inverse(
-            grid, np.asarray(canonical_values["metric"])
+            grid, np.asarray(canonical_values["g"])
         )
     inverse_mismatch = float(
         np.max(
@@ -942,21 +942,21 @@ def canonicalize_continuation_boundary(
     inverse_tolerance = 256.0 * np.finfo(float).eps * inverse_scale
     if inverse_mismatch > inverse_tolerance:
         raise ValueError(
-            "recomputed outgoing inverse changed the accepted metric inverse: "
+            "recomputed outgoing inverse_g changed the accepted g inverse_g: "
             f"maximum mismatch={inverse_mismatch:.6g}, roundoff tolerance="
             f"{inverse_tolerance:.6g}"
         )
     inverse_new_tail = recomputed_inverse[:, old_count:].copy()
     recomputed_inverse[:, :old_count] = accepted_inverse
-    result["inverse"] = recomputed_inverse
-    mismatch_by_field["inverse"] = inverse_mismatch
-    tolerance_by_field["inverse"] = inverse_tolerance
-    new_tail_exact_by_field["inverse"] = bool(
+    result["inverse_g"] = recomputed_inverse
+    mismatch_by_field["inverse_g"] = inverse_mismatch
+    tolerance_by_field["inverse_g"] = inverse_tolerance
+    new_tail_exact_by_field["inverse_g"] = bool(
         np.array_equal(
             recomputed_inverse[:, old_count:], inverse_new_tail
         )
     )
-    prefix_bitwise_by_field["inverse"] = bool(
+    prefix_bitwise_by_field["inverse_g"] = bool(
         np.array_equal(
             recomputed_inverse[:, :old_count], accepted_inverse
         )
@@ -964,8 +964,8 @@ def canonicalize_continuation_boundary(
     diagnostics: dict[str, object] = {
         "semantics": (
             "accepted H_-1 prefix is bitwise authoritative; recomputed "
-            "new-v tail is exact; inverse prefix is recomputed from the "
-            "accepted metric"
+            "new-v tail is exact; inverse_g prefix is recomputed from the "
+            "accepted g"
         ),
         "old_v_count": old_count,
         "stage_v_count": v_count,
@@ -995,7 +995,7 @@ def _prolongation_trace_diagnostics(
     retained_overgrid_tolerance: float,
     overgrid_extra_degree: int = 3,
 ) -> dict[str, object]:
-    """Audit the new-panel shear before the first Picard construction.
+    """Audit the new-panel Omega_chih before the first Picard construction.
 
     The raw nodal statistic shows how far the additive predictor leaves the
     moving trace-free manifold.  The hard checks are the unprojected
@@ -1005,22 +1005,22 @@ def _prolongation_trace_diagnostics(
     to hide interpolation drift in the stored exact trace-free field.
     """
 
-    if scalar_coordinates.u.shape != state.q.shape[1:2] or not np.array_equal(
+    if scalar_coordinates.u.shape != state.Omega_trchi.shape[1:2] or not np.array_equal(
         scalar_coordinates.u, -np.exp(-scalar_coordinates.tau.nodes)
     ):
         raise ValueError("predictor trace audit has incompatible tau scalar_coordinates")
     if not 0 < old_count < len(scalar_coordinates.v):
         raise ValueError("predictor trace audit requires a nonempty new v panel")
-    metric = state.metric[:, :, old_count:]
-    shear = state.shear[:, :, old_count:]
-    if raw_tail_shear.shape != shear.shape:
-        raise ValueError("raw predictor shear has the wrong new-panel shape")
+    g = state.g[:, :, old_count:]
+    Omega_chih = state.Omega_chih[:, :, old_count:]
+    if raw_tail_shear.shape != Omega_chih.shape:
+        raise ValueError("raw predictor Omega_chih has the wrong new-panel shape")
 
-    node_inverse = tangent_inverse(grid, metric)
+    node_inverse = tangent_inverse(grid, g)
     node_norm = np.sqrt(
-        np.maximum(tensor_norm_sq(shear, node_inverse), 0.0)
+        np.maximum(tensor_norm_sq(Omega_chih, node_inverse), 0.0)
     )
-    node_trace = tensor_trace(shear, node_inverse)
+    node_trace = tensor_trace(Omega_chih, node_inverse)
     retained_node_trace = angular.project_scalar(node_trace)
     raw_norm = np.sqrt(
         np.maximum(tensor_norm_sq(raw_tail_shear, node_inverse), 0.0)
@@ -1049,7 +1049,7 @@ def _prolongation_trace_diagnostics(
     retracted_overgrid_tensor_norms: list[Array] = []
     overgrid_metric_minimum = math.inf
     overgrid_lapse_minimum = math.inf
-    lapse = state.omega[:, :, old_count:]
+    Omega = state.Omega[:, :, old_count:]
     for segment, indices in zip(
         scalar_coordinates.tau.segments,
         scalar_coordinates.tau.indices,
@@ -1061,9 +1061,9 @@ def _prolongation_trace_diagnostics(
             segment.degree + overgrid_extra_degree,
         )
         interpolation = segment.interpolation_matrix(over.nodes)
-        local_metric = np.moveaxis(metric[:, indices], 1, 0)
-        local_shear = np.moveaxis(shear[:, indices], 1, 0)
-        local_lapse = np.moveaxis(lapse[:, indices], 1, 0)
+        local_metric = np.moveaxis(g[:, indices], 1, 0)
+        local_shear = np.moveaxis(Omega_chih[:, indices], 1, 0)
+        local_lapse = np.moveaxis(Omega[:, indices], 1, 0)
         over_metric = np.tensordot(interpolation, local_metric, axes=(1, 0))
         over_shear = np.tensordot(interpolation, local_shear, axes=(1, 0))
         over_lapse = np.tensordot(interpolation, local_lapse, axes=(1, 0))
@@ -1074,7 +1074,7 @@ def _prolongation_trace_diagnostics(
         if sample_lapse_minimum <= 0.0:
             raise FloatingPointError(
                 "boundary-lift predictor has a nonpositive tau-overgrid "
-                f"lapse {sample_lapse_minimum:.6g}"
+                f"Omega {sample_lapse_minimum:.6g}"
             )
         pointwise_samples: list[Array] = []
         retained_samples: list[Array] = []
@@ -1099,26 +1099,26 @@ def _prolongation_trace_diagnostics(
             if sample_metric_minimum <= 0.0:
                 raise FloatingPointError(
                     "boundary-lift predictor has a nonpositive tau-overgrid "
-                    f"metric eigenvalue {sample_metric_minimum:.6g}"
+                    f"g eigenvalue {sample_metric_minimum:.6g}"
                 )
-            inverse = tangent_inverse(grid, sample_metric)
-            trace = tensor_trace(sample_shear, inverse)
+            inverse_g = tangent_inverse(grid, sample_metric)
+            trace = tensor_trace(sample_shear, inverse_g)
             norm = np.sqrt(
-                np.maximum(tensor_norm_sq(sample_shear, inverse), 0.0)
+                np.maximum(tensor_norm_sq(sample_shear, inverse_g), 0.0)
             )
             pointwise_samples.append(trace)
             retained_samples.append(angular.project_scalar(trace))
             norm_samples.append(norm)
             retracted_shear = tensor_tracefree(
-                sample_shear, sample_metric, inverse
+                sample_shear, sample_metric, inverse_g
             )
             retracted_trace_samples.append(
-                tensor_trace(retracted_shear, inverse)
+                tensor_trace(retracted_shear, inverse_g)
             )
             retracted_norm_samples.append(
                 np.sqrt(
                     np.maximum(
-                        tensor_norm_sq(retracted_shear, inverse), 0.0
+                        tensor_norm_sq(retracted_shear, inverse_g), 0.0
                     )
                 )
             )
@@ -1223,7 +1223,7 @@ def prolonged_state(
     """
 
     template = initial_state(grid, u, v)
-    old_count = old.q.shape[2]
+    old_count = old.Omega_trchi.shape[2]
     if old_count >= len(v):
         raise ValueError("continuation must add at least one v node")
     if predictor not in {"constant", "boundary-lift"}:
@@ -1267,7 +1267,7 @@ def prolonged_state(
             np.max(np.abs(current[:, :, old_count:] - tail))
         )
         values[name] = current
-    raw_tail_shear = values["shear"][:, :, old_count:].copy()
+    raw_tail_shear = values["Omega_chih"][:, :, old_count:].copy()
     prolonged = FirstOrderState(**values)
     if predictor == "boundary-lift":
         if angular is None or scalar_coordinates is None:
@@ -1282,11 +1282,11 @@ def prolonged_state(
                 "the continuation predictor scalar_coordinates do not match u and v"
             )
         tail_inverse = tangent_inverse(
-            grid, prolonged.metric[:, :, old_count:]
+            grid, prolonged.g[:, :, old_count:]
         )
-        prolonged.shear[:, :, old_count:] = tensor_tracefree(
-            prolonged.shear[:, :, old_count:],
-            prolonged.metric[:, :, old_count:],
+        prolonged.Omega_chih[:, :, old_count:] = tensor_tracefree(
+            prolonged.Omega_chih[:, :, old_count:],
+            prolonged.g[:, :, old_count:],
             tail_inverse,
         )
     boundary_mismatch_by_field: dict[str, float] = {}
@@ -1418,15 +1418,15 @@ def prolonged_state(
             + ", ".join(nonfinite)
         )
     metric_minimum = minimum_metric_eigenvalue(grid, prolonged)
-    lapse_minimum = float(np.min(prolonged.omega))
-    q_minimum = float(np.min(prolonged.q))
-    # The geometric primitive cone requires an SPD section metric and positive
-    # lapse.  q=Omega^{-1} tr(chi) is deliberately *not* sign constrained:
+    lapse_minimum = float(np.min(prolonged.Omega))
+    Omega_trchi_minimum = float(np.min(prolonged.Omega_trchi))
+    # The geometric primitive cone requires an SPD section g and positive
+    # Omega.  Omega_trchi=Omega tr(chi) is deliberately *not* sign constrained:
     # trapped-surface formation requires it to cross through zero.
     if metric_minimum <= 0.0 or lapse_minimum <= 0.0:
         raise FloatingPointError(
             "continuation predictor left the positive cone: "
-            f"metric={metric_minimum:.6g}, lapse={lapse_minimum:.6g}"
+            f"g={metric_minimum:.6g}, Omega={lapse_minimum:.6g}"
         )
     trace_diagnostics: dict[str, object] | None = None
     if angular is not None and scalar_coordinates is not None:
@@ -1462,11 +1462,11 @@ def prolonged_state(
                 "tau_overgrid_lapse="
                 f"{trace_diagnostics['tau_overgrid_minimum_lapse']:.6g}"
             )
-    tail_increment_by_field["shear"] = float(
+    tail_increment_by_field["Omega_chih"] = float(
         np.max(
             np.abs(
-                prolonged.shear[:, :, old_count:]
-                - old.shear[:, :, -1:]
+                prolonged.Omega_chih[:, :, old_count:]
+                - old.Omega_chih[:, :, -1:]
             )
         )
     )
@@ -1519,7 +1519,7 @@ def prolonged_state(
             else trace_diagnostics["tau_overgrid_minimum_lapse"]
         ),
         "minimum_lapse": lapse_minimum,
-        "minimum_q": q_minimum,
+        "minimum_Omega_trchi": Omega_trchi_minimum,
         "tail_increment_maximum_by_field": tail_increment_by_field,
         "trace": trace_diagnostics,
     }
@@ -1532,7 +1532,7 @@ def minimum_metric_eigenvalue(
     local = np.einsum(
         "nia,n...ij,njb->n...ab",
         grid.frames,
-        state.metric,
+        state.g,
         grid.frames,
     )
     return float(np.min(np.linalg.eigvalsh(local)))
@@ -1670,7 +1670,7 @@ def checkpoint_diagnostic_arrays(
     required = ("pointwise", "differential_pointwise")
     missing = [name for name in required if name not in closure]
     if missing:
-        raise ValueError("metric closure lacks arrays: " + ", ".join(missing))
+        raise ValueError("g closure lacks arrays: " + ", ".join(missing))
     result = {
         "metric_closure": np.asarray(closure["pointwise"]),
         "differential_metric_closure": np.asarray(
@@ -1780,7 +1780,7 @@ def continuation_sweep_evidence(
     extra = {
         "construction_total_residual": total,
         "picard_update_history": np.stack(update_history),
-        # Persist the actual half-step shear so an independent angular grid
+        # Persist the actual half-step Omega_chih so an independent angular grid
         # can audit the nonlinear strong trace after the expensive sweep.
         # This is diagnostic state, not an additional evolved unknown.
         "half_shear": np.asarray(context["half_shear"]),
@@ -1806,15 +1806,15 @@ def load_continuation_checkpoint_arrays(
             "v",
             "state_schema_version",
             "weighted_omegab_semantics",
-            "metric",
-            "omega",
-            "zeta_up",
-            "shift",
-            "q",
-            "shear",
-            "weighted_chib",
-            "weighted_omega",
-            "weighted_omegab",
+            "g",
+            "Omega",
+            "zeta",
+            "b",
+            "Omega_trchi",
+            "Omega_chih",
+            "Omega_chib",
+            "Omega_omega",
+            "Omega_omegab",
         }
         extra = {
             name: np.asarray(data[name])
@@ -1967,7 +1967,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
             unsafe_allow_unverified=unsafe_allow_unverified_resume,
         )
     calibration = calibrate_low_band_profiles(
-        args.v1, args.c, divisor=args.shear_divisor
+        args.v1, args.c, divisor=args.Omega_chih_divisor
     )
     execution_boundary = solve_low_band_boundary(
         grid,
@@ -2445,8 +2445,8 @@ def run(args: argparse.Namespace) -> dict[str, object]:
                     "minimum_metric_eigenvalue": minimum_metric_eigenvalue(
                         grid, candidate
                     ),
-                    "minimum_lapse": float(np.min(candidate.omega)),
-                    "minimum_q": float(np.min(candidate.q)),
+                    "minimum_lapse": float(np.min(candidate.Omega)),
+                    "minimum_Omega_trchi": float(np.min(candidate.Omega_trchi)),
                     "metric_sdc_diagnostics": context.get(
                         "metric_sdc_diagnostics", []
                     ),
@@ -2796,7 +2796,7 @@ def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser()
     result.add_argument("--output-label", required=True)
     result.add_argument("--c", type=float, default=1.0)
-    result.add_argument("--shear-divisor", type=float, default=3.2)
+    result.add_argument("--Omega_chih-divisor", type=float, default=3.2)
     result.add_argument("--v1", type=float, default=0.5)
     result.add_argument("--points", type=int, default=200)
     result.add_argument("--neighbors", type=int, default=30)
@@ -2902,14 +2902,20 @@ def parser() -> argparse.ArgumentParser:
         default=2,
         help="number of valid same-run generations retained (minimum two)",
     )
-    result.add_argument("--metric-substeps", type=int, default=2)
     result.add_argument(
-        "--metric-parameterization",
+        "--g-substeps", dest="metric_substeps", type=int, default=2
+    )
+    result.add_argument(
+        "--g-parameterization",
+        dest="metric_parameterization",
         choices=("direct", "cholesky"),
         default="cholesky",
     )
     result.add_argument(
-        "--metric-integrator", choices=("rk4", "sdc"), default="rk4"
+        "--g-integrator",
+        dest="metric_integrator",
+        choices=("rk4", "sdc"),
+        default="rk4",
     )
     result.add_argument("--sdc-tolerance", type=float, default=1.0e-10)
     result.add_argument("--sdc-overgrid-tolerance", type=float, default=1.0e-7)

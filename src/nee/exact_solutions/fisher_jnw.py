@@ -153,35 +153,35 @@ def jnw_exact_state(
     )
     omega_sq = f**nu
     projector = grid.projector[:, None, None]
-    metric = areal_radius[None, ..., None, None] ** 2 * projector
+    g = areal_radius[None, ..., None, None] ** 2 * projector
     scalar_shape = (grid.count, len(u), len(v))
     scalar = np.ones(scalar_shape)
-    omega = scalar * np.sqrt(omega_sq)[None]
-    q = scalar * (2.0 * lambda_r)[None]
-    weighted_chib = (
-        -(omega_sq * lambda_r)[None, ..., None, None] * metric
+    Omega = scalar * np.sqrt(omega_sq)[None]
+    Omega_trchi = scalar * (2.0 * omega_sq * lambda_r)[None]
+    Omega_chib = (
+        -(omega_sq * lambda_r)[None, ..., None, None] * g
     )
-    weighted_omega = scalar * (
+    Omega_omega = scalar * (
         -nu * sigma / (4.0 * radius**2) * f ** (nu - 1.0)
     )[None]
-    weighted_omegab = -weighted_omega
+    Omega_omegab = -Omega_omega
     phi = scalar * (c_nu * np.log(f))[None]
-    scalar_p = scalar * (
+    Omega_e4phi = scalar * (
         c_nu * sigma / radius**2 * f ** (nu - 1.0)
     )[None]
     state = ESEState(
-        metric=metric.copy(),
-        omega=omega.copy(),
-        zeta_up=np.zeros((*scalar_shape, 3)),
-        shift=np.zeros((*scalar_shape, 3)),
-        q=q.copy(),
-        shear=np.zeros_like(metric),
-        weighted_chib=weighted_chib.copy(),
-        weighted_omega=weighted_omega.copy(),
-        weighted_omegab=weighted_omegab.copy(),
+        g=g.copy(),
+        Omega=Omega.copy(),
+        zeta=np.zeros((*scalar_shape, 3)),
+        b=np.zeros((*scalar_shape, 3)),
+        Omega_trchi=Omega_trchi.copy(),
+        Omega_chih=np.zeros_like(g),
+        Omega_chib=Omega_chib.copy(),
+        Omega_omega=Omega_omega.copy(),
+        Omega_omegab=Omega_omegab.copy(),
         phi=phi.copy(),
-        scalar_p=scalar_p.copy(),
-        incoming_scalar=-scalar_p.copy(),
+        Omega_e4phi=Omega_e4phi.copy(),
+        Omega_e3phi=-Omega_e4phi.copy(),
     )
     return state, {
         "sigma": sigma,
@@ -198,18 +198,18 @@ def _faces(
     exact: ESEState, u: Array, v: Array, diagnostics: dict[str, float]
 ) -> InitialDataBundle:
     common = (
-        "metric",
-        "omega",
-        "shift",
-        "zeta_up",
-        "q",
-        "shear",
-        "weighted_chib",
-        "weighted_omega",
-        "weighted_omegab",
+        "g",
+        "Omega",
+        "b",
+        "zeta",
+        "Omega_trchi",
+        "Omega_chih",
+        "Omega_chib",
+        "Omega_omega",
+        "Omega_omegab",
         "phi",
-        "scalar_p",
-        "incoming_scalar",
+        "Omega_e4phi",
+        "Omega_e3phi",
     )
     incoming = {"u": u.copy()}
     outgoing = {"v": v.copy()}
@@ -312,12 +312,12 @@ def run_case(
             "iteration": iteration,
             "seconds": time.perf_counter() - started,
             "picard_update": update_norm(state, previous),
-            "metric_error": _field_error(state, exact, "metric"),
-            "lapse_error": _field_error(state, exact, "omega"),
+            "metric_error": _field_error(state, exact, "g"),
+            "lapse_error": _field_error(state, exact, "Omega"),
             "scalar_error": _field_error(state, exact, "phi"),
-            "scalar_p_error": _field_error(state, exact, "scalar_p"),
+            "scalar_p_error": _field_error(state, exact, "Omega_e4phi"),
             "incoming_scalar_error": _field_error(
-                state, exact, "incoming_scalar"
+                state, exact, "Omega_e3phi"
             ),
             "residual": residual_summary,
         }

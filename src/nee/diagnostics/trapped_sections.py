@@ -9,15 +9,15 @@ Array = np.ndarray
 
 
 def trapped_sections(
-    outgoing_expansion: Array,
-    incoming_expansion: Array,
+    Omega_trchi: Array,
+    Omega_trchib: Array,
     *,
     u_endpoint_halo: int = 3,
 ) -> tuple[Array, Array]:
     """Return full and u-halo-masked trapped-section indicators."""
 
-    outgoing = np.asarray(outgoing_expansion, dtype=float)
-    incoming = np.asarray(incoming_expansion, dtype=float)
+    outgoing = np.asarray(Omega_trchi, dtype=float)
+    incoming = np.asarray(Omega_trchib, dtype=float)
     if outgoing.shape != incoming.shape or outgoing.ndim != 2:
         raise ValueError("expansion suprema must be equally shaped (u,v) maps")
     trapped = (outgoing < 0.0) & (incoming < 0.0)

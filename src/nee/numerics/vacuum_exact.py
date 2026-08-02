@@ -116,24 +116,24 @@ def schwarzschild_state(
         np.ones((grid.count, 1, 1)), (grid.count, len(u), len(v))
     )
     projector = sphere_broadcast(grid, 2)
-    metric = radius[None, :, :, None, None] ** 2 * projector
-    omega = scalar * np.sqrt(lapse_sq)[None]
-    q = scalar * (2.0 / radius)[None]
-    weighted_chib = (
-        -(lapse_sq / radius)[None, :, :, None, None] * metric
+    g = radius[None, :, :, None, None] ** 2 * projector
+    Omega = scalar * np.sqrt(lapse_sq)[None]
+    Omega_trchi = scalar * (2.0 * lapse_sq / radius)[None]
+    Omega_chib = (
+        -(lapse_sq / radius)[None, :, :, None, None] * g
     )
-    weighted_omega = scalar * (-mass / (2.0 * radius**2))[None]
-    weighted_omegab = scalar * (mass / (2.0 * radius**2))[None]
+    Omega_omega = scalar * (-mass / (2.0 * radius**2))[None]
+    Omega_omegab = scalar * (mass / (2.0 * radius**2))[None]
     return FirstOrderState(
-        metric=metric.copy(),
-        omega=omega.copy(),
-        zeta_up=np.zeros((*omega.shape, 3)),
-        shift=np.zeros((*omega.shape, 3)),
-        q=q.copy(),
-        shear=np.zeros_like(metric),
-        weighted_chib=weighted_chib.copy(),
-        weighted_omega=weighted_omega.copy(),
-        weighted_omegab=weighted_omegab.copy(),
+        g=g.copy(),
+        Omega=Omega.copy(),
+        zeta=np.zeros((*Omega.shape, 3)),
+        b=np.zeros((*Omega.shape, 3)),
+        Omega_trchi=Omega_trchi.copy(),
+        Omega_chih=np.zeros_like(g),
+        Omega_chib=Omega_chib.copy(),
+        Omega_omega=Omega_omega.copy(),
+        Omega_omegab=Omega_omegab.copy(),
     )
 
 
@@ -143,24 +143,24 @@ def characteristic_data(
     """Extract compatible outgoing and incoming characteristic faces."""
 
     outgoing = {
-        "metric": exact.metric[:, 0].copy(),
-        "inverse": tangent_inverse(grid, exact.metric[:, 0]),
-        "expansion": exact.q[:, 0].copy(),
-        "shear": exact.shear[:, 0].copy(),
-        "omega": exact.omega[:, 0].copy(),
-        "weighted_omega": exact.weighted_omega[:, 0].copy(),
-        "weighted_omegab": exact.weighted_omegab[:, 0].copy(),
-        "weighted_chib": exact.weighted_chib[:, 0].copy(),
-        "zeta_up": exact.zeta_up[:, 0].copy(),
-        "shift": exact.shift[:, 0].copy(),
+        "g": exact.g[:, 0].copy(),
+        "inverse_g": tangent_inverse(grid, exact.g[:, 0]),
+        "Omega_trchi": exact.Omega_trchi[:, 0].copy(),
+        "Omega_chih": exact.Omega_chih[:, 0].copy(),
+        "Omega": exact.Omega[:, 0].copy(),
+        "Omega_omega": exact.Omega_omega[:, 0].copy(),
+        "Omega_omegab": exact.Omega_omegab[:, 0].copy(),
+        "Omega_chib": exact.Omega_chib[:, 0].copy(),
+        "zeta": exact.zeta[:, 0].copy(),
+        "b": exact.b[:, 0].copy(),
     }
     incoming = {
-        "metric": exact.metric[:, :, 0].copy(),
-        "expansion": exact.q[:, :, 0].copy(),
-        "weighted_omegab": exact.weighted_omegab[:, :, 0].copy(),
-        "weighted_chib": exact.weighted_chib[:, :, 0].copy(),
-        "zeta_up": exact.zeta_up[:, :, 0].copy(),
-        "shift": exact.shift[:, :, 0].copy(),
+        "g": exact.g[:, :, 0].copy(),
+        "Omega_trchi": exact.Omega_trchi[:, :, 0].copy(),
+        "Omega_omegab": exact.Omega_omegab[:, :, 0].copy(),
+        "Omega_chib": exact.Omega_chib[:, :, 0].copy(),
+        "zeta": exact.zeta[:, :, 0].copy(),
+        "b": exact.b[:, :, 0].copy(),
     }
     return outgoing, incoming
 
@@ -217,16 +217,14 @@ def kinematic_exactness(
     """Check analytic state identities using independent finite differences."""
 
     edge_order = 2 if min(len(u), len(v)) >= 3 else 1
-    metric_v = np.gradient(exact.metric, v, axis=2, edge_order=edge_order)
-    metric_u = np.gradient(exact.metric, u, axis=1, edge_order=edge_order)
+    metric_v = np.gradient(exact.g, v, axis=2, edge_order=edge_order)
+    metric_u = np.gradient(exact.g, u, axis=1, edge_order=edge_order)
     outgoing_rhs = (
-        exact.omega[..., None, None] ** 2
-        * exact.q[..., None, None]
-        * exact.metric
-        + 2.0 * exact.shear
+        exact.Omega_trchi[..., None, None] * exact.g
+        + 2.0 * exact.Omega_chih
     )
-    incoming_rhs = 2.0 * exact.weighted_chib
-    scale = np.maximum(np.abs(exact.metric), 1.0)
+    incoming_rhs = 2.0 * exact.Omega_chib
+    scale = np.maximum(np.abs(exact.g), 1.0)
     return {
         "outgoing_metric_fd_max": float(
             np.max(np.abs(metric_v - outgoing_rhs) / scale)
@@ -234,14 +232,14 @@ def kinematic_exactness(
         "incoming_metric_fd_max": float(
             np.max(np.abs(metric_u - incoming_rhs) / scale)
         ),
-        "minimum_lapse": float(np.min(exact.omega)),
+        "minimum_lapse": float(np.min(exact.Omega)),
         "minimum_tangent_metric_eigenvalue": float(
             np.min(
                 np.linalg.eigvalsh(
                     np.einsum(
                         "nia,n...ij,njb->n...ab",
                         grid.frames,
-                        exact.metric,
+                        exact.g,
                         grid.frames,
                     )
                 )
@@ -296,11 +294,11 @@ def run_case(
             "sweep": sweep,
             "seconds": time.perf_counter() - started,
             "picard_update": update_norm(new_state, state),
-            "metric_error": relative_field_error(new_state, exact, "metric"),
-            "lapse_error": relative_field_error(new_state, exact, "omega"),
-            "expansion_error": relative_field_error(new_state, exact, "q"),
+            "metric_error": relative_field_error(new_state, exact, "g"),
+            "lapse_error": relative_field_error(new_state, exact, "Omega"),
+            "expansion_error": relative_field_error(new_state, exact, "Omega_trchi"),
             "incoming_form_error": relative_field_error(
-                new_state, exact, "weighted_chib"
+                new_state, exact, "Omega_chib"
             ),
         }
         print(json.dumps({"mass": mass, **record}), flush=True)
@@ -331,7 +329,7 @@ def run_case(
         **{f"incoming_{name}": value for name, value in incoming.items()},
     )
     summary = {
-        "metric": "Schwarzschild",
+        "g": "Schwarzschild",
         "mass": mass,
         "domain": {"u": [u_min, u_max], "v": [v_min, v_max]},
         "resolution": {
@@ -361,7 +359,7 @@ def main() -> None:
     parser.add_argument("--v-min", type=float, default=0.0)
     parser.add_argument("--v-max", type=float, default=0.2)
     parser.add_argument("--iterations", type=int, default=5)
-    parser.add_argument("--metric-substeps", type=int, default=2)
+    parser.add_argument("--g-substeps", type=int, default=2)
     parser.add_argument(
         "--output",
         type=Path,

@@ -46,7 +46,7 @@ from nee.discretization.overgrid import (  # noqa: E402
     resample_primitives_power,
 )
 from nee.state.boundary import BoundaryData
-from nee.state.iterate import PicardState as WeightedState  # noqa: E402
+from nee.state.iterate import PicardState  # noqa: E402
 
 
 Array = np.ndarray
@@ -82,7 +82,7 @@ def strictly_decreasing_finite(values: list[float | None]) -> bool:
 
 
 def state_errors(
-    numerical: WeightedState, exact: WeightedState
+    numerical: PicardState, exact: PicardState
 ) -> dict[str, dict[str, float]]:
     result = {}
     for name in numerical.arrays():
@@ -118,7 +118,7 @@ def save_boundary(
 
 def direct_audit(
     grid: Any,
-    state: WeightedState,
+    state: PicardState,
     u: Array,
     v: Array,
     *,
@@ -131,9 +131,9 @@ def direct_audit(
     overgrid = resample_primitives(
         grid,
         PrimitiveFields(
-            metric=state.metric,
-            log_omega=state.log_omega,
-            shift=state.shift,
+            g=state.g,
+            log_Omega=state.log_Omega,
+            b=state.b,
             phi=state.phi,
         ),
         u,
@@ -159,7 +159,7 @@ def direct_audit(
 
 def mapped_direct_audit(
     grid: Any,
-    state: WeightedState,
+    state: PicardState,
     coordinates: Any,
     *,
     retained_degree: int,
@@ -184,9 +184,9 @@ def mapped_direct_audit(
     overgrid = resample_primitives_power(
         grid,
         PrimitiveFields(
-            metric=state.metric,
-            log_omega=state.log_omega,
-            shift=state.shift,
+            g=state.g,
+            log_Omega=state.log_Omega,
+            b=state.b,
             phi=state.phi,
         ),
         coordinates,
@@ -242,7 +242,7 @@ def mapped_direct_audit(
     summary.update(
         {
             "method": (
-                "four-metric connection difference on an independent "
+                "four-g connection difference on an independent "
                 "higher-degree (tau,s) LGL overgrid"
             ),
             "overgrid": overgrid.diagnostics,
@@ -266,7 +266,7 @@ def mapped_direct_audit(
 
 def first_order_audit(
     grid: Any,
-    state: WeightedState,
+    state: PicardState,
     u: Array,
     v: Array,
     *,
@@ -281,20 +281,20 @@ def first_order_audit(
 
 def spherical_high_precision_audit(
     grid: Any,
-    state: WeightedState,
+    state: PicardState,
     u: Array,
     v: Array,
 ) -> dict[str, Any]:
     """Reconstruct the spherical warped product and audit it with mpmath."""
 
     radius_squared = 0.5 * np.einsum(
-        "nij,nuvij->nuv", grid.projector, state.metric
+        "nij,nuvij->nuv", grid.projector, state.g
     )
     radius = np.sqrt(np.mean(radius_squared, axis=0))
-    log_omega = np.mean(state.log_omega, axis=0)
+    log_Omega = np.mean(state.log_Omega, axis=0)
     result = warped_product_rectangular_residual_mpmath(
         radius,
-        log_omega,
+        log_Omega,
         u,
         v,
         halo=max(2, min(len(u), len(v)) // 8),
@@ -309,11 +309,11 @@ def spherical_high_precision_audit(
                 )
             )
         ),
-        "log_omega": float(
+        "log_Omega": float(
             np.max(
                 np.abs(
-                    state.log_omega
-                    - np.mean(state.log_omega, axis=0, keepdims=True)
+                    state.log_Omega
+                    - np.mean(state.log_Omega, axis=0, keepdims=True)
                 )
             )
         ),
@@ -408,7 +408,7 @@ def vacuum_case(
         "schema": "nee-official-vacuum-case-v1",
         "case_id": case_id,
         "terminal_status": "completed",
-        "state_semantics": "full weighted forms; traces derived from current metric",
+        "state_semantics": "full weighted forms; traces derived from current g",
         "resolution": {
             "u_count": len(u),
             "v_count": len(v),
@@ -658,8 +658,8 @@ def run_experiment_3(output: Path) -> dict[str, Any]:
                     v0=np.asarray(exact["v0"]),
                     outgoing_radius=np.asarray(exact["radius"][0]),
                     incoming_radius=np.asarray(exact["radius"][:, 0]),
-                    outgoing_log_lapse=np.asarray(exact["log_omega"][0]),
-                    incoming_log_lapse=np.asarray(exact["log_omega"][:, 0]),
+                    outgoing_log_lapse=np.asarray(exact["log_Omega"][0]),
+                    incoming_log_lapse=np.asarray(exact["log_Omega"][:, 0]),
                     corner_radius_mismatch=np.asarray(0.0),
                     corner_log_lapse_mismatch=np.asarray(0.0),
                     minimum_radius=np.asarray(np.min(exact["radius"])),
@@ -702,11 +702,11 @@ def run_experiment_3(output: Path) -> dict[str, Any]:
                     v=np.asarray(solution.v),
                     v0=np.asarray(solution.v0),
                     metric_scalar=np.asarray(solution.radius**2),
-                    log_omega=np.asarray(solution.log_omega),
+                    log_Omega=np.asarray(solution.log_Omega),
                     x_out_scalar=np.asarray(solution.x_out_scalar),
                     x_in_scalar=np.asarray(solution.x_in_scalar),
-                    w_out=np.asarray(solution.w_out),
-                    w_in=np.asarray(solution.w_in),
+                    Omega_omega=np.asarray(solution.Omega_omega),
+                    Omega_omegab=np.asarray(solution.Omega_omegab),
                 )
                 summary = {
                     "schema": "nee-official-curved-spherical-v1",
@@ -815,9 +815,9 @@ def ese_case(
     exact_overgrid = resample_primitives(
         grid,
         PrimitiveFields(
-            metric=exact.metric,
-            log_omega=exact.log_omega,
-            shift=exact.shift,
+            g=exact.g,
+            log_Omega=exact.log_Omega,
+            b=exact.b,
             phi=exact.phi,
         ),
         mesh.u,
@@ -838,9 +838,9 @@ def ese_case(
         block_size=4,
     )
     mutated_fields = PrimitiveFields(
-        metric=exact_overgrid.fields.metric,
-        log_omega=exact_overgrid.fields.log_omega,
-        shift=exact_overgrid.fields.shift,
+        g=exact_overgrid.fields.g,
+        log_Omega=exact_overgrid.fields.log_Omega,
+        b=exact_overgrid.fields.b,
         phi=1.01 * exact_overgrid.fields.phi,
     )
     mutated_direct = evaluate_blocked(
@@ -874,7 +874,7 @@ def ese_case(
         "schema": "nee-official-ese-exact-case-v1",
         "case_id": f"exp06-jnw-nu{nu:.2f}-C{level}",
         "terminal_status": "completed",
-        "state_semantics": "full weighted forms; traces derived from current metric",
+        "state_semantics": "full weighted forms; traces derived from current g",
         "config": config.to_dict(),
         "exact_diagnostics": exact_diagnostics,
         "boundary_digest": boundary.digest,
@@ -943,12 +943,12 @@ def run_experiment_6(output: Path) -> dict[str, Any]:
         "nu": 1.0,
         "expected_schwarzschild_mass": 0.5,
         "maximum_abs_phi": float(np.max(np.abs(limit.phi))),
-        "maximum_abs_P3": float(np.max(np.abs(limit.incoming_scalar))),
-        "maximum_abs_P4": float(np.max(np.abs(limit.scalar_p))),
+        "maximum_abs_P3": float(np.max(np.abs(limit.Omega_e3phi))),
+        "maximum_abs_P4": float(np.max(np.abs(limit.Omega_e4phi))),
         "passed": bool(
             np.max(np.abs(limit.phi)) == 0.0
-            and np.max(np.abs(limit.incoming_scalar)) == 0.0
-            and np.max(np.abs(limit.scalar_p)) == 0.0
+            and np.max(np.abs(limit.Omega_e3phi)) == 0.0
+            and np.max(np.abs(limit.Omega_e4phi)) == 0.0
         ),
         "diagnostics": diagnostics,
     }
@@ -1019,7 +1019,7 @@ def nonspherical_ese_case(
 
         return construct
 
-    def initial_state(bundle: Any, angular: Any) -> WeightedState:
+    def initial_state(bundle: Any, angular: Any) -> PicardState:
         state = from_numerical(original_initial_state(bundle, angular), captured["grid"])
         captured["state"] = state
         return state
@@ -1028,10 +1028,10 @@ def nonspherical_ese_case(
         grid: Any,
         angular: Any,
         mesh: Any,
-        state: WeightedState,
+        state: PicardState,
         bundle: Any,
         **kwargs: Any,
-    ) -> tuple[WeightedState, dict[str, Any]]:
+    ) -> tuple[PicardState, dict[str, Any]]:
         result, context = ese_picard_step(
             grid, angular, mesh, state, bundle, **kwargs
         )
@@ -1040,7 +1040,7 @@ def nonspherical_ese_case(
 
     def save_state(
         path: Path,
-        state: WeightedState,
+        state: PicardState,
         update_maps: list[Array],
         residual_maps: dict[str, list[Array]],
         u: Array,
@@ -1125,8 +1125,8 @@ def nonspherical_ese_case(
         retained_degree=retained,
     )
     mutated_state = state.copy()
-    assert mutated_state.scalar is not None
-    mutated_state.scalar = 1.01 * mutated_state.scalar
+    assert mutated_state.phi is not None
+    mutated_state.phi = 1.01 * mutated_state.phi
     mutated = mapped_direct_audit(
         grid,
         mutated_state,

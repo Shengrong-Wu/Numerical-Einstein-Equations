@@ -81,7 +81,7 @@ def integration_weights(nodes: Array, left: float, right: float) -> Array:
     mapped = 0.5 * (right - left) * points + 0.5 * (right + left)
     basis = _basis_values(nodes, mapped)
     return 0.5 * (right - left) * np.einsum(
-        "q,qj->j", weights, basis
+        "Omega_trchi,qj->j", weights, basis
     )
 
 
@@ -159,7 +159,7 @@ def volterra_step(
         return np.longdouble(np.sum(raw * row) / np.sum(raw))
 
     incoming_radius = exact["radius"][:, 0]
-    incoming_log = exact["log_omega"][:, 0]
+    incoming_log = exact["log_Omega"][:, 0]
     for i in range(nu):
         physical_v = xi * v0[i]
         outgoing_radius = kruskal_radius(
@@ -256,7 +256,7 @@ def exact_fields(
         "v0_prime": v0_prime,
         "v": v,
         "radius": radius,
-        "log_omega": 0.5 * np.log(omega_sq),
+        "log_Omega": 0.5 * np.log(omega_sq),
         "omega_squared": omega_sq,
     }
 
@@ -280,7 +280,7 @@ def physical_derivatives(
 
 def rhs(
     radius: Array,
-    log_omega: Array,
+    log_Omega: Array,
     d_u: Array,
     d_xi: Array,
     xi: Array,
@@ -290,7 +290,7 @@ def rhs(
     radius_u, radius_v = physical_derivatives(
         radius, d_u, d_xi, xi, v0, v0_prime
     )
-    common = radius_u * radius_v + np.exp(2 * log_omega)
+    common = radius_u * radius_v + np.exp(2 * log_Omega)
     return -common / radius, common / radius**2
 
 
@@ -299,7 +299,7 @@ def face_blend(
 ) -> tuple[Array, Array]:
     physical_v = exact["v"]
     incoming_radius = exact["radius"][:, :1]
-    incoming_log = exact["log_omega"][:, :1]
+    incoming_log = exact["log_Omega"][:, :1]
     outgoing_radius = kruskal_radius(
         physical_v + np.longdouble(0.2), mass, True
     )
@@ -310,13 +310,13 @@ def face_blend(
         * np.exp(-outgoing_radius / (2 * np.longdouble(mass)))
     )
     radius = incoming_radius + outgoing_radius - outgoing_radius[0, 0]
-    log_omega = incoming_log + outgoing_log - outgoing_log[0, 0]
-    return radius, log_omega
+    log_Omega = incoming_log + outgoing_log - outgoing_log[0, 0]
+    return radius, log_Omega
 
 
 def warped_product_residual(
     radius: Array,
-    log_omega: Array,
+    log_Omega: Array,
     u: Array,
     xi: Array,
     d_u: Array,
@@ -326,13 +326,13 @@ def warped_product_residual(
     *,
     halo: int,
 ) -> dict[str, Any]:
-    """Independent 80-bit Ricci audit derived from the reconstructed metric."""
+    """Independent 80-bit Ricci audit derived from the reconstructed g."""
 
     ru, rv = physical_derivatives(
         radius, d_u, d_xi, xi, v0, v0_prime
     )
     ellu, ellv = physical_derivatives(
-        log_omega, d_u, d_xi, xi, v0, v0_prime
+        log_Omega, d_u, d_xi, xi, v0, v0_prime
     )
     ruu, _ = physical_derivatives(ru, d_u, d_xi, xi, v0, v0_prime)
     _, rvv = physical_derivatives(rv, d_u, d_xi, xi, v0, v0_prime)
@@ -342,7 +342,7 @@ def warped_product_residual(
     elluv_a, _ = physical_derivatives(ellv, d_u, d_xi, xi, v0, v0_prime)
     _, elluv_b = physical_derivatives(ellu, d_u, d_xi, xi, v0, v0_prime)
     elluv = 0.5 * (elluv_a + elluv_b)
-    omega_sq = np.exp(2 * log_omega)
+    omega_sq = np.exp(2 * log_Omega)
 
     ric_uu = -2 * (ruu - 2 * ellu * ru) / radius
     ric_vv = -2 * (rvv - 2 * ellv * rv) / radius
@@ -384,7 +384,7 @@ def warped_product_residual(
 
 def warped_product_residual_mpmath(
     radius: Array,
-    log_omega: Array,
+    log_Omega: Array,
     epsilon: float,
     mass: float,
     *,
@@ -424,7 +424,7 @@ def warped_product_residual_mpmath(
     )
     ell = mpmath.matrix(
         [
-            [mp.mpf(str(float(log_omega[i, j]))) for j in range(nx)]
+            [mp.mpf(str(float(log_Omega[i, j]))) for j in range(nx)]
             for i in range(nu)
         ]
     )
@@ -518,7 +518,7 @@ def warped_product_residual_mpmath(
 
 def warped_product_rectangular_residual_mpmath(
     radius: Array,
-    log_omega: Array,
+    log_Omega: Array,
     u: Array,
     v: Array,
     *,
@@ -562,7 +562,7 @@ def warped_product_rectangular_residual_mpmath(
     )
     ell = mpmath.matrix(
         [
-            [mp.mpf(str(float(log_omega[i, j]))) for j in range(nv)]
+            [mp.mpf(str(float(log_Omega[i, j]))) for j in range(nv)]
             for i in range(nu)
         ]
     )
@@ -650,11 +650,11 @@ class CurvedSolution:
     v: Array
     v0: Array
     radius: Array
-    log_omega: Array
+    log_Omega: Array
     x_out_scalar: Array
     x_in_scalar: Array
-    w_out: Array
-    w_in: Array
+    Omega_omega: Array
+    Omega_omegab: Array
     records: list[dict[str, float | None]]
     diagnostics: dict[str, Any]
 
@@ -675,14 +675,14 @@ def solve(
     exact = exact_fields(
         u, xi, epsilon, mass, high_precision=high_precision
     )
-    radius, log_omega = face_blend(exact, u, xi, mass)
+    radius, log_Omega = face_blend(exact, u, xi, mass)
     records: list[dict[str, float | None]] = []
     previous_update = math.inf
     positivity_stabilized = False
     for iteration in range(1, iterations + 1):
         radius_rhs, lapse_rhs = rhs(
             radius,
-            log_omega,
+            log_Omega,
             d_u,
             d_xi,
             xi,
@@ -699,7 +699,7 @@ def solve(
                 + relaxation * raw_radius_next
             )
             log_next = (
-                (1.0 - relaxation) * log_omega
+                (1.0 - relaxation) * log_Omega
                 + relaxation * raw_log_next
             )
             scale_r = np.maximum(
@@ -708,7 +708,7 @@ def solve(
             update = float(
                 np.sqrt(
                     np.mean(((radius_next - radius) / scale_r) ** 2)
-                    + np.mean((log_next - log_omega) ** 2)
+                    + np.mean((log_next - log_Omega) ** 2)
                 )
             )
             finite_positive = bool(
@@ -743,7 +743,7 @@ def solve(
                 "relaxation": relaxation,
             }
         )
-        radius, log_omega = radius_next, log_next
+        radius, log_Omega = radius_next, log_next
         previous_update = update
         if update <= tolerance:
             break
@@ -757,7 +757,7 @@ def solve(
         exact["v0_prime"],
     )
     ellu, ellv = physical_derivatives(
-        log_omega,
+        log_Omega,
         d_u,
         d_xi,
         xi,
@@ -765,13 +765,13 @@ def solve(
         exact["v0_prime"],
     )
     exact_radius = exact["radius"]
-    exact_log = exact["log_omega"]
+    exact_log = exact["log_Omega"]
     relative_radius = np.abs(radius - exact_radius) / np.maximum(
         np.abs(exact_radius), np.longdouble(1.0e-30)
     )
     residual = warped_product_residual(
         radius,
-        log_omega,
+        log_Omega,
         u,
         xi,
         d_u,
@@ -783,7 +783,7 @@ def solve(
     high_precision_residual = (
         warped_product_residual_mpmath(
             radius,
-            log_omega,
+            log_Omega,
             epsilon,
             mass,
             halo=max(2, min(u_count, xi_count) // 8),
@@ -801,7 +801,7 @@ def solve(
         "radius_relative_raw_maximum": float(np.max(relative_radius)),
         "radius_relative_rms": float(np.sqrt(np.mean(relative_radius**2))),
         "log_omega_absolute_raw_maximum": float(
-            np.max(np.abs(log_omega - exact_log))
+            np.max(np.abs(log_Omega - exact_log))
         ),
         "maximum_kretschmann": float(
             np.max(48 * np.longdouble(mass) ** 2 / radius**6)
@@ -831,11 +831,11 @@ def solve(
         v=exact["v"],
         v0=exact["v0"],
         radius=radius,
-        log_omega=log_omega,
+        log_Omega=log_Omega,
         x_out_scalar=radius * rv,
         x_in_scalar=radius * ru,
-        w_out=-0.5 * ellv,
-        w_in=-0.5 * ellu,
+        Omega_omega=-0.5 * ellv,
+        Omega_omegab=-0.5 * ellu,
         records=records,
         diagnostics=diagnostics,
     )
@@ -863,7 +863,7 @@ def overgrid_audit(
         return basis_u @ values @ basis_xi.T
 
     radius = transfer(solution.radius)
-    log_omega = transfer(solution.log_omega)
+    log_Omega = transfer(solution.log_Omega)
     exact = exact_fields(
         u,
         xi,
@@ -873,7 +873,7 @@ def overgrid_audit(
     )
     residual = warped_product_residual(
         radius,
-        log_omega,
+        log_Omega,
         u,
         xi,
         d_u,
@@ -885,7 +885,7 @@ def overgrid_audit(
     high_precision = (
         warped_product_residual_mpmath(
             radius,
-            log_omega,
+            log_Omega,
             epsilon,
             mass,
             halo=max(2, min(len(u), len(xi)) // 8),
@@ -905,7 +905,7 @@ def overgrid_audit(
         "xi_count": len(xi),
         "radius_relative_raw_maximum": float(np.max(relative_radius)),
         "log_omega_absolute_raw_maximum": float(
-            np.max(np.abs(log_omega - exact["log_omega"]))
+            np.max(np.abs(log_Omega - exact["log_Omega"]))
         ),
         "warped_product_residual": {
             key: value

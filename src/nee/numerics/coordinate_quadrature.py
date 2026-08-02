@@ -27,10 +27,10 @@ Array = np.ndarray
 class State:
     g_tt: Array
     g_pp: Array
-    omega: Array
-    zeta_up: Array
-    shift: Array
-    q: Array  # Omega^{-1} tr(chi)
+    Omega: Array
+    zeta: Array
+    b: Array
+    Omega_trchi: Array  # Omega tr(chi)
     shear_tt: Array  # Omega hat(chi)_{theta theta}
     shear_pp: Array  # Omega hat(chi)_{phi phi}
 
@@ -121,7 +121,7 @@ def stage_value(values: Array, midpoints: Array, index: int, alpha: float, axis:
 def initial_outgoing_data(
     v: Array, theta: Array, c: float, delta: float, profile_kind: str = "constant-chart"
 ) -> tuple[Array, Array, Array, Array, Array]:
-    """Solve the H_-1 constraints for plus-polarized shear.
+    """Solve the H_-1 constraints for plus-polarized Omega_chih.
 
     ``constant-chart`` enforces the requested pointwise norm on the regular
     chart.  It does not extend smoothly through the poles.  ``smooth-l2`` uses
@@ -177,22 +177,22 @@ def initial_outgoing_data(
 def section_geometry(state: State, u: Array, v: Array, theta: Array) -> dict[str, Array]:
     a = state.g_tt
     p = state.g_pp
-    omega = state.omega
-    b = state.shift
+    Omega = state.Omega
+    b = state.b
     a_t = smooth_derivative(a, theta, axis=2)
     p_t = smooth_derivative(p, theta, axis=2)
     b_t = smooth_derivative(b, theta, axis=2)
 
     lie_a = smooth_derivative(a, u, axis=0) + b * a_t + 2.0 * a * b_t
     lie_p = smooth_derivative(p, u, axis=0) + b * p_t
-    chib_a = lie_a / (2.0 * omega)
-    chib_p = lie_p / (2.0 * omega)
+    chib_a = lie_a / (2.0 * Omega)
+    chib_p = lie_p / (2.0 * Omega)
     tr_chib = chib_a / a + chib_p / p
     hatchib_a = chib_a - 0.5 * tr_chib * a
     hatchib_p = chib_p - 0.5 * tr_chib * p
 
-    log_omega_t = smooth_derivative(np.log(omega), theta, axis=2)
-    zeta_cov = a * state.zeta_up
+    log_omega_t = smooth_derivative(np.log(Omega), theta, axis=2)
+    zeta_cov = a * state.zeta
     eta = zeta_cov + log_omega_t
     etab = -zeta_cov + log_omega_t
 
@@ -271,25 +271,25 @@ def solve_half_shear(
     # Construction_chih: h_half = sym(h_data g_data^{-1} g_old).
     tt[0] = boundary_ratio_tt * state.g_tt[0]
     pp[0] = boundary_ratio_pp * state.g_pp[0]
-    tr_chi = state.omega * state.q
+    tr_chi = state.Omega_trchi / state.Omega
 
-    source_tt = state.omega**2 * (
+    source_tt = state.Omega**2 * (
         geometry["eta_grad_tt"]
         + geometry["eta_quad_tt"]
         - 0.5 * tr_chi * geometry["hatchib_tt"]
     )
-    source_pp = state.omega**2 * (
+    source_pp = state.Omega**2 * (
         geometry["eta_grad_pp"]
         + geometry["eta_quad_pp"]
         - 0.5 * tr_chi * geometry["hatchib_pp"]
     )
-    weighted_trace = state.omega * geometry["tr_chib"]
-    weighted_h_tt = state.omega * geometry["hatchib_tt"] / state.g_tt
-    weighted_h_pp = state.omega * geometry["hatchib_pp"] / state.g_pp
+    weighted_trace = state.Omega * geometry["tr_chib"]
+    weighted_h_tt = state.Omega * geometry["hatchib_tt"] / state.g_tt
+    weighted_h_pp = state.Omega * geometry["hatchib_pp"] / state.g_pp
     midpoint_fields = {
         name: midpoint_values(values, u, axis=0)
         for name, values in {
-            "b": state.shift,
+            "b": state.b,
             "b_t": geometry["b_t"],
             "w": weighted_trace,
             "h_tt": weighted_h_tt,
@@ -303,7 +303,7 @@ def solve_half_shear(
         step = float(u[i + 1] - u[i])
 
         def rhs(y_tt: Array, y_pp: Array, alpha: float) -> tuple[Array, Array]:
-            b = stage_value(state.shift, midpoint_fields["b"], i, alpha, axis=0)
+            b = stage_value(state.b, midpoint_fields["b"], i, alpha, axis=0)
             b_t = stage_value(geometry["b_t"], midpoint_fields["b_t"], i, alpha, axis=0)
             w = stage_value(weighted_trace, midpoint_fields["w"], i, alpha, axis=0)
             h_tt = stage_value(weighted_h_tt, midpoint_fields["h_tt"], i, alpha, axis=0)
@@ -331,7 +331,7 @@ def solve_half_shear(
         pp[i + 1] = y_pp + step * (k1_pp + 2.0 * k2_pp + 2.0 * k3_pp + k4_pp) / 6.0
 
     # The continuum equation preserves trace-freeness.  Projection removes the
-    # Runge--Kutta/finite-difference trace drift before the metric transfer.
+    # Runge--Kutta/finite-difference trace drift before the g transfer.
     trace = tt / state.g_tt + pp / state.g_pp
     tt -= 0.5 * trace * state.g_tt
     pp -= 0.5 * trace * state.g_pp
@@ -339,37 +339,44 @@ def solve_half_shear(
 
 
 def solve_log_omega(
-    state: State, weighted_omegab: Array, u: Array, theta: Array
+    state: State, Omega_omegab: Array, u: Array, theta: Array
 ) -> Array:
-    log_omega = np.zeros_like(state.omega)
-    midpoint_b = midpoint_values(state.shift, u, axis=0)
-    midpoint_source = midpoint_values(weighted_omegab, u, axis=0)
+    log_Omega = np.zeros_like(state.Omega)
+    midpoint_b = midpoint_values(state.b, u, axis=0)
+    midpoint_source = midpoint_values(Omega_omegab, u, axis=0)
     for i in range(len(u) - 1):
         step = float(u[i + 1] - u[i])
 
         def rhs(values: Array, alpha: float) -> Array:
-            b = stage_value(state.shift, midpoint_b, i, alpha, axis=0)
-            source = stage_value(weighted_omegab, midpoint_source, i, alpha, axis=0)
+            b = stage_value(state.b, midpoint_b, i, alpha, axis=0)
+            source = stage_value(Omega_omegab, midpoint_source, i, alpha, axis=0)
             return -b * smooth_derivative(values, theta, axis=1) - 2.0 * source
 
-        values = log_omega[i]
+        values = log_Omega[i]
         k1 = rhs(values, 0.0)
         k2 = rhs(values + step * k1 / 2.0, 0.5)
         k3 = rhs(values + step * k2 / 2.0, 0.5)
         k4 = rhs(values + step * k3, 1.0)
-        log_omega[i + 1] = values + step * (k1 + 2.0 * k2 + 2.0 * k3 + k4) / 6.0
-    return np.exp(log_omega)
+        log_Omega[i + 1] = values + step * (k1 + 2.0 * k2 + 2.0 * k3 + k4) / 6.0
+    return np.exp(log_Omega)
 
 
 def solve_metric_and_expansion(
-    state: State, half_tt: Array, half_pp: Array, new_omega: Array, u: Array, v: Array, theta: Array
+    state: State,
+    half_tt: Array,
+    half_pp: Array,
+    new_omega: Array,
+    new_Omega_omega: Array,
+    u: Array,
+    v: Array,
+    theta: Array,
 ) -> tuple[Array, Array, Array, Array, Array]:
     a = np.zeros_like(state.g_tt)
     p = np.zeros_like(state.g_pp)
-    q = np.zeros_like(state.q)
+    Omega_trchi = np.zeros_like(state.Omega_trchi)
     a[:, 0] = (-u[:, None]) ** 2
     p[:, 0] = (-u[:, None]) ** 2 * np.sin(theta)[None, :] ** 2
-    q[:, 0] = 2.0 / (-u[:, None])
+    Omega_trchi[:, 0] = 2.0 / (-u[:, None])
 
     ratio_tt = half_tt / state.g_tt
     ratio_pp = half_pp / state.g_pp
@@ -377,7 +384,8 @@ def solve_metric_and_expansion(
     midpoint_fields = {
         name: midpoint_values(values, v, axis=1)
         for name, values in {
-            "omega": new_omega,
+            "Omega": new_omega,
+            "Omega_omega": new_Omega_omega,
             "ratio_tt": ratio_tt,
             "ratio_pp": ratio_pp,
             "norm_sq": shear_norm_sq,
@@ -387,30 +395,36 @@ def solve_metric_and_expansion(
     for j in range(len(v) - 1):
         step = float(v[j + 1] - v[j])
 
-        def rhs(y_q: Array, y_a: Array, y_p: Array, alpha: float) -> tuple[Array, Array, Array]:
-            om = stage_value(new_omega, midpoint_fields["omega"], j, alpha, axis=1)
+        def rhs(y_Omega_trchi: Array, y_a: Array, y_p: Array, alpha: float) -> tuple[Array, Array, Array]:
+            om = stage_value(new_omega, midpoint_fields["Omega"], j, alpha, axis=1)
+            weighted_omega = stage_value(
+                new_Omega_omega,
+                midpoint_fields["Omega_omega"],
+                j,
+                alpha,
+                axis=1,
+            )
             r_tt = stage_value(ratio_tt, midpoint_fields["ratio_tt"], j, alpha, axis=1)
             r_pp = stage_value(ratio_pp, midpoint_fields["ratio_pp"], j, alpha, axis=1)
             norm_sq = stage_value(shear_norm_sq, midpoint_fields["norm_sq"], j, alpha, axis=1)
-            om_sq = om**2
             return (
-                -0.5 * om_sq * y_q**2 - norm_sq / om_sq,
-                (om_sq * y_q + 2.0 * r_tt) * y_a,
-                (om_sq * y_q + 2.0 * r_pp) * y_p,
+                -0.5 * y_Omega_trchi**2 - 4.0 * weighted_omega * y_Omega_trchi - norm_sq,
+                (y_Omega_trchi + 2.0 * r_tt) * y_a,
+                (y_Omega_trchi + 2.0 * r_pp) * y_p,
             )
 
-        y_q, y_a, y_p = q[:, j], a[:, j], p[:, j]
-        k1 = rhs(y_q, y_a, y_p, 0.0)
-        k2 = rhs(y_q + step * k1[0] / 2.0, y_a + step * k1[1] / 2.0, y_p + step * k1[2] / 2.0, 0.5)
-        k3 = rhs(y_q + step * k2[0] / 2.0, y_a + step * k2[1] / 2.0, y_p + step * k2[2] / 2.0, 0.5)
-        k4 = rhs(y_q + step * k3[0], y_a + step * k3[1], y_p + step * k3[2], 1.0)
-        q[:, j + 1] = y_q + step * (k1[0] + 2.0 * k2[0] + 2.0 * k3[0] + k4[0]) / 6.0
+        y_Omega_trchi, y_a, y_p = Omega_trchi[:, j], a[:, j], p[:, j]
+        k1 = rhs(y_Omega_trchi, y_a, y_p, 0.0)
+        k2 = rhs(y_Omega_trchi + step * k1[0] / 2.0, y_a + step * k1[1] / 2.0, y_p + step * k1[2] / 2.0, 0.5)
+        k3 = rhs(y_Omega_trchi + step * k2[0] / 2.0, y_a + step * k2[1] / 2.0, y_p + step * k2[2] / 2.0, 0.5)
+        k4 = rhs(y_Omega_trchi + step * k3[0], y_a + step * k3[1], y_p + step * k3[2], 1.0)
+        Omega_trchi[:, j + 1] = y_Omega_trchi + step * (k1[0] + 2.0 * k2[0] + 2.0 * k3[0] + k4[0]) / 6.0
         a[:, j + 1] = y_a + step * (k1[1] + 2.0 * k2[1] + 2.0 * k3[1] + k4[1]) / 6.0
         p[:, j + 1] = y_p + step * (k1[2] + 2.0 * k2[2] + 2.0 * k3[2] + k4[2]) / 6.0
 
     new_shear_tt = half_tt * a / state.g_tt
     new_shear_pp = half_pp * p / state.g_pp
-    return a, p, q, new_shear_tt, new_shear_pp
+    return a, p, Omega_trchi, new_shear_tt, new_shear_pp
 
 
 def picard_step(
@@ -430,25 +444,25 @@ def picard_step(
     eta_norm = geometry["eta"] ** 2 / state.g_tt
     eta_etab = geometry["eta"] * geometry["etab"] / state.g_tt
     shear_dot = (
-        half_tt * (state.omega * geometry["hatchib_tt"]) / state.g_tt**2
-        + half_pp * (state.omega * geometry["hatchib_pp"]) / state.g_pp**2
+        half_tt * (state.Omega * geometry["hatchib_tt"]) / state.g_tt**2
+        + half_pp * (state.Omega * geometry["hatchib_pp"]) / state.g_pp**2
     )
-    omega_tr_chi = state.omega**2 * state.q
-    omega_tr_chib = state.omega * geometry["tr_chib"]
+    omega_tr_chi = state.Omega_trchi
+    omega_tr_chib = state.Omega * geometry["tr_chib"]
     omegab_source = (
-        state.omega**2 * (0.5 * eta_norm - eta_etab - 0.5 * geometry["curvature"])
+        state.Omega**2 * (0.5 * eta_norm - eta_etab - 0.5 * geometry["curvature"])
         + 0.25 * shear_dot
         - 0.125 * omega_tr_chi * omega_tr_chib
     )
-    weighted_omegab = cumulative_polynomial_quadrature(omegab_source, v, axis=1)
-    new_omega = solve_log_omega(state, weighted_omegab, u, theta)
-    weighted_omega = -0.5 * derivative(np.log(new_omega), v, axis=1)
+    Omega_omegab = cumulative_polynomial_quadrature(omegab_source, v, axis=1)
+    new_omega = solve_log_omega(state, Omega_omegab, u, theta)
+    Omega_omega = -0.5 * derivative(np.log(new_omega), v, axis=1)
 
     div_half = tensor_divergence_theta(half_tt, half_pp, state, geometry, theta)
     zeta_source = (
-        -2.0 * omega_tr_chi * state.zeta_up
-        -2.0 * half_tt * state.zeta_up / state.g_tt
-        +2.0 * smooth_derivative(weighted_omega, theta, axis=2) / state.g_tt
+        -2.0 * omega_tr_chi * state.zeta
+        -2.0 * half_tt * state.zeta / state.g_tt
+        +2.0 * smooth_derivative(Omega_omega, theta, axis=2) / state.g_tt
         +zeta_divergence_factor * div_half / state.g_tt
         -0.5 * smooth_derivative(omega_tr_chi, theta, axis=2) / state.g_tt
         +omega_tr_chi
@@ -460,18 +474,18 @@ def picard_step(
         -4.0 * new_omega**2 * new_zeta, v, axis=1
     )
 
-    new_a, new_p, new_q, new_shear_tt, new_shear_pp = solve_metric_and_expansion(
-        state, half_tt, half_pp, new_omega, u, v, theta
+    new_a, new_p, new_Omega_trchi, new_shear_tt, new_shear_pp = solve_metric_and_expansion(
+        state, half_tt, half_pp, new_omega, Omega_omega, u, v, theta
     )
     if np.min(new_a) <= 0.0 or np.min(new_p) <= 0.0 or np.min(new_omega) <= 0.0:
-        raise FloatingPointError("iteration left the positive-metric/lapse region")
+        raise FloatingPointError("iteration left the positive-g/Omega region")
     return State(
         g_tt=new_a,
         g_pp=new_p,
-        omega=new_omega,
-        zeta_up=new_zeta,
-        shift=new_shift,
-        q=new_q,
+        Omega=new_omega,
+        zeta=new_zeta,
+        b=new_shift,
+        Omega_trchi=new_Omega_trchi,
         shear_tt=new_shear_tt,
         shear_pp=new_shear_pp,
     )
@@ -487,10 +501,10 @@ def initial_state(u: Array, v: Array, theta: Array) -> State:
     return State(
         g_tt=g_tt,
         g_pp=g_pp,
-        omega=np.ones(shape),
-        zeta_up=np.zeros(shape),
-        shift=np.zeros(shape),
-        q=np.broadcast_to(2.0 / (-u[:, None, None]), shape).copy(),
+        Omega=np.ones(shape),
+        zeta=np.zeros(shape),
+        b=np.zeros(shape),
+        Omega_trchi=np.broadcast_to(2.0 / (-u[:, None, None]), shape).copy(),
         shear_tt=np.zeros(shape),
         shear_pp=np.zeros(shape),
     )
@@ -498,7 +512,7 @@ def initial_state(u: Array, v: Array, theta: Array) -> State:
 
 def update_norm(new: State, old: State) -> float:
     terms = []
-    for name in ["g_tt", "g_pp", "omega", "zeta_up", "shift", "q"]:
+    for name in ["g_tt", "g_pp", "Omega", "zeta", "b", "Omega_trchi"]:
         current = getattr(new, name)
         previous = getattr(old, name)
         scale = np.maximum(1.0, np.abs(current))
@@ -508,22 +522,22 @@ def update_norm(new: State, old: State) -> float:
 
 def build_spacetime_metric(state: State) -> Array:
     shape = state.g_tt.shape
-    metric = np.zeros(shape + (4, 4), dtype=float)
-    metric[..., 0, 0] = state.g_tt * state.shift**2
-    metric[..., 0, 1] = -2.0 * state.omega**2
-    metric[..., 1, 0] = -2.0 * state.omega**2
-    metric[..., 0, 2] = -state.g_tt * state.shift
-    metric[..., 2, 0] = metric[..., 0, 2]
-    metric[..., 2, 2] = state.g_tt
-    metric[..., 3, 3] = state.g_pp
-    return metric
+    g = np.zeros(shape + (4, 4), dtype=float)
+    g[..., 0, 0] = state.g_tt * state.b**2
+    g[..., 0, 1] = -2.0 * state.Omega**2
+    g[..., 1, 0] = -2.0 * state.Omega**2
+    g[..., 0, 2] = -state.g_tt * state.b
+    g[..., 2, 0] = g[..., 0, 2]
+    g[..., 2, 2] = state.g_tt
+    g[..., 3, 3] = state.g_pp
+    return g
 
 
 def adapted_ricci_norm(ricci: Array, state: State) -> Array:
     inv_a = 1.0 / state.g_tt
     inv_p = 1.0 / state.g_pp
-    om_sq = state.omega**2
-    b = state.shift
+    om_sq = state.Omega**2
+    b = state.b
     r44 = ricci[..., 1, 1] / om_sq
     r33 = (
         ricci[..., 0, 0]
@@ -531,10 +545,10 @@ def adapted_ricci_norm(ricci: Array, state: State) -> Array:
         + b**2 * ricci[..., 2, 2]
     ) / om_sq
     r34 = (ricci[..., 0, 1] + b * ricci[..., 1, 2]) / om_sq
-    r4t = ricci[..., 1, 2] / state.omega
-    r4p = ricci[..., 1, 3] / state.omega
-    r3t = (ricci[..., 0, 2] + b * ricci[..., 2, 2]) / state.omega
-    r3p = (ricci[..., 0, 3] + b * ricci[..., 2, 3]) / state.omega
+    r4t = ricci[..., 1, 2] / state.Omega
+    r4p = ricci[..., 1, 3] / state.Omega
+    r3t = (ricci[..., 0, 2] + b * ricci[..., 2, 2]) / state.Omega
+    r3p = (ricci[..., 0, 3] + b * ricci[..., 2, 3]) / state.Omega
     sphere = (
         ricci[..., 2, 2] ** 2 * inv_a**2
         + 2.0 * ricci[..., 2, 3] ** 2 * inv_a * inv_p
@@ -557,9 +571,9 @@ def subset_state(state: State, iu: Array, iv: Array, it: Array) -> State:
 
 
 def audit_state(state: State, u: Array, v: Array, theta: Array) -> tuple[Array, Array, Array, Array]:
-    metric = build_spacetime_metric(state)
+    g = build_spacetime_metric(state)
     ricci, _ = direct_ricci(
-        metric, [u, v, theta, np.array([0.0])], high_order=True
+        g, [u, v, theta, np.array([0.0])], high_order=True
     )
     rho = adapted_ricci_norm(ricci, state)
     area_density = np.sqrt(state.g_tt * state.g_pp)
@@ -584,7 +598,7 @@ def audit_state_blocked(
     for target_start in range(0, len(v), block_size):
         target_stop = min(target_start + block_size, len(v))
         # Ricci contains a derivative of Christoffel, while Christoffel already
-        # contains a metric derivative.  Ten halo points reproduce the nested
+        # contains a g derivative.  Ten halo points reproduce the nested
         # support of two eleven-point differentiation passes.
         local_start = max(0, target_start - 10)
         local_stop = min(len(v), target_stop + 10)
@@ -672,7 +686,7 @@ def dispersed_good_samples(
 
 
 def trapped_boundary(state: State, u: Array, v: Array) -> tuple[Array, Array]:
-    supremum = np.max(state.omega * state.q, axis=2)
+    supremum = np.max(state.Omega_trchi / state.Omega, axis=2)
     return suffix_boundary(supremum <= 0.0, u), supremum
 
 
@@ -813,8 +827,8 @@ def run_case(
             "max_initial_shear_norm_error": prescribed_norm_error,
             "max_final_shear_trace": float(trace_error),
             "min_final_metric_eigenvalue": float(min(np.min(state.g_tt), np.min(state.g_pp))),
-            "min_final_lapse": float(np.min(state.omega)),
-            "max_final_shift": float(np.max(np.abs(state.shift))),
+            "min_final_lapse": float(np.min(state.Omega)),
+            "max_final_shift": float(np.max(np.abs(state.b))),
         },
     }
 
@@ -1313,7 +1327,7 @@ def run_axisymmetric_short_pulse_suite(results_dir: Path, log_path: Path) -> dic
         "",
         "Implemented the displayed Picard map for diagonal axisymmetric section",
         "metrics on the fixed regular chart `0.38 <= theta <= pi-0.38`.  The",
-        "four-coordinate Ricci tensor is reconstructed from the resulting metric.",
+        "four-coordinate Ricci tensor is reconstructed from the resulting g.",
         "The final sweep uses the full grid; convergence-speed samples use the",
         "same complete local stencils and full angular chart on earlier sweeps.",
         "",

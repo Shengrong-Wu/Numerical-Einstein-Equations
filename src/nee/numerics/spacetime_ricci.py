@@ -3,7 +3,7 @@
 The two sphere directions are represented redundantly by three ambient
 Cartesian components with the tangent projector.  The reference connection is
 the product of the flat ``(u,v)`` connection and the unit round-sphere
-connection.  Ricci is reconstructed from the full metric's connection
+connection.  Ricci is reconstructed from the full g's connection
 difference, independently of the null construction equations.
 """
 
@@ -84,40 +84,40 @@ def spacetime_reference_derivative(
 def build_metric_and_inverse(
     grid: PointSphereGrid, state: GlobalState
 ) -> tuple[Array, Array, Array]:
-    shape = state.omega.shape
-    metric = np.zeros(shape + (5, 5), dtype=float)
-    inverse = np.zeros_like(metric)
-    sphere_inverse = tangent_inverse(grid, state.metric)
-    shift_cov = np.einsum("n...ij,n...j->n...i", state.metric, state.shift)
-    shift_norm_sq = np.einsum("n...i,n...i->n...", shift_cov, state.shift)
-    metric[..., 0, 0] = shift_norm_sq
-    metric[..., 0, 1] = -2.0 * state.omega**2
-    metric[..., 1, 0] = metric[..., 0, 1]
-    metric[..., 0, 2:5] = -shift_cov
-    metric[..., 2:5, 0] = -shift_cov
-    metric[..., 2:5, 2:5] = state.metric
+    shape = state.Omega.shape
+    g = np.zeros(shape + (5, 5), dtype=float)
+    inverse_g = np.zeros_like(g)
+    sphere_inverse = tangent_inverse(grid, state.g)
+    shift_cov = np.einsum("n...ij,n...j->n...i", state.g, state.b)
+    shift_norm_sq = np.einsum("n...i,n...i->n...", shift_cov, state.b)
+    g[..., 0, 0] = shift_norm_sq
+    g[..., 0, 1] = -2.0 * state.Omega**2
+    g[..., 1, 0] = g[..., 0, 1]
+    g[..., 0, 2:5] = -shift_cov
+    g[..., 2:5, 0] = -shift_cov
+    g[..., 2:5, 2:5] = state.g
 
-    null_inverse = -0.5 / state.omega**2
-    inverse[..., 0, 1] = null_inverse
-    inverse[..., 1, 0] = null_inverse
-    inverse[..., 1, 2:5] = null_inverse[..., None] * state.shift
-    inverse[..., 2:5, 1] = inverse[..., 1, 2:5]
-    inverse[..., 2:5, 2:5] = sphere_inverse
-    return metric, inverse, sphere_inverse
+    null_inverse = -0.5 / state.Omega**2
+    inverse_g[..., 0, 1] = null_inverse
+    inverse_g[..., 1, 0] = null_inverse
+    inverse_g[..., 1, 2:5] = null_inverse[..., None] * state.b
+    inverse_g[..., 2:5, 1] = inverse_g[..., 1, 2:5]
+    inverse_g[..., 2:5, 2:5] = sphere_inverse
+    return g, inverse_g, sphere_inverse
 
 
 def direct_ricci_block(
     grid: PointSphereGrid, state: GlobalState, u: Array, v: Array
 ) -> tuple[Array, Array, Array]:
-    metric, inverse, sphere_inverse = build_metric_and_inverse(grid, state)
-    derivative = spacetime_reference_derivative(grid, metric, 2, u, v)
+    g, inverse_g, sphere_inverse = build_metric_and_inverse(grid, state)
+    derivative = spacetime_reference_derivative(grid, g, 2, u, v)
     lower = 0.5 * (
         derivative
         + np.swapaxes(derivative, -3, -2)
         - np.einsum("n...kij->n...ijk", derivative)
     )
-    difference = np.einsum("n...lk,n...ijk->n...lij", inverse, lower)
-    ricci = np.zeros_like(metric)
+    difference = np.einsum("n...lk,n...ijk->n...lij", inverse_g, lower)
+    ricci = np.zeros_like(g)
     ricci[..., 2:5, 2:5] = grid.projector[:, None, None]
     # Contract nabla^0 C direction by direction.  The complete rank-four
     # derivative has 625 components per point; Ricci needs only
@@ -165,30 +165,30 @@ def direct_ricci_block(
                     ricci[..., j, k] -= (
                         difference[..., i, k, m] * difference[..., m, j, i]
                     )
-    return ricci, sphere_inverse, metric
+    return ricci, sphere_inverse, g
 
 
 def adapted_ricci_norm(
     ricci: Array, state: GlobalState, sphere_inverse: Array
 ) -> Array:
-    omega_sq = state.omega**2
-    shift = state.shift
+    omega_sq = state.Omega**2
+    b = state.b
     angular = ricci[..., 2:5, 2:5]
     r44 = ricci[..., 1, 1] / omega_sq
     r33 = (
         ricci[..., 0, 0]
-        + 2.0 * np.einsum("n...i,n...i->n...", shift, ricci[..., 0, 2:5])
-        + np.einsum("n...i,n...ij,n...j->n...", shift, angular, shift)
+        + 2.0 * np.einsum("n...i,n...i->n...", b, ricci[..., 0, 2:5])
+        + np.einsum("n...i,n...ij,n...j->n...", b, angular, b)
     ) / omega_sq
     r34 = (
         ricci[..., 0, 1]
-        + np.einsum("n...i,n...i->n...", shift, ricci[..., 2:5, 1])
+        + np.einsum("n...i,n...i->n...", b, ricci[..., 2:5, 1])
     ) / omega_sq
-    r4 = ricci[..., 1, 2:5] / state.omega[..., None]
+    r4 = ricci[..., 1, 2:5] / state.Omega[..., None]
     r3 = (
         ricci[..., 0, 2:5]
-        + np.einsum("n...i,n...ij->n...j", shift, angular)
-    ) / state.omega[..., None]
+        + np.einsum("n...i,n...ij->n...j", b, angular)
+    ) / state.Omega[..., None]
     value = r33**2 + r44**2 + 2.0 * r34**2
     value += np.einsum("n...i,n...ij,n...j->n...", r3, sphere_inverse, r3)
     value += np.einsum("n...i,n...ij,n...j->n...", r4, sphere_inverse, r4)
@@ -243,7 +243,7 @@ def audit_state(
             local_metric = np.einsum(
                 "nia,n...ij,njb->n...ab",
                 grid.frames,
-                local_state.metric[:, :, local],
+                local_state.g[:, :, local],
                 grid.frames,
             )
             area_ratio = np.sqrt(np.maximum(np.linalg.det(local_metric), 0.0))
@@ -262,15 +262,15 @@ def audit_state(
 def minkowski_state(grid: PointSphereGrid, u: Array, v: Array) -> GlobalState:
     radius = v[None, None, :] - u[None, :, None]
     projector = grid.projector[:, None, None]
-    metric = radius[..., None, None] ** 2 * projector
+    g = radius[..., None, None] ** 2 * projector
     shape = (grid.count, len(u), len(v))
     return GlobalState(
-        metric=metric,
-        omega=np.ones(shape),
-        zeta_up=np.zeros(shape + (3,)),
-        shift=np.zeros(shape + (3,)),
-        q=np.broadcast_to(2.0 / radius, shape).copy(),
-        shear=np.zeros_like(metric),
+        g=g,
+        Omega=np.ones(shape),
+        zeta=np.zeros(shape + (3,)),
+        b=np.zeros(shape + (3,)),
+        Omega_trchi=np.broadcast_to(2.0 / radius, shape).copy(),
+        Omega_chih=np.zeros_like(g),
     )
 
 

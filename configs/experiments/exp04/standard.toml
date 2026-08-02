@@ -10,7 +10,7 @@ v1 = 0.5
 cap = 0.005
 [initial_data]
 profile = "low_band_hemisphere"
-shear_divisor = 3.2
+Omega_chih_divisor = 3.2
 [coordinates]
 u_min = -1.0
 u_max = -0.5

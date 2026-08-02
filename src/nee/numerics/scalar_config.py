@@ -99,10 +99,10 @@ class ExperimentConfig:
         if abs(d.shear_profile_power - d.outgoing_scalar_power) > 1.0e-14:
             raise ValueError(
                 "the current regular coordinate assumes equal scalar and "
-                "shear fractional powers"
+                "Omega_chih fractional powers"
             )
         if d.shear_profile not in {"quadrupole", "draft-conformal-killing"}:
-            raise ValueError(f"unknown shear profile {d.shear_profile!r}")
+            raise ValueError(f"unknown Omega_chih profile {d.shear_profile!r}")
         if d.incoming_scalar_branch not in {"positive", "negative"}:
             raise ValueError(
                 "incoming_scalar_branch must be 'positive' or 'negative'"

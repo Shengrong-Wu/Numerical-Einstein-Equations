@@ -91,7 +91,7 @@ def schwarzschild_interior(config: ExperimentConfig, output: Path) -> dict[str, 
         u=solution.u,
         v=solution.v,
         radius=solution.radius,
-        log_lapse=solution.log_omega,
+        log_Omega=solution.log_Omega,
     )
     residual = overgrid_audit(solution, 0.5)
     np.savez_compressed(output / "residual-maps.npz", radius_error=np.abs(solution.radius - exact["radius"]))

@@ -3,15 +3,14 @@
 ## Setup
 
 The power-law scalar pulse uses \(\kappa=0.25\), \(\delta=0.1\), scale 0.01,
-signed scalar amplitude \(-2\), and quadrupolar shear amplitude 0.1, so
+signed scalar amplitude \(-2\), and quadrupolar Omega_chih amplitude 0.1, so
 \[
  e_4\phi(-1,v)-e_4\phi(-1,0)
  =-2\left(\frac{v}{v+0.01}\right)^{0.1}.
 \]
-A 12-element
-degree-eight tau domain is extended by one whole element through exact-prefix
-prolongation; the transverse direction has three degree-eleven elements. The
-standard band is \(L=5,W=10,N=170\), and the control is
+A 12-element degree-eight tau domain is first tested through
+\(u=-0.02\); the transverse direction has three degree-eleven elements. The
+standard band is \(L=5,W=10,N=170\), and the angular control is
 \(L=7,W=14,N=300\). Both independently resample the two expansion suprema on
 1000 sphere points with a three-node endpoint halo.
 
@@ -23,18 +22,30 @@ outgoing face, \(e_4\phi\) ranges from \(-2.2627417\) at the corner to
 positive with minimum \(0.880366\). Thus the initial faces themselves contain
 no trapped section.
 
-The standard and angular-control evolutions both fail before completing base
-Picard sweep 1. The coupled outgoing Raychaudhuri/metric RK4 march overflows,
-and the nonfinite-state guard stops the runs after 53.21 and 95.57 seconds,
-respectively. The same failure at \((L,W,N)=(5,10,170)\) and \((7,14,300)\)
-shows that it is not removed by the tested angular refinement.
+The complete 12-element standard and angular-control domains encounter the
+same Raychaudhuri pole before completing sweep 1. Each run records that caustic
+and then recomputes on the exact four-element prefix ending at
+\(u=-0.2714417617\). This retains the original nodes and operation order on
+those elements while excluding the later coordinate singularity.
+
+Both prefix runs complete all 14 sweeps. Their final updates are
+\(4.09\times10^{-16}\) and \(6.76\times10^{-16}\). Each independent
+1000-point sign audit finds 32 trapped grid sections and 23 after the
+three-node endpoint halo. The first protected candidate is
+\[
+ (u,v)=(-0.4696271025,0.04),
+\]
+where the standard outgoing and incoming expansion suprema are
+\(-0.0593348\) and \(-4.9754530\). At the innermost retained corner the
+corresponding sign margins are 3.62907 and 10.5650. The angular control has the
+same candidate indices and changes these margins by less than
+\(1.7\times10^{-5}\).
 
 ## Limitation
 
-Changing the sign makes the outgoing scalar derivative substantially more
-negative and strengthens the focusing source \(-(e_4\phi)^2\). The present
-fixed-grid Picard/RK discretization cannot evolve this datum across the base
-domain. No continued state, expansion-sign audit, trapped-section candidate,
-or certificate is produced. The overflow is consistent with severe focusing
-or a double-null coordinate breakdown, but it is not by itself evidence of a
-physical trapped surface.
+The full-domain overflow is a double-null caustic and is not itself used as
+evidence. The trapped-section claim comes only from the converged finite-prefix
+state and its independent angular resampling. Standard and angular-control
+sign results agree, but a separate coordinate-refinement certificate has not
+yet been run; the summaries therefore label the result a numerical candidate
+rather than a refinement certificate.

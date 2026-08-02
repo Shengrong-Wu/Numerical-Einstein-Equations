@@ -14,7 +14,7 @@ import numpy as np
 
 from nee.solver.backend import vacuum_picard_step
 from nee.state.boundary import BoundaryData
-from nee.state.iterate import PicardState as WeightedState
+from nee.state.iterate import PicardState
 from nee.state.fields import (
     tangent_inverse,
     tensor_trace,
@@ -39,11 +39,11 @@ def initial_iterate(
     grid: Any,
     v: Array,
     boundary: BoundaryData,
-) -> WeightedState:
+) -> PicardState:
     """Construct exactly the prescribed zeroth Picard iterate.
 
-    Every field except the shift is extended constantly from ``v=0``.  The
-    shift is obtained by integrating
+    Every field except the b is extended constantly from ``v=0``.  The
+    b is obtained by integrating
 
         partial_v b^(0) = -4 (Omega^(0))^2 zeta^(0)
 
@@ -53,57 +53,57 @@ def initial_iterate(
     incoming = boundary.incoming
     v = np.asarray(v)
     v_count = len(v)
-    metric = _extend_in_v(incoming["metric"], v_count)
-    omega = _extend_in_v(incoming["omega"], v_count)
-    zeta_up = _extend_in_v(incoming["zeta_up"], v_count)
-    x_in = _extend_in_v(incoming["weighted_chib"], v_count)
+    g = _extend_in_v(incoming["g"], v_count)
+    Omega = _extend_in_v(incoming["Omega"], v_count)
+    zeta = _extend_in_v(incoming["zeta"], v_count)
+    Omega_chib = _extend_in_v(incoming["Omega_chib"], v_count)
 
-    weighted_tr_chi = _extend_in_v(
-        incoming["weighted_tr_chi"], v_count
+    Omega_trchi = _extend_in_v(
+        incoming["Omega_trchi"], v_count
     )
-    if "weighted_chi" in incoming:
-        x_out = _extend_in_v(incoming["weighted_chi"], v_count)
+    if "Omega_chi" in incoming:
+        Omega_chi = _extend_in_v(incoming["Omega_chi"], v_count)
     else:
         sigma_out_face = np.asarray(
             incoming.get(
-                "weighted_hatchi",
-                np.zeros_like(incoming["weighted_chib"]),
+                "Omega_chih",
+                np.zeros_like(incoming["Omega_chib"]),
             )
         )
-        sigma_out = _extend_in_v(sigma_out_face, v_count)
-        x_out = (
-            0.5 * weighted_tr_chi[..., None, None] * metric + sigma_out
+        Omega_chih = _extend_in_v(sigma_out_face, v_count)
+        Omega_chi = (
+            0.5 * Omega_trchi[..., None, None] * g + Omega_chih
         )
 
-    shift_face = np.asarray(incoming["shift"])
-    shift = _extend_in_v(shift_face, v_count)
-    shift -= (
+    shift_face = np.asarray(incoming["b"])
+    b = _extend_in_v(shift_face, v_count)
+    b -= (
         4.0
-        * omega[..., None] ** 2
-        * zeta_up
+        * Omega[..., None] ** 2
+        * zeta
         * (v - v[0]).reshape((1, 1, v_count, 1))
     )
 
-    scalar_shape = metric.shape[:-2]
-    w_out = _extend_in_v(
+    scalar_shape = g.shape[:-2]
+    Omega_omega = _extend_in_v(
         np.asarray(
             incoming.get(
-                "weighted_omega",
-                np.zeros(metric.shape[:2], dtype=metric.dtype),
+                "Omega_omega",
+                np.zeros(g.shape[:2], dtype=g.dtype),
             )
         ),
         v_count,
     )
-    w_in = _extend_in_v(incoming["weighted_omegab"], v_count)
-    state = WeightedState(
-        sphere_metric=metric,
-        shift=shift,
-        log_lapse=np.log(omega),
-        outgoing_null_form=x_out,
-        incoming_null_form=x_in,
-        torsion=zeta_up,
-        outgoing_weighted_omega=np.broadcast_to(w_out, scalar_shape).copy(),
-        incoming_weighted_omega=np.broadcast_to(w_in, scalar_shape).copy(),
+    Omega_omegab = _extend_in_v(incoming["Omega_omegab"], v_count)
+    state = PicardState(
+        g=g,
+        b=b,
+        log_Omega=np.log(Omega),
+        Omega_chi=Omega_chi,
+        Omega_chib=Omega_chib,
+        zeta=zeta,
+        Omega_omega=np.broadcast_to(Omega_omega, scalar_shape).copy(),
+        Omega_omegab=np.broadcast_to(Omega_omegab, scalar_shape).copy(),
     )
     state.validate(grid.frames)
     assert_incoming_traces(state, boundary)
@@ -111,9 +111,9 @@ def initial_iterate(
 
 
 def impose_characteristic_traces(
-    state: WeightedState,
+    state: PicardState,
     boundary: BoundaryData,
-) -> WeightedState:
+) -> PicardState:
     """Restore all prescribed face values on a copied state."""
 
     result = state.copy()
@@ -121,113 +121,113 @@ def impose_characteristic_traces(
     incoming = boundary.incoming
 
     # H_{-1}: array index u=0.
-    result.metric[:, 0] = outgoing["metric"]
-    result.log_omega[:, 0] = np.log(outgoing["omega"])
-    result.shift[:, 0] = outgoing["shift"]
-    result.zeta_up[:, 0] = outgoing["zeta_up"]
-    result.w_out[:, 0] = outgoing["weighted_omega"]
-    result.x_out[:, 0] = (
-        outgoing["shear"]
+    result.g[:, 0] = outgoing["g"]
+    result.log_Omega[:, 0] = np.log(outgoing["Omega"])
+    result.b[:, 0] = outgoing["b"]
+    result.zeta[:, 0] = outgoing["zeta"]
+    result.Omega_omega[:, 0] = outgoing["Omega_omega"]
+    result.Omega_chi[:, 0] = (
+        outgoing["Omega_chih"]
         + 0.5
-        * outgoing["expansion"][..., None, None]
-        * outgoing["metric"]
+        * outgoing["Omega_trchi"][..., None, None]
+        * outgoing["g"]
     )
 
     # Hbar_0: array index v=0.  Apply this second so the single shared corner
     # is represented by the incoming copy; corner validation guarantees that
     # the prescribed fields agree there.
-    result.metric[:, :, 0] = incoming["metric"]
-    result.log_omega[:, :, 0] = np.log(incoming["omega"])
-    result.shift[:, :, 0] = incoming["shift"]
-    result.zeta_up[:, :, 0] = incoming["zeta_up"]
-    result.w_in[:, :, 0] = incoming["weighted_omegab"]
-    result.x_in[:, :, 0] = incoming["weighted_chib"]
+    result.g[:, :, 0] = incoming["g"]
+    result.log_Omega[:, :, 0] = np.log(incoming["Omega"])
+    result.b[:, :, 0] = incoming["b"]
+    result.zeta[:, :, 0] = incoming["zeta"]
+    result.Omega_omegab[:, :, 0] = incoming["Omega_omegab"]
+    result.Omega_chib[:, :, 0] = incoming["Omega_chib"]
 
-    if "weighted_chi" in incoming:
+    if "Omega_chi" in incoming:
         # A restarted slab carries the complete terminal value of the
         # preceding slab.
-        result.x_out[:, :, 0] = incoming["weighted_chi"]
+        result.Omega_chi[:, :, 0] = incoming["Omega_chi"]
     else:
         # On the original v=0 face the data prescribe A_+ but no independent
-        # transverse shear.  Preserve the candidate shear and restore A_+.
-        incoming_metric = result.metric[:, :, 0]
+        # transverse Omega_chih.  Preserve the candidate Omega_chih and restore A_+.
+        incoming_metric = result.g[:, :, 0]
         incoming_inverse = tangent_inverse(incoming_metric)
-        sigma_out = tracefree(
-            result.x_out[:, :, 0],
+        Omega_chih = tracefree(
+            result.Omega_chi[:, :, 0],
             incoming_metric,
             incoming_inverse,
         )
-        result.x_out[:, :, 0] = (
-            sigma_out
+        result.Omega_chi[:, :, 0] = (
+            Omega_chih
             + 0.5
-            * incoming["weighted_tr_chi"][..., None, None]
+            * incoming["Omega_trchi"][..., None, None]
             * incoming_metric
         )
-    if "weighted_omega" in incoming:
-        result.w_out[:, :, 0] = incoming["weighted_omega"]
+    if "Omega_omega" in incoming:
+        result.Omega_omega[:, :, 0] = incoming["Omega_omega"]
     return result
 
 
 def incoming_trace_errors(
-    state: WeightedState,
+    state: PicardState,
     boundary: BoundaryData,
 ) -> dict[str, float]:
     """Return maximum component errors on the fixed ``v=0`` face."""
 
     incoming = boundary.incoming
     errors = {
-        "metric": float(
-            np.max(np.abs(state.metric[:, :, 0] - incoming["metric"]))
+        "g": float(
+            np.max(np.abs(state.g[:, :, 0] - incoming["g"]))
         ),
-        "omega": float(
-            np.max(np.abs(state.omega[:, :, 0] - incoming["omega"]))
+        "Omega": float(
+            np.max(np.abs(state.Omega[:, :, 0] - incoming["Omega"]))
         ),
-        "shift": float(
-            np.max(np.abs(state.shift[:, :, 0] - incoming["shift"]))
+        "b": float(
+            np.max(np.abs(state.b[:, :, 0] - incoming["b"]))
         ),
-        "zeta_up": float(
-            np.max(np.abs(state.zeta_up[:, :, 0] - incoming["zeta_up"]))
+        "zeta": float(
+            np.max(np.abs(state.zeta[:, :, 0] - incoming["zeta"]))
         ),
-        "x_in": float(
+        "Omega_chib": float(
             np.max(
                 np.abs(
-                    state.x_in[:, :, 0] - incoming["weighted_chib"]
+                    state.Omega_chib[:, :, 0] - incoming["Omega_chib"]
                 )
             )
         ),
-        "w_in": float(
+        "Omega_omegab": float(
             np.max(
                 np.abs(
-                    state.w_in[:, :, 0] - incoming["weighted_omegab"]
+                    state.Omega_omegab[:, :, 0] - incoming["Omega_omegab"]
                 )
             )
         ),
-        "a_out": float(
+        "Omega_trchi": float(
             np.max(
                 np.abs(
                     tensor_trace(
-                        state.x_out[:, :, 0],
-                        tangent_inverse(state.metric[:, :, 0]),
+                        state.Omega_chi[:, :, 0],
+                        tangent_inverse(state.g[:, :, 0]),
                     )
-                    - incoming["weighted_tr_chi"]
+                    - incoming["Omega_trchi"]
                 )
             )
         ),
     }
-    if "weighted_chi" in incoming:
-        errors["x_out"] = float(
+    if "Omega_chi" in incoming:
+        errors["Omega_chi"] = float(
             np.max(
                 np.abs(
-                    state.x_out[:, :, 0] - incoming["weighted_chi"]
+                    state.Omega_chi[:, :, 0] - incoming["Omega_chi"]
                 )
             )
         )
-    if "weighted_omega" in incoming:
-        errors["w_out"] = float(
+    if "Omega_omega" in incoming:
+        errors["Omega_omega"] = float(
             np.max(
                 np.abs(
-                    state.w_out[:, :, 0]
-                    - incoming["weighted_omega"]
+                    state.Omega_omega[:, :, 0]
+                    - incoming["Omega_omega"]
                 )
             )
         )
@@ -235,38 +235,38 @@ def incoming_trace_errors(
 
 
 def outgoing_trace_errors(
-    state: WeightedState,
+    state: PicardState,
     boundary: BoundaryData,
 ) -> dict[str, float]:
     """Return maximum component errors on the fixed ``u=-1`` face."""
 
     outgoing = boundary.outgoing
     expected_x_out = (
-        outgoing["shear"]
+        outgoing["Omega_chih"]
         + 0.5
-        * outgoing["expansion"][..., None, None]
-        * outgoing["metric"]
+        * outgoing["Omega_trchi"][..., None, None]
+        * outgoing["g"]
     )
     return {
-        "metric": float(
-            np.max(np.abs(state.metric[:, 0] - outgoing["metric"]))
+        "g": float(
+            np.max(np.abs(state.g[:, 0] - outgoing["g"]))
         ),
-        "omega": float(
-            np.max(np.abs(state.omega[:, 0] - outgoing["omega"]))
+        "Omega": float(
+            np.max(np.abs(state.Omega[:, 0] - outgoing["Omega"]))
         ),
-        "shift": float(
-            np.max(np.abs(state.shift[:, 0] - outgoing["shift"]))
+        "b": float(
+            np.max(np.abs(state.b[:, 0] - outgoing["b"]))
         ),
-        "zeta_up": float(
-            np.max(np.abs(state.zeta_up[:, 0] - outgoing["zeta_up"]))
+        "zeta": float(
+            np.max(np.abs(state.zeta[:, 0] - outgoing["zeta"]))
         ),
-        "x_out": float(
-            np.max(np.abs(state.x_out[:, 0] - expected_x_out))
+        "Omega_chi": float(
+            np.max(np.abs(state.Omega_chi[:, 0] - expected_x_out))
         ),
-        "w_out": float(
+        "Omega_omega": float(
             np.max(
                 np.abs(
-                    state.w_out[:, 0] - outgoing["weighted_omega"]
+                    state.Omega_omega[:, 0] - outgoing["Omega_omega"]
                 )
             )
         ),
@@ -274,7 +274,7 @@ def outgoing_trace_errors(
 
 
 def assert_incoming_traces(
-    state: WeightedState,
+    state: PicardState,
     boundary: BoundaryData,
     *,
     tolerance: float = 5.0e-12,
@@ -289,7 +289,7 @@ def assert_incoming_traces(
 
 
 def assert_characteristic_traces(
-    state: WeightedState,
+    state: PicardState,
     boundary: BoundaryData,
     *,
     tolerance: float = 5.0e-12,
@@ -314,12 +314,12 @@ def raw_picard_candidate(
     grid: Any,
     mesh: Any,
     angular: Any,
-    current: WeightedState,
+    current: PicardState,
     boundary: BoundaryData,
     *,
     metric_substeps: int,
     transport_cfl: float = 0.45,
-) -> tuple[WeightedState, dict[str, Any]]:
+) -> tuple[PicardState, dict[str, Any]]:
     """Apply one equation sweep and restore its prescribed traces."""
 
     # The declared U^(0) is the incoming-face extension and therefore does
@@ -361,11 +361,11 @@ def raw_picard_candidate(
 
 
 def relaxed_next_iterate(
-    previous: WeightedState,
-    candidate: WeightedState,
+    previous: PicardState,
+    candidate: PicardState,
     boundary: BoundaryData,
     relaxation: float,
-) -> WeightedState:
+) -> PicardState:
     """Relax the full state and then reimpose the immutable face data."""
 
     if not 0.0 < relaxation <= 1.0:
@@ -376,15 +376,15 @@ def relaxed_next_iterate(
         new = np.asarray(getattr(candidate, name))
         return old + relaxation * (new - old)
 
-    relaxed = WeightedState(
-        sphere_metric=blend("metric"),
-        shift=blend("shift"),
-        log_lapse=blend("log_omega"),
-        outgoing_null_form=blend("x_out"),
-        incoming_null_form=blend("x_in"),
-        torsion=blend("zeta_up"),
-        outgoing_weighted_omega=blend("w_out"),
-        incoming_weighted_omega=blend("w_in"),
+    relaxed = PicardState(
+        g=blend("g"),
+        b=blend("b"),
+        log_Omega=blend("log_Omega"),
+        Omega_chi=blend("Omega_chi"),
+        Omega_chib=blend("Omega_chib"),
+        zeta=blend("zeta"),
+        Omega_omega=blend("Omega_omega"),
+        Omega_omegab=blend("Omega_omegab"),
     )
     relaxed = impose_characteristic_traces(relaxed, boundary)
     assert_characteristic_traces(relaxed, boundary)

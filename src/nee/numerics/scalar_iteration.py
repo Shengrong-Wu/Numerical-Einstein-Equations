@@ -37,8 +37,8 @@ class ESEState(eve.FirstOrderState):
     """EVE first-order state augmented by three scalar-field variables."""
 
     phi: Array
-    scalar_p: Array  # partial_v phi = Omega e_4 phi
-    incoming_scalar: Array  # (partial_u+b.grad)phi = Omega e_3 phi
+    Omega_e4phi: Array  # partial_v phi = Omega e_4 phi
+    Omega_e3phi: Array  # (partial_u+b.grad)phi = Omega e_3 phi
 
 
 def _project_scalar(angular: AngularGalerkin | None, value: Array) -> Array:
@@ -92,18 +92,18 @@ def initial_state(
     incoming = data.incoming
     outgoing = data.outgoing
     u = incoming["u"]
-    metric = _extend_face(incoming["metric"], outgoing["metric"], u, 2.0)
-    q = _extend_face(incoming["q"], outgoing["q"], u, -1.0)
-    shear = _extend_face(incoming["shear"], outgoing["shear"], u, 1.0)
-    log_omega = _extend_face(
-        np.log(incoming["omega"]), np.log(outgoing["omega"]), u, 0.0
+    g = _extend_face(incoming["g"], outgoing["g"], u, 2.0)
+    Omega_trchi = _extend_face(incoming["Omega_trchi"], outgoing["Omega_trchi"], u, -1.0)
+    Omega_chih = _extend_face(incoming["Omega_chih"], outgoing["Omega_chih"], u, 1.0)
+    log_Omega = _extend_face(
+        np.log(incoming["Omega"]), np.log(outgoing["Omega"]), u, 0.0
     )
-    weighted_omega = _extend_face(
-        incoming["weighted_omega"], outgoing["weighted_omega"], u, -1.0
+    Omega_omega = _extend_face(
+        incoming["Omega_omega"], outgoing["Omega_omega"], u, -1.0
     )
     phi = _extend_face(incoming["phi"], outgoing["phi"], u, 0.0)
-    scalar_p = _extend_face(
-        incoming["scalar_p"], outgoing["scalar_p"], u, -1.0
+    Omega_e4phi = _extend_face(
+        incoming["Omega_e4phi"], outgoing["Omega_e4phi"], u, -1.0
     )
     v_count = len(outgoing["v"])
 
@@ -114,24 +114,24 @@ def initial_state(
         ).copy()
 
     state = ESEState(
-        metric=metric,
-        omega=np.exp(log_omega),
-        zeta_up=repeat("zeta_up"),
-        shift=repeat("shift"),
-        q=q,
-        shear=shear,
-        weighted_chib=repeat("weighted_chib"),
-        weighted_omega=weighted_omega,
-        weighted_omegab=repeat("weighted_omegab"),
+        g=g,
+        Omega=np.exp(log_Omega),
+        zeta=repeat("zeta"),
+        b=repeat("b"),
+        Omega_trchi=Omega_trchi,
+        Omega_chih=Omega_chih,
+        Omega_chib=repeat("Omega_chib"),
+        Omega_omega=Omega_omega,
+        Omega_omegab=repeat("Omega_omegab"),
         phi=phi,
-        scalar_p=scalar_p,
-        incoming_scalar=repeat("incoming_scalar"),
+        Omega_e4phi=Omega_e4phi,
+        Omega_e3phi=repeat("Omega_e3phi"),
     )
     if angular is not None:
         angular.project_state(state)
         state.phi = angular.project_scalar(state.phi)
-        state.scalar_p = angular.project_scalar(state.scalar_p)
-        state.incoming_scalar = angular.project_scalar(state.incoming_scalar)
+        state.Omega_e4phi = angular.project_scalar(state.Omega_e4phi)
+        state.Omega_e3phi = angular.project_scalar(state.Omega_e3phi)
     impose_characteristic_faces(state, data)
     validate_state(angular.grid if angular is not None else None, state)
     return state
@@ -147,26 +147,26 @@ def impose_characteristic_faces(
     outgoing = data.outgoing
     # Outgoing u-marches.
     for state_name, data_name in (
-        ("metric", "metric"),
-        ("q", "q"),
-        ("shear", "shear"),
-        ("omega", "omega"),
-        ("weighted_omega", "weighted_omega"),
+        ("g", "g"),
+        ("Omega_trchi", "Omega_trchi"),
+        ("Omega_chih", "Omega_chih"),
+        ("Omega", "Omega"),
+        ("Omega_omega", "Omega_omega"),
         ("phi", "phi"),
-        ("scalar_p", "scalar_p"),
+        ("Omega_e4phi", "Omega_e4phi"),
     ):
         getattr(state, state_name)[:, 0] = outgoing[data_name]
     # Incoming v-marches or definitions.
     for state_name, data_name in (
-        ("metric", "metric"),
-        ("q", "q"),
-        ("shear", "shear"),
+        ("g", "g"),
+        ("Omega_trchi", "Omega_trchi"),
+        ("Omega_chih", "Omega_chih"),
         ("phi", "phi"),
-        ("zeta_up", "zeta_up"),
-        ("shift", "shift"),
-        ("weighted_chib", "weighted_chib"),
-        ("weighted_omegab", "weighted_omegab"),
-        ("incoming_scalar", "incoming_scalar"),
+        ("zeta", "zeta"),
+        ("b", "b"),
+        ("Omega_chib", "Omega_chib"),
+        ("Omega_omegab", "Omega_omegab"),
+        ("Omega_e3phi", "Omega_e3phi"),
     ):
         getattr(state, state_name)[:, :, 0] = incoming[data_name]
 
@@ -179,19 +179,19 @@ def section_geometry(
     geometry = eve.section_geometry(
         grid, state, include_curvature=include_curvature
     )
-    inverse = geometry["inverse"]
-    grad_phi = scalar_gradient(grid, state.phi)
-    grad_phi_up = np.einsum("n...ij,n...j->n...i", inverse, grad_phi)
+    inverse_g = geometry["inverse_g"]
+    nabla_phi = scalar_gradient(grid, state.phi)
+    grad_phi_up = np.einsum("n...ij,n...j->n...i", inverse_g, nabla_phi)
     geometry.update(
         {
-            "grad_phi": grad_phi,
+            "nabla_phi": nabla_phi,
             "grad_phi_up": grad_phi_up,
             "lap_phi": vector_divergence(
                 grid, grad_phi_up, geometry["difference"]
             ),
             # The project's hat-tensor convention is twice the STF product.
             "phi_square_hat": tracefree_square(
-                grad_phi, state.metric, inverse
+                nabla_phi, state.g, inverse_g
             ),
         }
     )
@@ -206,44 +206,44 @@ def solve_half_shear(
     mesh: CharacteristicPowerMesh,
     angular: AngularGalerkin | None,
 ) -> Array:
-    """Solve the moving-trace half-shear DAE including scalar anisotropy."""
+    """Solve the moving-trace half-Omega_chih DAE including scalar anisotropy."""
 
     u = mesh.u
-    half = np.zeros_like(state.metric)
-    boundary_inverse = tangent_inverse(grid, boundary["metric"])
-    old_inverse_boundary = geometry["inverse"][:, 0]
+    half = np.zeros_like(state.g)
+    boundary_inverse = tangent_inverse(grid, boundary["g"])
+    old_inverse_boundary = geometry["inverse_g"][:, 0]
     transfer = np.matmul(
-        np.matmul(boundary["shear"], boundary_inverse), state.metric[:, 0]
+        np.matmul(boundary["Omega_chih"], boundary_inverse), state.g[:, 0]
     )
     transfer = 0.5 * (transfer + np.swapaxes(transfer, -1, -2))
     half[:, 0] = (
         tensor_tracefree(
-            transfer, state.metric[:, 0], old_inverse_boundary
+            transfer, state.g[:, 0], old_inverse_boundary
         )
         if angular is None
         else angular.project_g_tracefree(
             transfer, old_inverse_boundary
         )
     )
-    source = state.omega[..., None, None] ** 2 * (
+    source = state.Omega[..., None, None] ** 2 * (
         geometry["eta_grad_hat"]
         + geometry["eta_square_hat"]
         + 0.5 * geometry["phi_square_hat"]
         - 0.5
-        * (state.omega * state.q)[..., None, None]
+        * (state.Omega_trchi / state.Omega)[..., None, None]
         * geometry["hatchib"]
     )
-    weighted_hatchib = geometry["weighted_hatchib"]
-    mixed_hatchib = np.matmul(weighted_hatchib, geometry["inverse"])
-    metric_u = mesh.differentiate_u(state.metric, axis=1)
+    Omega_chibh = geometry["Omega_chibh"]
+    mixed_hatchib = np.matmul(Omega_chibh, geometry["inverse_g"])
+    metric_u = mesh.differentiate_u(state.g, axis=1)
     midpoint = {
         name: midpoint_values(value, u, axis=1)
         for name, value in {
-            "shift": state.shift,
-            "trace": geometry["weighted_tr_chib"],
+            "b": state.b,
+            "trace": geometry["Omega_trchib"],
             "mixed": mixed_hatchib,
             "source": source,
-            "metric": state.metric,
+            "g": state.g,
             "metric_u": metric_u,
         }.items()
     }
@@ -252,10 +252,10 @@ def solve_half_shear(
 
         def rhs(value: Array, alpha: float) -> Array:
             stage_shift = stage_value(
-                state.shift, midpoint["shift"], index, alpha, axis=1
+                state.b, midpoint["b"], index, alpha, axis=1
             )
             stage_trace = stage_value(
-                geometry["weighted_tr_chib"],
+                geometry["Omega_trchib"],
                 midpoint["trace"],
                 index,
                 alpha,
@@ -272,7 +272,7 @@ def solve_half_shear(
             stage_inverse_u = None
             if angular is not None:
                 stage_metric = stage_value(
-                    state.metric, midpoint["metric"], index, alpha, axis=1
+                    state.g, midpoint["g"], index, alpha, axis=1
                 )
                 stage_metric_u = stage_value(
                     metric_u, midpoint["metric_u"], index, alpha, axis=1
@@ -313,12 +313,12 @@ def solve_half_shear(
         half[:, index + 1] = (
             tensor_tracefree(
                 candidate,
-                state.metric[:, index + 1],
-                geometry["inverse"][:, index + 1],
+                state.g[:, index + 1],
+                geometry["inverse_g"][:, index + 1],
             )
             if angular is None
             else angular.project_g_tracefree(
-                candidate, geometry["inverse"][:, index + 1]
+                candidate, geometry["inverse_g"][:, index + 1]
             )
         )
     return half
@@ -332,23 +332,23 @@ def solve_scalar_p(
     u: Array,
     angular: AngularGalerkin | None,
 ) -> Array:
-    value = np.zeros_like(state.scalar_p)
+    value = np.zeros_like(state.Omega_e4phi)
     value[:, 0] = boundary_p
     eta_grad_phi = np.einsum(
         "n...i,n...i->n...", geometry["eta"], geometry["grad_phi_up"]
     )
     source = (
-        state.omega**2 * geometry["lap_phi"]
+        state.Omega**2 * geometry["lap_phi"]
         - 0.5
-        * (state.omega**2 * state.q)
-        * state.incoming_scalar
-        + 2.0 * state.omega**2 * eta_grad_phi
+        * state.Omega_trchi
+        * state.Omega_e3phi
+        + 2.0 * state.Omega**2 * eta_grad_phi
     )
     midpoint = {
         name: midpoint_values(field, u, axis=1)
         for name, field in {
-            "shift": state.shift,
-            "trace": geometry["weighted_tr_chib"],
+            "b": state.b,
+            "trace": geometry["Omega_trchib"],
             "source": source,
         }.items()
     }
@@ -357,7 +357,7 @@ def solve_scalar_p(
 
         def rhs(stage_p: Array, alpha: float) -> Array:
             stage_shift = stage_value(
-                state.shift, midpoint["shift"], index, alpha, axis=1
+                state.b, midpoint["b"], index, alpha, axis=1
             )
             complete = stage_value(
                 source, midpoint["source"], index, alpha, axis=1
@@ -368,7 +368,7 @@ def solve_scalar_p(
                 scalar_gradient(grid, stage_p),
             )
             complete -= 0.5 * stage_value(
-                geometry["weighted_tr_chib"],
+                geometry["Omega_trchib"],
                 midpoint["trace"],
                 index,
                 alpha,
@@ -392,26 +392,28 @@ def solve_metric_and_expansion(
     old_state: ESEState,
     half: Array,
     new_omega: Array,
+    new_Omega_omega: Array,
     new_scalar_p: Array,
     incoming: dict[str, Array],
     mesh: CharacteristicPowerMesh,
     substeps: int,
     angular: AngularGalerkin | None,
 ) -> tuple[Array, Array, Array, Array, Array]:
-    """Coupled all-current metric, Raychaudhuri, and shear march."""
+    """Coupled all-current g, Raychaudhuri, and Omega_chih march."""
 
-    metric = np.zeros_like(old_state.metric)
-    q = np.zeros_like(old_state.q)
-    metric[:, :, 0] = incoming["metric"]
-    q[:, :, 0] = incoming["q"]
-    old_inverse = tangent_inverse(grid, old_state.metric)
+    g = np.zeros_like(old_state.g)
+    Omega_trchi = np.zeros_like(old_state.Omega_trchi)
+    g[:, :, 0] = incoming["g"]
+    Omega_trchi[:, :, 0] = incoming["Omega_trchi"]
+    old_inverse = tangent_inverse(grid, old_state.g)
     u = mesh.u
     v = mesh.v
     fields = {
-        "log_omega": np.log(new_omega),
+        "log_Omega": np.log(new_omega),
+        "Omega_omega": new_Omega_omega,
         "half": half,
-        "old_metric": old_state.metric,
-        "scalar_p": new_scalar_p,
+        "old_metric": old_state.g,
+        "Omega_e4phi": new_scalar_p,
     }
     interpolation_cache: dict[tuple[int, float], tuple[Array, Array]] = {}
 
@@ -446,12 +448,12 @@ def solve_metric_and_expansion(
         return np.tensordot(weights, local, axes=(0, 2))
 
     def rhs(
-        value_q: Array,
+        value_Omega_trchi: Array,
         value_metric: Array,
         interval: int,
         fraction: float,
     ) -> tuple[Array, Array, Array]:
-        stage_omega = np.exp(external("log_omega", interval, fraction))
+        stage_omega = np.exp(external("log_Omega", interval, fraction))
         stage_half = external("half", interval, fraction)
         stage_old_metric = external("old_metric", interval, fraction)
         stage_old_inverse = tangent_inverse(grid, stage_old_metric)
@@ -459,22 +461,23 @@ def solve_metric_and_expansion(
             np.matmul(stage_half, stage_old_inverse), value_metric
         )
         raw = 0.5 * (raw + np.swapaxes(raw, -1, -2))
-        inverse = tangent_inverse(grid, value_metric)
-        stage_shear = tensor_tracefree(raw, value_metric, inverse)
-        shear_norm = tensor_norm_sq(stage_shear, inverse)
-        stage_p = external("scalar_p", interval, fraction)
-        q_rhs = (
-            -0.5 * stage_omega**2 * value_q**2
-            - (shear_norm + stage_p**2) / stage_omega**2
+        inverse_g = tangent_inverse(grid, value_metric)
+        stage_shear = tensor_tracefree(raw, value_metric, inverse_g)
+        shear_norm = tensor_norm_sq(stage_shear, inverse_g)
+        stage_p = external("Omega_e4phi", interval, fraction)
+        stage_Omega_omega = external("Omega_omega", interval, fraction)
+        Omega_trchi_rhs = (
+            -0.5 * value_Omega_trchi**2
+            - 4.0 * stage_Omega_omega * value_Omega_trchi
+            - shear_norm
+            - stage_p**2
         )
         metric_rhs = (
-            stage_omega[..., None, None] ** 2
-            * value_q[..., None, None]
-            * value_metric
+            value_Omega_trchi[..., None, None] * value_metric
             + 2.0 * stage_shear
         )
         return (
-            _project_scalar(angular, q_rhs),
+            _project_scalar(angular, Omega_trchi_rhs),
             _project_sym2(angular, metric_rhs),
             stage_shear,
         )
@@ -482,117 +485,116 @@ def solve_metric_and_expansion(
     for interval in range(len(v) - 1):
         full_step = float(v[interval + 1] - v[interval])
         step = full_step / substeps
-        value_q = q[:, :, interval]
-        value_metric = metric[:, :, interval]
+        value_Omega_trchi = Omega_trchi[:, :, interval]
+        value_metric = g[:, :, interval]
         for substep in range(substeps):
             start = substep / substeps
             middle = (substep + 0.5) / substeps
             end = (substep + 1.0) / substeps
-            k1_q, k1_g, _ = rhs(value_q, value_metric, interval, start)
-            k2_q, k2_g, _ = rhs(
-                value_q + 0.5 * step * k1_q,
+            k1_Omega_trchi, k1_g, _ = rhs(value_Omega_trchi, value_metric, interval, start)
+            k2_Omega_trchi, k2_g, _ = rhs(
+                value_Omega_trchi + 0.5 * step * k1_Omega_trchi,
                 value_metric + 0.5 * step * k1_g,
                 interval,
                 middle,
             )
-            k3_q, k3_g, _ = rhs(
-                value_q + 0.5 * step * k2_q,
+            k3_Omega_trchi, k3_g, _ = rhs(
+                value_Omega_trchi + 0.5 * step * k2_Omega_trchi,
                 value_metric + 0.5 * step * k2_g,
                 interval,
                 middle,
             )
-            k4_q, k4_g, _ = rhs(
-                value_q + step * k3_q,
+            k4_Omega_trchi, k4_g, _ = rhs(
+                value_Omega_trchi + step * k3_Omega_trchi,
                 value_metric + step * k3_g,
                 interval,
                 end,
             )
-            value_q = value_q + step * (
-                k1_q + 2.0 * k2_q + 2.0 * k3_q + k4_q
+            value_Omega_trchi = value_Omega_trchi + step * (
+                k1_Omega_trchi + 2.0 * k2_Omega_trchi + 2.0 * k3_Omega_trchi + k4_Omega_trchi
             ) / 6.0
             value_metric = value_metric + step * (
                 k1_g + 2.0 * k2_g + 2.0 * k3_g + k4_g
             ) / 6.0
-        metric[:, :, interval + 1] = value_metric
-        q[:, :, interval + 1] = value_q
-    transfer = np.matmul(np.matmul(half, old_inverse), metric)
+        g[:, :, interval + 1] = value_metric
+        Omega_trchi[:, :, interval + 1] = value_Omega_trchi
+    transfer = np.matmul(np.matmul(half, old_inverse), g)
     transfer = 0.5 * (transfer + np.swapaxes(transfer, -1, -2))
-    inverse = tangent_inverse(grid, metric)
-    shear = tensor_tracefree(transfer, metric, inverse)
+    inverse_g = tangent_inverse(grid, g)
+    Omega_chih = tensor_tracefree(transfer, g, inverse_g)
     raychaudhuri_source = _project_scalar(
         angular,
-        -0.5 * new_omega**2 * q**2
-        - (tensor_norm_sq(shear, inverse) + new_scalar_p**2) / new_omega**2,
+        -0.5 * Omega_trchi**2
+        - 4.0 * new_Omega_omega * Omega_trchi
+        - tensor_norm_sq(Omega_chih, inverse_g)
+        - new_scalar_p**2,
     )
     metric_source = _project_sym2(
         angular,
-        new_omega[..., None, None] ** 2
-        * q[..., None, None]
-        * metric
-        + 2.0 * shear,
+        Omega_trchi[..., None, None] * g
+        + 2.0 * Omega_chih,
     )
-    return metric, q, shear, raychaudhuri_source, metric_source
+    return g, Omega_trchi, Omega_chih, raychaudhuri_source, metric_source
 
 
 def solve_weighted_chib(
     grid: PointSphereGrid,
-    metric: Array,
-    omega: Array,
-    zeta_up: Array,
-    shift: Array,
-    q: Array,
-    shear: Array,
+    g: Array,
+    Omega: Array,
+    zeta: Array,
+    b: Array,
+    Omega_trchi: Array,
+    Omega_chih: Array,
     incoming_chib: Array,
     mesh: CharacteristicPowerMesh,
     angular: AngularGalerkin | None,
 ) -> tuple[Array, Array]:
-    inverse = tangent_inverse(grid, metric)
-    difference, _ = connection_difference(grid, metric, inverse)
-    weighted_tr_chi = omega**2 * q
-    weighted_chi = (
-        shear
-        + 0.5 * weighted_tr_chi[..., None, None] * metric
+    inverse_g = tangent_inverse(grid, g)
+    difference, _ = connection_difference(grid, g, inverse_g)
+    Omega_chi = (
+        Omega_chih
+        + 0.5 * Omega_trchi[..., None, None] * g
     )
-    d3_weighted_chi = mesh.differentiate_u(weighted_chi, axis=1)
-    d3_weighted_chi += lie_covariant_tensor(grid, shift, weighted_chi)
-    zeta = np.einsum("n...ij,n...j->n...i", metric, zeta_up)
+    Lie_Omega_e3_Omega_chi = mesh.differentiate_u(Omega_chi, axis=1)
+    Lie_Omega_e3_Omega_chi += lie_covariant_tensor(grid, b, Omega_chi)
+    zeta = np.einsum("n...ij,n...j->n...i", g, zeta)
     nabla_zeta = one_form_covariant_derivative(grid, zeta, difference)
     sym_nabla_zeta = nabla_zeta + np.swapaxes(nabla_zeta, -1, -2)
-    grad_log_omega = scalar_gradient(grid, np.log(omega))
+    grad_log_omega = scalar_gradient(grid, np.log(Omega))
     sym_zeta_grad = np.einsum(
         "n...i,n...j->n...ij", zeta, grad_log_omega
     )
     sym_zeta_grad += np.swapaxes(sym_zeta_grad, -1, -2)
     source = _project_sym2(
         angular,
-        d3_weighted_chi
-        - 2.0 * omega[..., None, None] ** 2 * sym_nabla_zeta
-        - 4.0 * omega[..., None, None] ** 2 * sym_zeta_grad,
+        Lie_Omega_e3_Omega_chi
+        - 2.0 * Omega[..., None, None] ** 2 * sym_nabla_zeta
+        - 4.0 * Omega[..., None, None] ** 2 * sym_zeta_grad,
     )
-    weighted_chib = (
+    Omega_chib = (
         incoming_chib[:, :, None]
         + mesh.integrate_v(source, axis=2)
     )
-    return _project_sym2(angular, weighted_chib), source
+    return _project_sym2(angular, Omega_chib), source
 
 
 def solve_incoming_scalar(
     grid: PointSphereGrid,
-    scalar_p: Array,
+    Omega_e4phi: Array,
     phi: Array,
-    omega: Array,
-    zeta_up: Array,
-    shift: Array,
+    Omega: Array,
+    zeta: Array,
+    b: Array,
     incoming_value: Array,
     mesh: CharacteristicPowerMesh,
     angular: AngularGalerkin | None,
 ) -> tuple[Array, Array]:
-    grad_p = scalar_gradient(grid, scalar_p)
-    grad_phi = scalar_gradient(grid, phi)
-    source = mesh.differentiate_u(scalar_p, axis=1)
-    source += np.einsum("n...i,n...i->n...", shift, grad_p)
-    source -= 4.0 * omega**2 * np.einsum(
-        "n...i,n...i->n...", zeta_up, grad_phi
+    grad_p = scalar_gradient(grid, Omega_e4phi)
+    nabla_phi = scalar_gradient(grid, phi)
+    source = mesh.differentiate_u(Omega_e4phi, axis=1)
+    source += np.einsum("n...i,n...i->n...", b, grad_p)
+    source -= 4.0 * Omega**2 * np.einsum(
+        "n...i,n...i->n...", zeta, nabla_phi
     )
     source = _project_scalar(angular, source)
     value = incoming_value[:, :, None] + mesh.integrate_v(source, axis=2)
@@ -601,25 +603,25 @@ def solve_incoming_scalar(
 
 def reconstruct_phi(
     grid: PointSphereGrid,
-    incoming_scalar: Array,
-    shift: Array,
+    Omega_e3phi: Array,
+    b: Array,
     boundary_phi: Array,
     u: Array,
     angular: AngularGalerkin | None,
 ) -> Array:
-    result = np.zeros_like(incoming_scalar)
+    result = np.zeros_like(Omega_e3phi)
     result[:, 0] = boundary_phi
-    midpoint_shift = midpoint_values(shift, u, axis=1)
-    midpoint_source = midpoint_values(incoming_scalar, u, axis=1)
+    midpoint_shift = midpoint_values(b, u, axis=1)
+    midpoint_source = midpoint_values(Omega_e3phi, u, axis=1)
     for index in range(len(u) - 1):
         step = float(u[index + 1] - u[index])
 
         def rhs(value: Array, alpha: float) -> Array:
             stage_shift = stage_value(
-                shift, midpoint_shift, index, alpha, axis=1
+                b, midpoint_shift, index, alpha, axis=1
             )
             complete = stage_value(
-                incoming_scalar,
+                Omega_e3phi,
                 midpoint_source,
                 index,
                 alpha,
@@ -664,7 +666,7 @@ def picard_step(
         grid,
         state,
         geometry,
-        outgoing["scalar_p"],
+        outgoing["Omega_e4phi"],
         mesh.u,
         angular,
     )
@@ -674,33 +676,33 @@ def picard_step(
         + mesh.integrate_v(new_scalar_p, axis=2),
     )
 
-    inverse = geometry["inverse"]
+    inverse_g = geometry["inverse_g"]
     eta_etab = np.einsum(
         "n...i,n...ij,n...j->n...",
         geometry["eta"],
-        inverse,
+        inverse_g,
         geometry["etab"],
     )
     shear_cross = np.einsum(
         "n...ik,n...jl,n...ij,n...kl->n...",
-        inverse,
-        inverse,
+        inverse_g,
+        inverse_g,
         half,
-        geometry["weighted_hatchib"],
+        geometry["Omega_chibh"],
     )
-    weighted_tr_chi = state.omega**2 * state.q
+    Omega_trchi = state.Omega_trchi
     eta_up = np.einsum(
-        "n...ij,n...j->n...i", inverse, geometry["eta"]
+        "n...ij,n...j->n...i", inverse_g, geometry["eta"]
     )
     div_eta = vector_divergence(
         grid, eta_up, geometry["difference"]
     )
-    d3_weighted_tr_chi = mesh.differentiate_u(
-        weighted_tr_chi, axis=1
+    Omega_e3_Omega_trchi = mesh.differentiate_u(
+        Omega_trchi, axis=1
     ) + np.einsum(
         "n...i,n...i->n...",
-        state.shift,
-        scalar_gradient(grid, weighted_tr_chi),
+        state.b,
+        scalar_gradient(grid, Omega_trchi),
     )
     omegab_source = _project_scalar(
         angular,
@@ -708,17 +710,17 @@ def picard_step(
         * (
             shear_cross
             + 0.5
-            * weighted_tr_chi
-            * geometry["weighted_tr_chib"]
-            - 4.0 * state.omega**2 * eta_etab
-            + d3_weighted_tr_chi
-            - 2.0 * state.omega**2 * div_eta
-            + new_scalar_p * state.incoming_scalar
+            * Omega_trchi
+            * geometry["Omega_trchib"]
+            - 4.0 * state.Omega**2 * eta_etab
+            + Omega_e3_Omega_trchi
+            - 2.0 * state.Omega**2 * div_eta
+            + new_scalar_p * state.Omega_e3phi
         ),
     )
     new_weighted_omegab_half = _project_scalar(
         angular,
-        incoming["weighted_omegab"][:, :, None]
+        incoming["Omega_omegab"][:, :, None]
         + mesh.integrate_v(omegab_source, axis=2),
     )
     new_omega = eve.solve_log_omega(
@@ -726,7 +728,7 @@ def picard_step(
         state,
         new_weighted_omegab_half,
         mesh.u,
-        initial_log_omega=np.log(outgoing["omega"]),
+        initial_log_omega=np.log(outgoing["Omega"]),
         angular=angular,
     )
     new_weighted_omega = eve.solve_weighted_omega(
@@ -735,45 +737,45 @@ def picard_step(
         omegab_source,
         new_omega,
         mesh.u,
-        initial_value=outgoing["weighted_omega"],
+        initial_value=outgoing["Omega_omega"],
         angular=angular,
     )
 
-    grad_old_phi = geometry["grad_phi"]
+    grad_old_phi = geometry["nabla_phi"]
     div_half = tensor_divergence(
-        grid, half, geometry["difference"], inverse
+        grid, half, geometry["difference"], inverse_g
     )
     grad_weighted_omega = scalar_gradient(grid, new_weighted_omega)
-    grad_weighted_tr_chi = scalar_gradient(grid, weighted_tr_chi)
+    grad_weighted_tr_chi = scalar_gradient(grid, Omega_trchi)
     grad_log_new_omega = scalar_gradient(grid, np.log(new_omega))
     half_zeta = np.einsum(
-        "n...ij,n...j->n...i", half, state.zeta_up
+        "n...ij,n...j->n...i", half, state.zeta
     )
     zeta_source = _project_vector(
         angular,
-        -2.0 * weighted_tr_chi[..., None] * state.zeta_up
+        -2.0 * Omega_trchi[..., None] * state.zeta
         - 2.0 * np.einsum(
-            "n...ij,n...j->n...i", inverse, half_zeta
+            "n...ij,n...j->n...i", inverse_g, half_zeta
         )
         + 2.0
         * np.einsum(
-            "n...ij,n...j->n...i", inverse, grad_weighted_omega
+            "n...ij,n...j->n...i", inverse_g, grad_weighted_omega
         )
-        + np.einsum("n...ij,n...j->n...i", inverse, div_half)
+        + np.einsum("n...ij,n...j->n...i", inverse_g, div_half)
         - 0.5
         * np.einsum(
-            "n...ij,n...j->n...i", inverse, grad_weighted_tr_chi
+            "n...ij,n...j->n...i", inverse_g, grad_weighted_tr_chi
         )
-        + weighted_tr_chi[..., None]
+        + Omega_trchi[..., None]
         * np.einsum(
-            "n...ij,n...j->n...i", inverse, grad_log_new_omega
+            "n...ij,n...j->n...i", inverse_g, grad_log_new_omega
         )
         - new_scalar_p[..., None]
-        * np.einsum("n...ij,n...j->n...i", inverse, grad_old_phi),
+        * np.einsum("n...ij,n...j->n...i", inverse_g, grad_old_phi),
     )
     new_zeta = _project_vector(
         angular,
-        incoming["zeta_up"][:, :, None]
+        incoming["zeta"][:, :, None]
         + mesh.integrate_v(zeta_source, axis=2),
     )
     shift_source = _project_vector(
@@ -781,12 +783,12 @@ def picard_step(
     )
     new_shift = _project_vector(
         angular,
-        incoming["shift"][:, :, None]
+        incoming["b"][:, :, None]
         + mesh.integrate_v(shift_source, axis=2),
     )
     (
         new_metric,
-        new_q,
+        new_Omega_trchi,
         new_shear,
         raychaudhuri_source,
         metric_source,
@@ -795,6 +797,7 @@ def picard_step(
         state,
         half,
         new_omega,
+        new_weighted_omega,
         new_scalar_p,
         incoming,
         mesh,
@@ -802,9 +805,9 @@ def picard_step(
         angular,
     )
     # The three outgoing fields are free characteristic data.
-    new_metric[:, 0] = outgoing["metric"]
-    new_q[:, 0] = outgoing["q"]
-    new_shear[:, 0] = outgoing["shear"]
+    new_metric[:, 0] = outgoing["g"]
+    new_Omega_trchi[:, 0] = outgoing["Omega_trchi"]
+    new_shear[:, 0] = outgoing["Omega_chih"]
 
     new_weighted_omegab, omegab_full_source = (
         eve.complete_weighted_omegab(
@@ -825,9 +828,9 @@ def picard_step(
         new_omega,
         new_zeta,
         new_shift,
-        new_q,
+        new_Omega_trchi,
         new_shear,
-        incoming["weighted_chib"],
+        incoming["Omega_chib"],
         mesh,
         angular,
     )
@@ -838,28 +841,28 @@ def picard_step(
         new_omega,
         new_zeta,
         new_shift,
-        incoming["incoming_scalar"],
+        incoming["Omega_e3phi"],
         mesh,
         angular,
     )
     new_state = ESEState(
-        metric=new_metric,
-        omega=new_omega,
-        zeta_up=new_zeta,
-        shift=new_shift,
-        q=new_q,
-        shear=new_shear,
-        weighted_chib=new_weighted_chib,
-        weighted_omega=new_weighted_omega,
-        weighted_omegab=new_weighted_omegab,
+        g=new_metric,
+        Omega=new_omega,
+        zeta=new_zeta,
+        b=new_shift,
+        Omega_trchi=new_Omega_trchi,
+        Omega_chih=new_shear,
+        Omega_chib=new_weighted_chib,
+        Omega_omega=new_weighted_omega,
+        Omega_omegab=new_weighted_omegab,
         phi=new_phi,
-        scalar_p=new_scalar_p,
-        incoming_scalar=new_incoming_scalar,
+        Omega_e4phi=new_scalar_p,
+        Omega_e3phi=new_incoming_scalar,
     )
     validate_state(grid, new_state)
     incoming_metric = eve.solve_incoming_metric(
         grid,
-        outgoing["metric"],
+        outgoing["g"],
         new_weighted_chib,
         new_shift,
         mesh.u,
@@ -908,50 +911,50 @@ def validate_state(
     arrays = tuple(
         getattr(state, name)
         for name in (
-            "metric",
-            "omega",
-            "zeta_up",
-            "shift",
-            "q",
-            "shear",
-            "weighted_chib",
-            "weighted_omega",
-            "weighted_omegab",
+            "g",
+            "Omega",
+            "zeta",
+            "b",
+            "Omega_trchi",
+            "Omega_chih",
+            "Omega_chib",
+            "Omega_omega",
+            "Omega_omegab",
             "phi",
-            "scalar_p",
-            "incoming_scalar",
+            "Omega_e4phi",
+            "Omega_e3phi",
         )
     )
     if not all(np.all(np.isfinite(value)) for value in arrays):
         raise FloatingPointError("ESE state contains a nonfinite value")
-    if float(np.min(state.omega)) <= 0.0:
-        raise FloatingPointError("the lapse left the positive region")
+    if float(np.min(state.Omega)) <= 0.0:
+        raise FloatingPointError("the Omega left the positive region")
     if grid is not None:
         local = np.einsum(
             "nia,n...ij,njb->n...ab",
             grid.frames,
-            state.metric,
+            state.g,
             grid.frames,
         )
         if float(np.min(np.linalg.eigvalsh(local))) <= 0.0:
-            raise FloatingPointError("the section metric left the positive cone")
+            raise FloatingPointError("the section g left the positive cone")
 
 
 def update_norm(new: ESEState, old: ESEState) -> float:
     values = []
     for name in (
-        "metric",
-        "omega",
-        "zeta_up",
-        "shift",
-        "q",
-        "shear",
-        "weighted_chib",
-        "weighted_omega",
-        "weighted_omegab",
+        "g",
+        "Omega",
+        "zeta",
+        "b",
+        "Omega_trchi",
+        "Omega_chih",
+        "Omega_chib",
+        "Omega_omega",
+        "Omega_omegab",
         "phi",
-        "scalar_p",
-        "incoming_scalar",
+        "Omega_e4phi",
+        "Omega_e3phi",
     ):
         current = getattr(new, name)
         previous = getattr(old, name)
@@ -961,20 +964,20 @@ def update_norm(new: ESEState, old: ESEState) -> float:
 
 
 def update_map(new: ESEState, old: ESEState) -> Array:
-    result = np.zeros(new.q.shape[1:])
+    result = np.zeros(new.Omega_trchi.shape[1:])
     for name in (
-        "metric",
-        "omega",
-        "zeta_up",
-        "shift",
-        "q",
-        "shear",
-        "weighted_chib",
-        "weighted_omega",
-        "weighted_omegab",
+        "g",
+        "Omega",
+        "zeta",
+        "b",
+        "Omega_trchi",
+        "Omega_chih",
+        "Omega_chib",
+        "Omega_omega",
+        "Omega_omegab",
         "phi",
-        "scalar_p",
-        "incoming_scalar",
+        "Omega_e4phi",
+        "Omega_e3phi",
     ):
         current = getattr(new, name)
         previous = getattr(old, name)

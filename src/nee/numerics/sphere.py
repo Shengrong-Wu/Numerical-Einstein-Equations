@@ -3,7 +3,7 @@
 Fields are sampled on a Fibonacci sphere and stored as ambient Cartesian
 tangent vectors/tensors.  Local polynomial differentiation and projection
 give the round-sphere covariant derivative without a polar chart.  A general
-section metric is handled by its connection difference from the round metric.
+section g is handled by its connection difference from the round g.
 """
 
 from __future__ import annotations
@@ -184,8 +184,8 @@ class PointSphereGrid:
                 radial = np.sqrt(xn**2 + yn**2)
                 fit_weight = np.exp(-2.5 * radial**2)
                 weighted_matrix = fit_weight[:, None] * matrix
-                inverse = np.linalg.pinv(weighted_matrix, rcond=1.0e-13)
-                reconstruction = inverse * fit_weight[None, :]
+                inverse_g = np.linalg.pinv(weighted_matrix, rcond=1.0e-13)
+                reconstruction = inverse_g * fit_weight[None, :]
                 target_first = np.zeros(len(powers))
                 target_second = np.zeros(len(powers))
                 target_first[powers.index((1, 0))] = 1.0 / scale
@@ -274,54 +274,54 @@ class PointSphereGrid:
         return np.sqrt(np.maximum(np.mean(values**2, axis=0), 0.0))
 
 
-def tangent_inverse(grid: PointSphereGrid, metric: Array) -> Array:
-    local = np.einsum("nia,n...ij,njb->n...ab", grid.frames, metric, grid.frames)
+def tangent_inverse(grid: PointSphereGrid, g: Array) -> Array:
+    local = np.einsum("nia,n...ij,njb->n...ab", grid.frames, g, grid.frames)
     local_inverse = np.linalg.inv(local)
     return np.einsum(
         "nia,n...ab,njb->n...ij", grid.frames, local_inverse, grid.frames
     )
 
 
-def tensor_trace(tensor: Array, inverse: Array) -> Array:
-    return np.einsum("n...ij,n...ij->n...", inverse, tensor)
+def tensor_trace(tensor: Array, inverse_g: Array) -> Array:
+    return np.einsum("n...ij,n...ij->n...", inverse_g, tensor)
 
 
-def tensor_tracefree(tensor: Array, metric: Array, inverse: Array) -> Array:
-    return tensor - 0.5 * tensor_trace(tensor, inverse)[..., None, None] * metric
+def tensor_tracefree(tensor: Array, g: Array, inverse_g: Array) -> Array:
+    return tensor - 0.5 * tensor_trace(tensor, inverse_g)[..., None, None] * g
 
 
-def tensor_norm_sq(tensor: Array, inverse: Array) -> Array:
+def tensor_norm_sq(tensor: Array, inverse_g: Array) -> Array:
     return np.einsum(
-        "n...ik,n...jl,n...ij,n...kl->n...", inverse, inverse, tensor, tensor
+        "n...ik,n...jl,n...ij,n...kl->n...", inverse_g, inverse_g, tensor, tensor
     )
 
 
 def connection_difference(
-    grid: PointSphereGrid, metric: Array, inverse: Array | None = None
+    grid: PointSphereGrid, g: Array, inverse_g: Array | None = None
 ) -> tuple[Array, Array]:
     """Return C^k_ij = Gamma(g)^k_ij-Gamma(round)^k_ij."""
 
-    if inverse is None:
-        inverse = tangent_inverse(grid, metric)
-    derivative = grid.reference_derivative(metric, tensor_rank=2)
+    if inverse_g is None:
+        inverse_g = tangent_inverse(grid, g)
+    derivative = grid.reference_derivative(g, tensor_rank=2)
     lower = 0.5 * (
         derivative
         + np.swapaxes(derivative, -3, -2)
         - np.einsum("n...kij->n...ijk", derivative)
     )
-    difference = np.einsum("n...lk,n...ijk->n...lij", inverse, lower)
-    return difference, inverse
+    difference = np.einsum("n...lk,n...ijk->n...lij", inverse_g, lower)
+    return difference, inverse_g
 
 
 def gaussian_curvature(
-    grid: PointSphereGrid, metric: Array
+    grid: PointSphereGrid, g: Array
 ) -> tuple[Array, Array, Array]:
-    difference, inverse = connection_difference(grid, metric)
-    batch_shape = metric.shape[1:-2]
+    difference, inverse_g = connection_difference(grid, g)
+    batch_shape = g.shape[1:-2]
     projector = grid.projector.reshape(
         (grid.count,) + (1,) * len(batch_shape) + (3, 3)
     )
-    ricci = np.broadcast_to(projector, metric.shape).copy()
+    ricci = np.broadcast_to(projector, g.shape).copy()
     # Only the two contractions of nabla^0 C that enter Ricci are needed.
     # Forming the complete rank-four derivative multiplies memory by 81;
     # contracting one ambient direction at a time keeps global refinements
@@ -359,8 +359,8 @@ def gaussian_curvature(
                     ricci[..., j, k] -= (
                         difference[..., i, k, m] * difference[..., m, j, i]
                     )
-    curvature = 0.5 * np.einsum("n...ij,n...ij->n...", inverse, ricci)
-    return curvature, difference, inverse
+    curvature = 0.5 * np.einsum("n...ij,n...ij->n...", inverse_g, ricci)
+    return curvature, difference, inverse_g
 
 
 def scalar_gradient(grid: PointSphereGrid, scalar: Array) -> Array:
@@ -377,24 +377,24 @@ def one_form_covariant_derivative(
 def tracefree_symmetric_gradient(
     grid: PointSphereGrid,
     form: Array,
-    metric: Array,
+    g: Array,
     difference: Array,
-    inverse: Array,
+    inverse_g: Array,
 ) -> Array:
     derivative = one_form_covariant_derivative(grid, form, difference)
-    divergence = np.einsum("n...ij,n...ij->n...", inverse, derivative)
+    divergence = np.einsum("n...ij,n...ij->n...", inverse_g, derivative)
     return (
         derivative
         + np.swapaxes(derivative, -1, -2)
-        - divergence[..., None, None] * metric
+        - divergence[..., None, None] * g
     )
 
 
-def tracefree_square(form: Array, metric: Array, inverse: Array) -> Array:
-    norm_sq = np.einsum("n...i,n...ij,n...j->n...", form, inverse, form)
+def tracefree_square(form: Array, g: Array, inverse_g: Array) -> Array:
+    norm_sq = np.einsum("n...i,n...ij,n...j->n...", form, inverse_g, form)
     return 2.0 * np.einsum("n...i,n...j->n...ij", form, form) - norm_sq[
         ..., None, None
-    ] * metric
+    ] * g
 
 
 def tensor_covariant_derivative(
@@ -411,10 +411,10 @@ def tensor_covariant_derivative(
 
 
 def tensor_divergence(
-    grid: PointSphereGrid, tensor: Array, difference: Array, inverse: Array
+    grid: PointSphereGrid, tensor: Array, difference: Array, inverse_g: Array
 ) -> Array:
     derivative = tensor_covariant_derivative(grid, tensor, difference)
-    return np.einsum("n...ij,n...ijk->n...k", inverse, derivative)
+    return np.einsum("n...ij,n...ijk->n...k", inverse_g, derivative)
 
 
 def vector_divergence(
@@ -477,22 +477,22 @@ def manufactured_case(
         degree=3,
         spectral_degree=spectral_degree,
     )
-    metric = grid.projector.copy()
-    curvature, difference, inverse = gaussian_curvature(grid, metric)
+    g = grid.projector.copy()
+    curvature, difference, inverse_g = gaussian_curvature(grid, g)
 
     ambient = np.zeros((3, 3), dtype=float)
     ambient[0, 2] = ambient[2, 0] = 1.0 / math.sqrt(2.0)
     tensor, scalar = projected_spin2(grid, ambient)
-    divergence = tensor_divergence(grid, tensor, difference, inverse)
+    divergence = tensor_divergence(grid, tensor, difference, inverse_g)
     expected_divergence = -math.sqrt(5.0 / 2.0) * scalar_gradient(grid, scalar)
     spin_error = np.linalg.norm(divergence - expected_divergence, axis=-1)
-    trace = tensor_trace(tensor, inverse)
+    trace = tensor_trace(tensor, inverse_g)
 
     laplacian = vector_divergence(
-        grid, np.einsum("nij,nj->ni", inverse, scalar_gradient(grid, scalar)), difference
+        grid, np.einsum("nij,nj->ni", inverse_g, scalar_gradient(grid, scalar)), difference
     )
     sigma = 0.08 * grid.points[:, 2]
-    conformal_metric = np.exp(2.0 * sigma)[:, None, None] * metric
+    conformal_metric = np.exp(2.0 * sigma)[:, None, None] * g
     conformal_curvature, _, _ = gaussian_curvature(grid, conformal_metric)
     expected_conformal = np.exp(-2.0 * sigma) * (1.0 + 2.0 * sigma)
     return {
@@ -528,14 +528,14 @@ def run_global_sphere_operator_suite(results_dir: Path, log_path: Path) -> dict:
     ]
     rows = spectral_rows
     grid = PointSphereGrid.create(182, neighbor_count=24, spectral_degree=10)
-    metric = grid.projector.copy()
-    _, difference, inverse = gaussian_curvature(grid, metric)
+    g = grid.projector.copy()
+    _, difference, inverse_g = gaussian_curvature(grid, g)
     ambient = np.zeros((3, 3), dtype=float)
     ambient[0, 2] = ambient[2, 0] = 1.0 / math.sqrt(2.0)
     mutated, _ = projected_spin2(grid, ambient, trace_coefficient=0.45)
-    mutated_trace = tensor_trace(mutated, inverse)
+    mutated_trace = tensor_trace(mutated, inverse_g)
     correct, scalar = projected_spin2(grid, ambient)
-    divergence = tensor_divergence(grid, correct, difference, inverse)
+    divergence = tensor_divergence(grid, correct, difference, inverse_g)
     wrong_target = -0.95 * math.sqrt(5.0 / 2.0) * scalar_gradient(grid, scalar)
     wrong_norm = np.linalg.norm(divergence - wrong_target, axis=-1)
     report = {

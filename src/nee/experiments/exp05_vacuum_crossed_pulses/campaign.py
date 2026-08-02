@@ -1,4 +1,4 @@
-"""Vacuum data with shear on both characteristic faces.
+"""Vacuum data with Omega_chih on both characteristic faces.
 
 The public state is the official full weighted state.  The repository-local
 first-order transport kernel is used only inside one Picard map
@@ -29,7 +29,7 @@ from nee.discretization.lgl import CompositeLGLMesh
 from nee.initial_data.crossed_shears import construct_boundary_data
 from nee.solver.backend import weighted_update_map, weighted_update_norm  # noqa: E402
 from nee.state.boundary import BoundaryData
-from nee.state.iterate import PicardState as WeightedState  # noqa: E402
+from nee.state.iterate import PicardState  # noqa: E402
 from nee.solver.picard import (  # noqa: E402
     assert_characteristic_traces,
     incoming_trace_errors,
@@ -96,14 +96,14 @@ class Resolution:
 
 def _l2_maps(
     grid: PointSphereGrid,
-    state: WeightedState,
+    state: PicardState,
     values: dict[str, Array],
 ) -> dict[str, Array]:
-    inverse = tangent_inverse(grid, state.metric)
+    inverse_g = tangent_inverse(grid, state.g)
     local_metric = np.einsum(
         "nia,n...ij,njb->n...ab",
         grid.frames,
-        state.metric,
+        state.g,
         grid.frames,
     )
     area_ratio = np.sqrt(np.maximum(np.linalg.det(local_metric), 0.0))
@@ -121,14 +121,14 @@ def _l2_maps(
             np.einsum(
                 "n...i,n...ij,n...j->n...",
                 value,
-                inverse,
+                inverse_g,
                 value,
             ),
             0.0,
         )
 
     def tensor_sq(value: Array) -> Array:
-        return np.maximum(tensor_norm_sq(value, inverse), 0.0)
+        return np.maximum(tensor_norm_sq(value, inverse_g), 0.0)
 
     return {
         "r33": integrate(values["Omega2_Ric33"] ** 2),
@@ -138,7 +138,7 @@ def _l2_maps(
         "rhat": integrate(tensor_sq(values["Omega2_hat_RicAB"])),
         "rR": integrate(values["Omega2_R"] ** 2),
         "r44": integrate(
-            (state.omega**2 * values["Ric44_fresh"]) ** 2
+            (state.Omega**2 * values["Ric44_fresh"]) ** 2
         ),
     }
 
@@ -310,7 +310,7 @@ def run_level(
     np.testing.assert_array_equal(artifact_v, mesh.v)
     records: list[dict[str, float | int]] = []
     context: dict[str, Any] | None = None
-    slab_states: list[WeightedState] = []
+    slab_states: list[PicardState] = []
     slab_summaries: list[dict[str, Any]] = []
     incoming = dict(boundary.incoming)
     global_s_breakpoints = np.asarray(

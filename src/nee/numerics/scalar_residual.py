@@ -40,65 +40,67 @@ def components(
         scalar_coordinates=mesh,
     )
     geometry = section_geometry(grid, state, include_curvature=True)
-    omega = state.omega
-    omega_sq = omega**2
-    grad_phi = geometry["grad_phi"]
+    Omega = state.Omega
+    omega_sq = Omega**2
+    nabla_phi = geometry["nabla_phi"]
     grad_phi_norm = np.einsum(
         "n...i,n...ij,n...j->n...",
-        grad_phi,
-        geometry["inverse"],
-        grad_phi,
+        nabla_phi,
+        geometry["inverse_g"],
+        nabla_phi,
     )
 
     raychaudhuri_source = np.asarray(context["raychaudhuri_source"])
-    shear_norm = tensor_norm_sq(state.shear, geometry["inverse"])
-    ric44_construction = -(
+    shear_norm = tensor_norm_sq(state.Omega_chih, geometry["inverse_g"])
+    Omega2_ric44_construction = -(
         raychaudhuri_source
-        + 0.5 * omega_sq * state.q**2
-        + shear_norm / omega_sq
+        + 0.5 * state.Omega_trchi**2
+        + 4.0 * state.Omega_omega * state.Omega_trchi
+        + shear_norm
     )
+    ric44_construction = Omega2_ric44_construction / omega_sq
 
-    d3_scalar_p = mesh.differentiate_u(state.scalar_p, axis=1)
-    d3_scalar_p += np.einsum(
+    Omega_e3_scalar_p = mesh.differentiate_u(state.Omega_e4phi, axis=1)
+    Omega_e3_scalar_p += np.einsum(
         "n...i,n...i->n...",
-        state.shift,
-        scalar_gradient(grid, state.scalar_p),
+        state.b,
+        scalar_gradient(grid, state.Omega_e4phi),
     )
     eta_grad_phi = np.einsum(
         "n...i,n...i->n...", geometry["eta"], geometry["grad_phi_up"]
     )
-    weighted_tr_chi = omega_sq * state.q
+    Omega_trchi = state.Omega_trchi
     wave = (
-        d3_scalar_p
-        + 0.5 * weighted_tr_chi * state.incoming_scalar
-        + 0.5 * geometry["weighted_tr_chib"] * state.scalar_p
+        Omega_e3_scalar_p
+        + 0.5 * Omega_trchi * state.Omega_e3phi
+        + 0.5 * geometry["Omega_trchib"] * state.Omega_e4phi
         - omega_sq * geometry["lap_phi"]
         - 2.0 * omega_sq * eta_grad_phi
     )
-    d3_phi = mesh.differentiate_u(state.phi, axis=1)
-    d3_phi += np.einsum(
+    Omega_e3phi_from_phi = mesh.differentiate_u(state.phi, axis=1)
+    Omega_e3phi_from_phi += np.einsum(
         "n...i,n...i->n...",
-        state.shift,
-        grad_phi,
+        state.b,
+        nabla_phi,
     )
     phi_v = mesh.differentiate_v(state.phi, axis=2)
 
     return {
-        "E44": ric44_construction - state.scalar_p**2 / omega_sq,
+        "E44": ric44_construction - state.Omega_e4phi**2 / omega_sq,
         "Omega2_E33": (
-            ricci["Omega2_Ric33"] - state.incoming_scalar**2
+            ricci["Omega2_Ric33"] - state.Omega_e3phi**2
         ),
         "Omega2_E34": (
             ricci["Omega2_Ric34"]
-            - state.incoming_scalar * state.scalar_p
+            - state.Omega_e3phi * state.Omega_e4phi
         ),
         "Omega_E3A": (
             ricci["Omega_Ric3A"]
-            - state.incoming_scalar[..., None] * grad_phi
+            - state.Omega_e3phi[..., None] * nabla_phi
         ),
         "Omega_E4A": (
             ricci["Omega_Ric4A"]
-            - state.scalar_p[..., None] * grad_phi
+            - state.Omega_e4phi[..., None] * nabla_phi
         ),
         "Omega2_hat_EAB": (
             ricci["Omega2_hat_RicAB"]
@@ -111,16 +113,16 @@ def components(
             - omega_sq * grad_phi_norm
         ),
         "minus_Omega2_box_phi": wave,
-        "incoming_phi_definition": state.incoming_scalar - d3_phi,
-        "outgoing_phi_definition": state.scalar_p - phi_v,
+        "incoming_phi_definition": state.Omega_e3phi - Omega_e3phi_from_phi,
+        "outgoing_phi_definition": state.Omega_e4phi - phi_v,
         "incoming_metric_closure": (
-            np.asarray(context["incoming_metric"]) - state.metric
+            np.asarray(context["incoming_metric"]) - state.g
         ),
         "incoming_phi_closure": (
             np.asarray(context["incoming_phi"]) - state.phi
         ),
         "Ric44_semidiscrete_projection_defect": (
-            ric44_construction - state.scalar_p**2 / omega_sq
+            ric44_construction - state.Omega_e4phi**2 / omega_sq
         ),
         "omegab_source_closure": ricci["omegab_source_closure"],
         "zeta_source_closure": ricci["zeta_source_closure"],
@@ -138,27 +140,27 @@ def l2_maps(
 ) -> dict[str, Array]:
     """Return physical ``(-u)L2(S)`` component and combined maps."""
 
-    inverse = tangent_inverse(grid, state.metric)
-    omega = state.omega
-    omega_sq = omega**2
+    inverse_g = tangent_inverse(grid, state.g)
+    Omega = state.Omega
+    omega_sq = Omega**2
 
     def form_norm_sq(value: Array) -> Array:
         return np.maximum(
             np.einsum(
-                "n...i,n...ij,n...j->n...", value, inverse, value
+                "n...i,n...ij,n...j->n...", value, inverse_g, value
             ),
             0.0,
         )
 
     def tensor_norm(value: Array) -> Array:
-        return np.maximum(tensor_norm_sq(value, inverse), 0.0)
+        return np.maximum(tensor_norm_sq(value, inverse_g), 0.0)
 
     physical = {
         "E44": values["E44"],
         "E33": values["Omega2_E33"] / omega_sq,
         "E34": values["Omega2_E34"] / omega_sq,
-        "E3A": values["Omega_E3A"] / omega[..., None],
-        "E4A": values["Omega_E4A"] / omega[..., None],
+        "E3A": values["Omega_E3A"] / Omega[..., None],
+        "E4A": values["Omega_E4A"] / Omega[..., None],
         "hat_EAB": (
             values["Omega2_hat_EAB"] / omega_sq[..., None, None]
         ),
@@ -180,7 +182,7 @@ def l2_maps(
     local_metric = np.einsum(
         "nia,n...ij,njb->n...ab",
         grid.frames,
-        state.metric,
+        state.g,
         grid.frames,
     )
     area_ratio = np.sqrt(np.maximum(np.linalg.det(local_metric), 0.0))
@@ -200,10 +202,10 @@ def closure_maxima(
     state: ESEState,
     values: dict[str, Array],
 ) -> dict[str, float]:
-    inverse = tangent_inverse(grid, state.metric)
+    inverse_g = tangent_inverse(grid, state.g)
     metric_closure = np.sqrt(
         np.maximum(
-            tensor_norm_sq(values["incoming_metric_closure"], inverse),
+            tensor_norm_sq(values["incoming_metric_closure"], inverse_g),
             0.0,
         )
     )
@@ -212,7 +214,7 @@ def closure_maxima(
             np.einsum(
                 "n...i,n...ij,n...j->n...",
                 values["zeta_source_closure"],
-                inverse,
+                inverse_g,
                 values["zeta_source_closure"],
             ),
             0.0,

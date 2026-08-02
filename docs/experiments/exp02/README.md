@@ -19,7 +19,7 @@ stencil audit for the Kruskal sequence decreases
 \]
 
 The near-horizon static residual does not decrease uniformly: the static chart
-becomes ill-conditioned as its lapse degenerates. Those values are reported as
+becomes ill-conditioned as its Omega degenerates. Those values are reported as
 a coordinate limitation, not evidence of a physical singularity. The local
 arbitrary-precision stencil supersedes an ill-conditioned global-polynomial
 diagnostic.

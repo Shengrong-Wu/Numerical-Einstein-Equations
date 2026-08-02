@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 
-from nee.state.iterate import PicardState as WeightedState
+from nee.state.iterate import PicardState
 
 
 Array = np.ndarray
@@ -37,7 +37,7 @@ def _summary(
 
 def evaluate(
     grid: Any,
-    state: WeightedState,
+    state: PicardState,
     u: Array,
     v: Array,
     *,
@@ -49,24 +49,24 @@ def evaluate(
 ) -> dict[str, Any]:
     metric_u = (
         high_order_differentiate(
-            state.metric, u, axis=1, stencil=min(stencil, len(u))
+            state.g, u, axis=1, stencil=min(stencil, len(u))
         )
         if coordinates is None
-        else coordinates.differentiate_u(state.metric, axis=1)
+        else coordinates.differentiate_u(state.g, axis=1)
     )
     metric_v = (
         high_order_differentiate(
-            state.metric, v, axis=2, stencil=min(stencil, len(v))
+            state.g, v, axis=2, stencil=min(stencil, len(v))
         )
         if coordinates is None
-        else coordinates.differentiate_v(state.metric, axis=2)
+        else coordinates.differentiate_v(state.g, axis=2)
     )
     if not omit_lie_derivative:
         metric_u = metric_u + lie_covariant_tensor(
-            grid, state.shift, state.metric
+            grid, state.b, state.g
         )
-    c3 = metric_u - 2.0 * state.x_in
-    c4 = metric_v - 2.0 * state.x_out
+    c3 = metric_u - 2.0 * state.Omega_chib
+    c4 = metric_v - 2.0 * state.Omega_chi
     quantities: dict[str, Array] = {
         "C3": c3,
         "C4": c4,
@@ -91,15 +91,15 @@ def evaluate(
             if coordinates is None
             else coordinates.differentiate_v(state.phi, axis=2)
         )
-        grad_phi = scalar_gradient(grid, state.phi)
-        d3_phi = phi_u + np.einsum(
-            "n...i,n...i->n...", state.shift, grad_phi
+        nabla_phi = scalar_gradient(grid, state.phi)
+        Omega_e3phi_from_phi = phi_u + np.einsum(
+            "n...i,n...i->n...", state.b, nabla_phi
         )
         quantities.update(
             {
-                "scalar_P3": d3_phi - state.p3,
-                "scalar_P4": phi_v - state.p4,
-                "scalar_gradient": grad_phi - state.grad_phi,
+                "scalar_P3": Omega_e3phi_from_phi - state.Omega_e3phi,
+                "scalar_P4": phi_v - state.Omega_e4phi,
+                "scalar_gradient": nabla_phi - state.nabla_phi,
             }
         )
         result.update(

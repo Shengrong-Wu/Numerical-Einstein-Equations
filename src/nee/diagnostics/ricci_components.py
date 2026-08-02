@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 
-from nee.state.iterate import PicardState as WeightedState
+from nee.state.iterate import PicardState
 
 
 Array = np.ndarray
@@ -22,7 +22,7 @@ from nee.numerics.sphere import (  # noqa: E402
 
 def components(
     grid: Any,
-    state: WeightedState,
+    state: PicardState,
     u: Array,
     v: Array,
     *,
@@ -44,43 +44,43 @@ def components(
     from nee.numerics import scalar_iteration as ese
 
     geometry = ese.section_geometry(grid, state, include_curvature=True)
-    omega = state.omega
-    omega_sq = omega**2
-    grad_phi = scalar_gradient(grid, state.phi)
+    Omega = state.Omega
+    omega_sq = Omega**2
+    nabla_phi = scalar_gradient(grid, state.phi)
     grad_norm = np.einsum(
         "n...i,n...ij,n...j->n...",
-        grad_phi,
-        geometry["inverse"],
-        grad_phi,
+        nabla_phi,
+        geometry["inverse_g"],
+        nabla_phi,
     )
     if coordinates is None:
         from nee.numerics.coordinate_differentiation import high_order_differentiate
 
-        d3_p4 = high_order_differentiate(state.p4, u, axis=1)
+        Omega_e3_Omega_e4phi = high_order_differentiate(state.Omega_e4phi, u, axis=1)
     else:
-        d3_p4 = coordinates.differentiate_u(state.p4, axis=1)
-    d3_p4 += np.einsum(
-        "n...i,n...i->n...", state.shift, scalar_gradient(grid, state.p4)
+        Omega_e3_Omega_e4phi = coordinates.differentiate_u(state.Omega_e4phi, axis=1)
+    Omega_e3_Omega_e4phi += np.einsum(
+        "n...i,n...i->n...", state.b, scalar_gradient(grid, state.Omega_e4phi)
     )
     eta_grad = np.einsum(
         "n...i,n...i->n...", geometry["eta"], geometry["grad_phi_up"]
     )
     wave = (
-        d3_p4
-        + 0.5 * state.a_out * state.p3
-        + 0.5 * state.a_in * state.p4
+        Omega_e3_Omega_e4phi
+        + 0.5 * state.Omega_trchi * state.Omega_e3phi
+        + 0.5 * state.Omega_trchib * state.Omega_e4phi
         - omega_sq * geometry["lap_phi"]
         - 2.0 * omega_sq * eta_grad
     )
     return {
-        "E44": ricci["Ric44"] - state.p4**2 / omega_sq,
-        "Omega2_E33": ricci["Omega2_Ric33"] - state.p3**2,
-        "Omega2_E34": ricci["Omega2_Ric34"] - state.p3 * state.p4,
+        "E44": ricci["Ric44"] - state.Omega_e4phi**2 / omega_sq,
+        "Omega2_E33": ricci["Omega2_Ric33"] - state.Omega_e3phi**2,
+        "Omega2_E34": ricci["Omega2_Ric34"] - state.Omega_e3phi * state.Omega_e4phi,
         "Omega_E3A": (
-            ricci["Omega_Ric3A"] - state.p3[..., None] * grad_phi
+            ricci["Omega_Ric3A"] - state.Omega_e3phi[..., None] * nabla_phi
         ),
         "Omega_E4A": (
-            ricci["Omega_Ric4A"] - state.p4[..., None] * grad_phi
+            ricci["Omega_Ric4A"] - state.Omega_e4phi[..., None] * nabla_phi
         ),
         "Omega2_hat_EAB": (
             ricci["Omega2_hat_RicAB"]
@@ -98,21 +98,21 @@ def components(
 
 def section_maps(
     grid: Any,
-    state: WeightedState,
+    state: PicardState,
     u: Array,
     values: dict[str, Array],
 ) -> dict[str, Array]:
-    inverse = tangent_inverse(grid, state.metric)
-    omega = state.omega
-    omega_sq = omega**2
+    inverse_g = tangent_inverse(grid, state.g)
+    Omega = state.Omega
+    omega_sq = Omega**2
 
     if not state.is_scalar:
         physical = {
             "Ric44": values["Ric44"],
             "Ric33": values["Omega2_Ric33"] / omega_sq,
             "Ric34": values["Omega2_Ric34"] / omega_sq,
-            "Ric3A": values["Omega_Ric3A"] / omega[..., None],
-            "Ric4A": values["Omega_Ric4A"] / omega[..., None],
+            "Ric3A": values["Omega_Ric3A"] / Omega[..., None],
+            "Ric4A": values["Omega_Ric4A"] / Omega[..., None],
             "hat_RicAB": values["Omega2_hat_RicAB"]
             / omega_sq[..., None, None],
             "trace_RicAB": values["Omega2_R_plus_Ric34"] / omega_sq,
@@ -122,25 +122,25 @@ def section_maps(
             "E44": values["E44"],
             "E33": values["Omega2_E33"] / omega_sq,
             "E34": values["Omega2_E34"] / omega_sq,
-            "E3A": values["Omega_E3A"] / omega[..., None],
-            "E4A": values["Omega_E4A"] / omega[..., None],
+            "E3A": values["Omega_E3A"] / Omega[..., None],
+            "E4A": values["Omega_E4A"] / Omega[..., None],
             "hat_EAB": values["Omega2_hat_EAB"] / omega_sq[..., None, None],
             "trace_EAB": values["Omega2_trace_EAB"] / omega_sq,
             "box_phi": values["minus_Omega2_box_phi"] / omega_sq,
         }
     density: dict[str, Array] = {}
     for name, value in physical.items():
-        if value.ndim == state.metric.ndim:
-            density[name] = tensor_norm_sq(value, inverse)
-        elif value.ndim == state.shift.ndim:
+        if value.ndim == state.g.ndim:
+            density[name] = tensor_norm_sq(value, inverse_g)
+        elif value.ndim == state.b.ndim:
             density[name] = np.einsum(
-                "n...i,n...ij,n...j->n...", value, inverse, value
+                "n...i,n...ij,n...j->n...", value, inverse_g, value
             )
         else:
             density[name] = value**2
     density["combined"] = sum(density.values())
     local = np.einsum(
-        "nia,n...ij,njb->n...ab", grid.frames, state.metric, grid.frames
+        "nia,n...ij,njb->n...ab", grid.frames, state.g, grid.frames
     )
     area_ratio = np.sqrt(np.maximum(np.linalg.det(local), 0.0))
     return {

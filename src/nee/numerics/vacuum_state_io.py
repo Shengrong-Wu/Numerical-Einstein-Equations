@@ -40,15 +40,15 @@ from .smooth_pulse import (  # noqa: E402
 
 Array = np.ndarray
 STATE_NAMES = (
-    "metric",
-    "omega",
-    "zeta_up",
-    "shift",
-    "q",
-    "shear",
-    "weighted_chib",
-    "weighted_omega",
-    "weighted_omegab",
+    "g",
+    "Omega",
+    "zeta",
+    "b",
+    "Omega_trchi",
+    "Omega_chih",
+    "Omega_chib",
+    "Omega_omega",
+    "Omega_omegab",
 )
 STATE_SCHEMA_VERSION = 2
 OMEGAB_SEMANTICS = "integer-step"
@@ -105,16 +105,16 @@ def continued_boundary(
         for name in STATE_NAMES
     }
     return {
-        "metric": terminal["metric"],
-        "inverse": tangent_inverse(grid, terminal["metric"]),
-        "expansion": terminal["q"],
-        "shear": terminal["shear"],
-        "omega": terminal["omega"],
-        "zeta_up": terminal["zeta_up"],
-        "shift": terminal["shift"],
-        "weighted_chib": terminal["weighted_chib"],
-        "weighted_omega": terminal["weighted_omega"],
-        "weighted_omegab": terminal["weighted_omegab"],
+        "g": terminal["g"],
+        "inverse_g": tangent_inverse(grid, terminal["g"]),
+        "Omega_trchi": terminal["Omega_trchi"],
+        "Omega_chih": terminal["Omega_chih"],
+        "Omega": terminal["Omega"],
+        "zeta": terminal["zeta"],
+        "b": terminal["b"],
+        "Omega_chib": terminal["Omega_chib"],
+        "Omega_omega": terminal["Omega_omega"],
+        "Omega_omegab": terminal["Omega_omegab"],
     }
 
 
@@ -126,27 +126,27 @@ def full_ricci_map(
 ) -> Array:
     """Return (-u)||Ric||_L2 using the positive null-component norm."""
 
-    inverse = tangent_inverse(grid, state.metric)
-    omega = state.omega
-    omega_sq = omega**2
+    inverse_g = tangent_inverse(grid, state.g)
+    Omega = state.Omega
+    omega_sq = Omega**2
     ric33 = values["Omega2_Ric33"] / omega_sq
     ric44 = values.get("Ric44", np.zeros_like(ric33))
     ric34 = values["Omega2_Ric34"] / omega_sq
-    ric3 = values["Omega_Ric3A"] / omega[..., None]
-    ric4 = values["Omega_Ric4A"] / omega[..., None]
+    ric3 = values["Omega_Ric3A"] / Omega[..., None]
+    ric4 = values["Omega_Ric4A"] / Omega[..., None]
     hat_ab = values["Omega2_hat_RicAB"] / omega_sq[..., None, None]
     trace_ab = values["Omega2_R_plus_Ric34"] / omega_sq
-    ric_ab = hat_ab + 0.5 * trace_ab[..., None, None] * state.metric
+    ric_ab = hat_ab + 0.5 * trace_ab[..., None, None] * state.g
     density_sq = ric33**2 + ric44**2 + 2.0 * ric34**2
     density_sq += np.einsum(
-        "n...i,n...ij,n...j->n...", ric3, inverse, ric3
+        "n...i,n...ij,n...j->n...", ric3, inverse_g, ric3
     )
     density_sq += np.einsum(
-        "n...i,n...ij,n...j->n...", ric4, inverse, ric4
+        "n...i,n...ij,n...j->n...", ric4, inverse_g, ric4
     )
-    density_sq += tensor_norm_sq(ric_ab, inverse)
+    density_sq += tensor_norm_sq(ric_ab, inverse_g)
     local = np.einsum(
-        "nia,n...ij,njb->n...ab", grid.frames, state.metric, grid.frames
+        "nia,n...ij,njb->n...ab", grid.frames, state.g, grid.frames
     )
     area_ratio = np.sqrt(np.maximum(np.linalg.det(local), 0.0))
     l2 = np.sqrt(
@@ -352,7 +352,7 @@ def run(args: argparse.Namespace) -> dict:
         spectral_degree=args.spectral_degree,
     )
     calibration = scaled_calibration(
-        calibrate_profiles(args.v1, args.c), args.shear_divisor
+        calibrate_profiles(args.v1, args.c), args.Omega_chih_divisor
     )
     slabs: list[dict] = []
     summaries: list[dict] = []
@@ -475,7 +475,7 @@ def run(args: argparse.Namespace) -> dict:
         ),
         "parameters": {
             "c": args.c,
-            "shear_divisor": args.shear_divisor,
+            "Omega_chih_divisor": args.Omega_chih_divisor,
             "v1": args.v1,
             "points": args.points,
             "neighbors": args.neighbors,
@@ -510,7 +510,7 @@ def run(args: argparse.Namespace) -> dict:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser()
     result.add_argument("--c", type=float, default=1.0)
-    result.add_argument("--shear-divisor", type=float, default=3.2)
+    result.add_argument("--Omega_chih-divisor", type=float, default=3.2)
     result.add_argument("--v1", type=float, default=0.5)
     result.add_argument("--points", type=int, default=50)
     result.add_argument("--neighbors", type=int, default=28)
@@ -519,7 +519,9 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--u-count", type=int, default=20)
     result.add_argument("--v-count", type=int, default=200)
     result.add_argument("--iterations", type=int, default=20)
-    result.add_argument("--metric-substeps", type=int, default=2)
+    result.add_argument(
+        "--g-substeps", dest="metric_substeps", type=int, default=2
+    )
     result.add_argument("--slab-count", type=int, default=8)
     result.add_argument("--start-slab", type=int, default=1)
     result.add_argument("--save-states", action="store_true")

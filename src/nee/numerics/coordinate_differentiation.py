@@ -65,28 +65,28 @@ def build_metric(u: Array, v: Array, theta: Array, perturbation: float = 0.0) ->
 
     uu, vv, tt = np.meshgrid(u, v, theta, indexing="ij")
     radius = vv - uu
-    q = perturbation * (uu + 1.0) ** 2 * vv**2 * np.sin(tt) ** 2
-    metric = np.zeros(uu.shape + (4, 4), dtype=float)
-    metric[..., 0, 1] = -2.0
-    metric[..., 1, 0] = -2.0
-    metric[..., 2, 2] = radius**2 * np.exp(2.0 * q)
-    metric[..., 3, 3] = radius**2 * np.exp(-2.0 * q) * np.sin(tt) ** 2
-    return metric
+    Omega_trchi = perturbation * (uu + 1.0) ** 2 * vv**2 * np.sin(tt) ** 2
+    g = np.zeros(uu.shape + (4, 4), dtype=float)
+    g[..., 0, 1] = -2.0
+    g[..., 1, 0] = -2.0
+    g[..., 2, 2] = radius**2 * np.exp(2.0 * Omega_trchi)
+    g[..., 3, 3] = radius**2 * np.exp(-2.0 * Omega_trchi) * np.sin(tt) ** 2
+    return g
 
 
 def christoffel_symbols(
-    metric: Array, scalar_coordinates: list[Array], high_order: bool = False
+    g: Array, scalar_coordinates: list[Array], high_order: bool = False
 ) -> tuple[Array, Array]:
-    inverse = np.linalg.inv(metric)
+    inverse_g = np.linalg.inv(g)
     diff = high_order_differentiate if high_order else differentiate
     derivatives = []
     for mu in range(4):
         if mu < 3:
-            derivatives.append(diff(metric, scalar_coordinates[mu], axis=mu))
+            derivatives.append(diff(g, scalar_coordinates[mu], axis=mu))
         else:
-            derivatives.append(np.zeros_like(metric))
+            derivatives.append(np.zeros_like(g))
 
-    grid_shape = metric.shape[:-2]
+    grid_shape = g.shape[:-2]
     gamma = np.zeros(grid_shape + (4, 4, 4), dtype=float)
     for a in range(4):
         for b in range(4):
@@ -99,17 +99,17 @@ def christoffel_symbols(
                         - derivatives[d][..., b, c]
                     )
                 gamma[..., a, b, c] = 0.5 * np.einsum(
-                    "...d,...d->...", inverse[..., a, :], covector
+                    "...d,...d->...", inverse_g[..., a, :], covector
                 )
-    return gamma, inverse
+    return gamma, inverse_g
 
 
 def direct_ricci(
-    metric: Array, scalar_coordinates: list[Array], high_order: bool = False
+    g: Array, scalar_coordinates: list[Array], high_order: bool = False
 ) -> tuple[Array, Array]:
-    gamma, inverse = christoffel_symbols(metric, scalar_coordinates, high_order=high_order)
+    gamma, inverse_g = christoffel_symbols(g, scalar_coordinates, high_order=high_order)
     diff = high_order_differentiate if high_order else differentiate
-    grid_shape = metric.shape[:-2]
+    grid_shape = g.shape[:-2]
     ricci = np.zeros(grid_shape + (4, 4), dtype=float)
 
     trace_connection = np.zeros(grid_shape + (4,), dtype=float)
@@ -132,21 +132,21 @@ def direct_ricci(
             if b < 3:
                 term -= diff(trace_a, scalar_coordinates[b], axis=b)
             ricci[..., a, b] = term
-    return ricci, inverse
+    return ricci, inverse_g
 
 
-def positive_frame_norm(ricci: Array, metric: Array) -> Array:
+def positive_frame_norm(ricci: Array, g: Array) -> Array:
     """Positive norm of Ricci components in the b=0 adapted null frame.
 
     The coordinate components with a u or v index acquire one factor of
     Omega^{-1} for each null-frame slot.  The angular block is contracted with
-    the inverse section metric.  This is a diagnostic positive norm, not the
+    the inverse_g section g.  This is a diagnostic positive norm, not the
     indefinite Lorentzian contraction Ric_{ab} Ric^{ab}.
     """
 
-    gamma = metric[..., 2:4, 2:4]
+    gamma = g[..., 2:4, 2:4]
     gamma_inverse = np.linalg.inv(gamma)
-    omega_sq = -0.5 * metric[..., 0, 1]
+    omega_sq = -0.5 * g[..., 0, 1]
     if np.any(omega_sq <= 0.0):
         raise FloatingPointError("non-positive Omega^2 in frame norm")
     value = (
@@ -184,9 +184,9 @@ def audit_case(
     # fixed equatorial chart for this finite-difference auditor.  A full-sphere
     # experiment must use overlapping regular patches or spin-weighted fields.
     theta = np.linspace(0.4, math.pi - 0.4, n_theta)
-    metric = build_metric(u, v, theta, perturbation)
-    ricci, _ = direct_ricci(metric, [u, v, theta, np.array([0.0])])
-    rho = positive_frame_norm(ricci, metric)
+    g = build_metric(u, v, theta, perturbation)
+    ricci, _ = direct_ricci(g, [u, v, theta, np.array([0.0])])
+    rho = positive_frame_norm(ricci, g)
     uu, vv, tt = np.meshgrid(u, v, theta, indexing="ij")
     core = (
         (uu > -0.9)
@@ -297,7 +297,7 @@ def run_axisymmetric_audit_suite(results_dir: Path, log_path: Path) -> dict:
             "",
             "Diagnostic correction: the first audit let the coordinate grid",
             "approach the polar singularities as resolution increased.  The",
-            "inverse-metric norm then amplified truncation error and falsely",
+            "inverse_g-g norm then amplified truncation error and falsely",
             "looked divergent.  These replacement numbers use a fixed regular",
             "equatorial chart and a fixed interior subdomain.  Full-sphere work",
             "will require regular overlapping patches or spin-weighted variables.",

@@ -69,9 +69,9 @@ def test_inward_dependency_boundaries() -> None:
 
 def test_primitive_fields_and_stopping_policy() -> None:
     fields = PrimitiveFields(
-        metric=np.eye(3)[None, None, None],
-        log_omega=np.zeros((1, 1, 1)),
-        shift=np.zeros((1, 1, 1, 3)),
+        g=np.eye(3)[None, None, None],
+        log_Omega=np.zeros((1, 1, 1)),
+        b=np.zeros((1, 1, 1, 3)),
     )
     assert fields.phi is None
     assert has_converged(1.0e-9, 1.0e-8)

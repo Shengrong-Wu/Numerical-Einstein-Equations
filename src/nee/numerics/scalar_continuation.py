@@ -25,18 +25,18 @@ from .scalar_run import numerical_fingerprint, save_state
 
 
 STATE_FIELDS = (
-    "metric",
-    "omega",
-    "zeta_up",
-    "shift",
-    "q",
-    "shear",
-    "weighted_chib",
-    "weighted_omega",
-    "weighted_omegab",
+    "g",
+    "Omega",
+    "zeta",
+    "b",
+    "Omega_trchi",
+    "Omega_chih",
+    "Omega_chib",
+    "Omega_omega",
+    "Omega_omegab",
     "phi",
-    "scalar_p",
-    "incoming_scalar",
+    "Omega_e4phi",
+    "Omega_e3phi",
 )
 
 
@@ -162,9 +162,9 @@ def main() -> None:
                 "update_norm": change,
                 "update_map_maximum": float(np.max(change_map)),
                 "residual": residual,
-                "minimum_q": float(np.min(state.q)),
-                "maximum_q": float(np.max(state.q)),
-                "minimum_omega": float(np.min(state.omega)),
+                "minimum_Omega_trchi": float(np.min(state.Omega_trchi)),
+                "maximum_Omega_trchi": float(np.max(state.Omega_trchi)),
+                "minimum_omega": float(np.min(state.Omega)),
             }
         )
         print(

@@ -13,5 +13,5 @@ All 12 numerical cases completed and the vacuum-limit control passed. Numerical
 and exact state archives contribute 336 mapped arrays and 107,353,392 values;
 all are bitwise identical in the same-grid validation, as are all 12 summaries.
 The finest \(\nu=0.99\) scalar-field maximum absolute error is
-\(1.14\times10^{-14}\), and the sphere-metric maximum absolute error is
+\(1.14\times10^{-14}\), and the sphere-g maximum absolute error is
 \(2.09\times10^{-12}\).

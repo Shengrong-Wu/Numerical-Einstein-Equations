@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import math
 import time
-from dataclasses import fields
+from dataclasses import fields, replace
 from pathlib import Path
 from typing import Any
 
@@ -149,27 +149,27 @@ def _verified_data(
 def _face_mismatches(state: ESEState, bundle: InitialDataBundle) -> dict[str, float]:
     mismatches: dict[str, float] = {}
     for state_name, data_name in (
-        ("metric", "metric"),
-        ("q", "q"),
-        ("shear", "shear"),
-        ("omega", "omega"),
-        ("weighted_omega", "weighted_omega"),
+        ("g", "g"),
+        ("Omega_trchi", "Omega_trchi"),
+        ("Omega_chih", "Omega_chih"),
+        ("Omega", "Omega"),
+        ("Omega_omega", "Omega_omega"),
         ("phi", "phi"),
-        ("scalar_p", "scalar_p"),
+        ("Omega_e4phi", "Omega_e4phi"),
     ):
         mismatches[f"outgoing.{state_name}"] = float(
             np.max(np.abs(getattr(state, state_name)[:, 0] - bundle.outgoing[data_name]))
         )
     for state_name, data_name in (
-        ("metric", "metric"),
-        ("q", "q"),
-        ("shear", "shear"),
+        ("g", "g"),
+        ("Omega_trchi", "Omega_trchi"),
+        ("Omega_chih", "Omega_chih"),
         ("phi", "phi"),
-        ("zeta_up", "zeta_up"),
-        ("shift", "shift"),
-        ("weighted_chib", "weighted_chib"),
-        ("weighted_omegab", "weighted_omegab"),
-        ("incoming_scalar", "incoming_scalar"),
+        ("zeta", "zeta"),
+        ("b", "b"),
+        ("Omega_chib", "Omega_chib"),
+        ("Omega_omegab", "Omega_omegab"),
+        ("Omega_e3phi", "Omega_e3phi"),
     ):
         mismatches[f"incoming.{state_name}"] = float(
             np.max(np.abs(getattr(state, state_name)[:, :, 0] - bundle.incoming[data_name]))
@@ -227,7 +227,7 @@ def _iterate(
             "update": update_norm(state, previous),
             "maximum_update_map": float(np.max(change_map)),
             "construction_residual": residual,
-            "minimum_lapse": float(np.min(state.omega)),
+            "minimum_lapse": float(np.min(state.Omega)),
             "maximum_fixed_face_mismatch": maximum_face_mismatch,
             "fixed_face_mismatches": face_mismatches,
             "boundary_hash_verified": True,
@@ -251,9 +251,9 @@ def _resample_scalar(points: Array, values: Array, degree: int, target_count: in
 
 
 def _sign_audit(state: ESEState, grid: Any, degree: int) -> dict[str, Any]:
-    inverse = tangent_inverse(grid, state.metric)
-    theta_plus = state.q
-    theta_minus = tensor_trace(state.weighted_chib, inverse) / state.omega
+    inverse_g = tangent_inverse(grid, state.g)
+    theta_plus = state.Omega_trchi
+    theta_minus = tensor_trace(state.Omega_chib, inverse_g) / state.Omega
     plus = _resample_scalar(grid.points, theta_plus, degree, 1000)
     minus = _resample_scalar(grid.points, theta_minus, degree, 1000)
     plus_supremum = np.max(plus, axis=0)
@@ -276,6 +276,131 @@ def _sign_audit(state: ESEState, grid: Any, degree: int) -> dict[str, Any]:
     }
 
 
+def _finite_prefix_config(
+    base_config: ExperimentConfig,
+) -> ExperimentConfig:
+    """Return the largest tested whole-element prefix before the caustic.
+
+    The production base mesh has twelve equal elements in
+    ``tau=-log(-u)``.  Its four-element prefix ends at the existing node
+    ``u=-50**(-1/3)``.  This prefix contains the first trapped sections but
+    excludes the later Raychaudhuri pole, so it can be converged and audited
+    without changing any node or operation on the retained elements.
+    """
+
+    coordinates = base_config.scalar_coordinates
+    prefix_elements = max(1, coordinates.tau_elements // 3)
+    tau_left = -math.log(-coordinates.u_left)
+    tau_right = -math.log(-coordinates.u_right)
+    prefix_tau_right = tau_left + (
+        prefix_elements / coordinates.tau_elements
+    ) * (tau_right - tau_left)
+    prefix_u_right = -math.exp(-prefix_tau_right)
+    return replace(
+        base_config,
+        name=f"{base_config.name}-finite-prefix",
+        scalar_coordinates=replace(
+            coordinates,
+            u_right=prefix_u_right,
+            tau_elements=prefix_elements,
+        ),
+    )
+
+
+def _run_finite_prefix_certificate(
+    output: Path,
+    *,
+    control: bool,
+    base_config: ExperimentConfig,
+    full_domain_error: FloatingPointError,
+) -> dict[str, Any]:
+    prefix_config = _finite_prefix_config(base_config)
+    bundle, grid, angular, mesh, boundary = _verified_data(
+        output / "finite-prefix", prefix_config
+    )
+    state = initial_state(bundle, angular)
+    state, records, update_maps, residual_history = _iterate(
+        state=state,
+        bundle=bundle,
+        grid=grid,
+        angular=angular,
+        mesh=mesh,
+        config=prefix_config,
+        boundary=boundary,
+    )
+    public_state = from_numerical(state, grid)
+    state_hash = save_state(
+        output / "final-state.npz",
+        public_state,
+        u=mesh.u,
+        v=mesh.v,
+    )
+    np.savez_compressed(
+        output / "residual-maps.npz",
+        update_maps=np.asarray(update_maps),
+        **{
+            name: np.asarray(values)
+            for name, values in residual_history.items()
+        },
+    )
+    sign = _sign_audit(state, grid, prefix_config.angular.retained_degree)
+    independent = mapped_direct_audit(
+        grid,
+        public_state,
+        mesh,
+        retained_degree=prefix_config.angular.retained_degree,
+        protected_s_values=(0.6,),
+    )
+    last_update = records[-1]["update"]
+    candidate = bool(
+        sign["protected_trapped_count"] > 0 and last_update < 1.0e-4
+    )
+    summary = {
+        "schema": "nee-scalar-trapped-section-2",
+        "configuration": "angular-control" if control else "standard",
+        "full_domain_config": base_config.to_dict(),
+        "full_domain_terminal_status": "caustic",
+        "full_domain_error": {
+            "type": type(full_domain_error).__name__,
+            "message": str(full_domain_error),
+        },
+        "finite_prefix_config": prefix_config.to_dict(),
+        "finite_prefix_boundary_hash": boundary.content_hash,
+        "finite_prefix_sweeps": records,
+        "independent_audit": independent,
+        "sign_audit": sign,
+        "mandatory_audit": {
+            "analytic_face_identities": bundle.metadata[
+                "analytic_connection_sample_errors"
+            ],
+            "corner_mismatches": bundle.metadata["corner_mismatches"],
+            "boundary_hashes_verified_each_sweep": all(
+                record["boundary_hash_verified"] for record in records
+            ),
+            "maximum_fixed_face_mismatch": max(
+                record["maximum_fixed_face_mismatch"] for record in records
+            ),
+            "positive_lapse_every_sweep": all(
+                record["minimum_lapse"] > 0.0 for record in records
+            ),
+            "independent_sphere_point_count": sign[
+                "sphere_point_count"
+            ],
+            "independent_residual_complete": bool(independent),
+        },
+        "candidate": candidate,
+        "certificate": False,
+        "certificate_limitation": (
+            "the finite-prefix sign result has an angular control but no "
+            "separate coordinate-refinement certificate"
+        ),
+        "final_state_hash": state_hash,
+        "terminal_status": "completed",
+    }
+    write_json(output / "summary.json", summary)
+    return summary
+
+
 def run_configuration(output: Path, *, control: bool, quick: bool) -> dict[str, Any]:
     if output.exists():
         raise FileExistsError(f"immutable run directory exists: {output}")
@@ -283,15 +408,25 @@ def run_configuration(output: Path, *, control: bool, quick: bool) -> dict[str, 
     base_config = numerical_config(control=control, continued=False, quick=quick)
     bundle, grid, angular, mesh, boundary = _verified_data(output / "base", base_config)
     state = initial_state(bundle, angular)
-    state, base_records, _, _ = _iterate(
-        state=state,
-        bundle=bundle,
-        grid=grid,
-        angular=angular,
-        mesh=mesh,
-        config=base_config,
-        boundary=boundary,
-    )
+    try:
+        state, base_records, _, _ = _iterate(
+            state=state,
+            bundle=bundle,
+            grid=grid,
+            angular=angular,
+            mesh=mesh,
+            config=base_config,
+            boundary=boundary,
+        )
+    except FloatingPointError as error:
+        if quick or "nonfinite" not in str(error):
+            raise
+        return _run_finite_prefix_certificate(
+            output,
+            control=control,
+            base_config=base_config,
+            full_domain_error=error,
+        )
 
     continued_config = numerical_config(control=control, continued=True, quick=quick)
     extended_bundle, extended_grid, extended_angular, extended_mesh, extended_boundary = _verified_data(

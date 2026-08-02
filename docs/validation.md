@@ -24,7 +24,7 @@ other cases complete.
 For the requested signed perturbation
 \(e_4\phi(-1,v)-e_4\phi(-1,0)=-2(v/(v+0.01))^{0.1}\), both Experiment 8
 boundary constructions are finite, but both angular bands overflow in the
-coupled outgoing Raychaudhuri/metric march before base sweep 1 completes. No
+coupled outgoing Raychaudhuri/g march before base sweep 1 completes. No
 continued or trapped-section artifacts exist for these failed runs.
 
 The finalized Experiment 3 artifact set includes its separately regenerated

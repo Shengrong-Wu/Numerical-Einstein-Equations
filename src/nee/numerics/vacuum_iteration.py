@@ -1,9 +1,9 @@
 """First-order Ricci-coefficient Picard iteration for the numerical backend.
 
-The incoming null second fundamental form, both weighted null lapse
-coefficients, and the outgoing shear are stored iteration variables.  The
+The incoming null second fundamental form, both weighted null Omega
+coefficients, and the outgoing Omega_chih are stored iteration variables.  The
 incoming form is advanced by its null structure equation instead of being
-reconstructed by differentiating the metric in ``u``.
+reconstructed by differentiating the g in ``u``.
 
 The numerical backend's sphere and quadrature modules are imported as numerical
 infrastructure only.  The iteration and diagnostics in this file are new.
@@ -127,7 +127,7 @@ def _quadratic_stage_value(
 
 def _transport_substeps(
     grid: PointSphereGrid,
-    shift: Array,
+    b: Array,
     midpoint_shift: Array,
     u: Array,
     index: int,
@@ -149,7 +149,7 @@ def _transport_substeps(
     rate = 0.0
     for alpha in (0.0, 0.5, 1.0):
         stage_shift = _quadratic_stage_value(
-            shift, midpoint_shift, index, alpha, axis=1
+            b, midpoint_shift, index, alpha, axis=1
         )
         component_first = np.einsum(
             "ni,n...i->n...", grid.first, stage_shift
@@ -179,12 +179,12 @@ def _transport_substeps(
 
 
 def _minimum_tangent_eigenvalue(
-    grid: PointSphereGrid, metric: Array
+    grid: PointSphereGrid, g: Array
 ) -> float:
-    """Return the smallest physical two-dimensional metric eigenvalue."""
+    """Return the smallest physical two-dimensional g eigenvalue."""
 
     local = np.einsum(
-        "nia,n...ij,njb->n...ab", grid.frames, metric, grid.frames
+        "nia,n...ij,njb->n...ab", grid.frames, g, grid.frames
     )
     if not np.all(np.isfinite(local)):
         return -math.inf
@@ -275,8 +275,8 @@ def _project_sym2(
 def _project_tracefree_sym2(
     angular: AngularGalerkin | None,
     value: Array,
-    metric: Array,
-    inverse: Array,
+    g: Array,
+    inverse_g: Array,
     tails: ProjectionTails | None = None,
     label: str = "tracefree_sym2",
 ) -> Array:
@@ -284,47 +284,47 @@ def _project_tracefree_sym2(
 
     symmetric = 0.5 * (value + np.swapaxes(value, -1, -2))
     if angular is None:
-        return tensor_tracefree(symmetric, metric, inverse)
+        return tensor_tracefree(symmetric, g, inverse_g)
     _record_tail(angular.sym2, symmetric, tails, label)
-    return angular.project_g_tracefree(symmetric, inverse)
+    return angular.project_g_tracefree(symmetric, inverse_g)
 
 
 @dataclass
 class FirstOrderState(GlobalState):
-    """First-order variables; every ``weighted_*`` field includes one Omega.
+    """First-order variables in theory-native Omega-weighted notation.
 
-    ``weighted_omegab`` is the full integer Picard coefficient.  The
+    ``Omega_omegab`` is the full integer Picard coefficient.  The
     half-step coefficient used to construct ``Omega`` is transient and is
     returned only in the Picard context.
     """
 
-    weighted_chib: Array
-    weighted_omega: Array
-    weighted_omegab: Array
+    Omega_chib: Array
+    Omega_omega: Array
+    Omega_omegab: Array
 
 
 def initial_state(grid: PointSphereGrid, u: Array, v: Array) -> FirstOrderState:
     projector = sphere_broadcast(grid, 2)
     scalar_shape = (grid.count, len(u), len(v))
-    metric = np.broadcast_to(
+    g = np.broadcast_to(
         (-u[None, :, None])[:, :, :, None, None] ** 2 * projector,
         scalar_shape + (3, 3),
     ).copy()
     # At v=0, Omega chib = (1/2) partial_u[(-u)^2 gamma] = u gamma.
-    weighted_chib = np.broadcast_to(
+    Omega_chib = np.broadcast_to(
         u[None, :, None, None, None] * projector,
         scalar_shape + (3, 3),
     ).copy()
     return FirstOrderState(
-        metric=metric,
-        omega=np.ones(scalar_shape),
-        zeta_up=np.zeros(scalar_shape + (3,)),
-        shift=np.zeros(scalar_shape + (3,)),
-        q=np.broadcast_to(2.0 / (-u[None, :, None]), scalar_shape).copy(),
-        shear=np.zeros_like(metric),
-        weighted_chib=weighted_chib,
-        weighted_omega=np.zeros(scalar_shape),
-        weighted_omegab=np.zeros(scalar_shape),
+        g=g,
+        Omega=np.ones(scalar_shape),
+        zeta=np.zeros(scalar_shape + (3,)),
+        b=np.zeros(scalar_shape + (3,)),
+        Omega_trchi=np.broadcast_to(2.0 / (-u[None, :, None]), scalar_shape).copy(),
+        Omega_chih=np.zeros_like(g),
+        Omega_chib=Omega_chib,
+        Omega_omega=np.zeros(scalar_shape),
+        Omega_omegab=np.zeros(scalar_shape),
     )
 
 
@@ -383,12 +383,12 @@ def boundary_compatible_initial_state(
     ``F_seed = F_flat + w R^p (F_H(v) - F_H(0))``.
 
     The powers are the flat-cone homogeneities of the stored coordinate
-    fields: ``g:2``, ``q:-1``, ``Omega:0``, covariant null second fundamental
-    forms ``hat(chi), Omega*chib:1``, ``Omega*omega`` and
+    fields: ``g:2``, ``Omega_trchi:-1``, ``Omega:0``, covariant null second fundamental
+    forms ``Omega*hat(chi), Omega*chib:1``, ``Omega*omega`` and
     ``Omega*omegab:-1``, contravariant ``zeta:-2``, and ``b:-1``.  In
-    particular, the metric is a positive scalar times a convex combination
+    particular, the g is a positive scalar times a convex combination
     of its positive corner and outgoing values.  The seed therefore preserves
-    positivity whenever the supplied outgoing metric is positive.
+    positivity whenever the supplied outgoing g is positive.
 
     The outgoing and incoming data must agree at the corner: no smooth
     function can match materially contradictory values there.  A mixed
@@ -422,17 +422,17 @@ def boundary_compatible_initial_state(
     # This table is deliberately exhaustive with impose_outgoing_boundary.
     # Optional boundary fields use their exact flat values when absent.
     specifications = (
-        ("metric", "metric", 2.0, None),
-        ("q", "expansion", -1.0, None),
-        ("shear", "shear", 1.0, None),
-        ("omega", "omega", 0.0, 1.0),
-        ("weighted_omega", "weighted_omega", -1.0, 0.0),
-        ("weighted_omegab", "weighted_omegab", -1.0, 0.0),
-        ("weighted_chib", "weighted_chib", 1.0, None),
-        ("zeta_up", "zeta_up", -2.0, 0.0),
-        ("shift", "shift", -1.0, 0.0),
+        ("g", "g", 2.0, None),
+        ("Omega_trchi", "Omega_trchi", -1.0, None),
+        ("Omega_chih", "Omega_chih", 1.0, None),
+        ("Omega", "Omega", 0.0, 1.0),
+        ("Omega_omega", "Omega_omega", -1.0, 0.0),
+        ("Omega_omegab", "Omega_omegab", -1.0, 0.0),
+        ("Omega_chib", "Omega_chib", 1.0, None),
+        ("zeta", "zeta", -2.0, 0.0),
+        ("b", "b", -1.0, 0.0),
     )
-    required = {"metric", "expansion", "shear"}
+    required = {"g", "Omega_trchi", "Omega_chih"}
     for state_name, boundary_name, homogeneity, default in specifications:
         current = getattr(state, state_name)
         boundary_shape = (grid.count, len(values_v), *current.shape[3:])
@@ -501,23 +501,23 @@ def boundary_compatible_initial_state(
 def impose_outgoing_boundary(
     state: FirstOrderState, boundary: dict[str, Array | float]
 ) -> FirstOrderState:
-    state.metric[:, 0] = np.asarray(boundary["metric"])
-    state.q[:, 0] = np.asarray(boundary["expansion"])
-    state.shear[:, 0] = np.asarray(boundary["shear"])
-    state.omega[:, 0] = np.asarray(boundary.get("omega", 1.0))
-    state.weighted_omega[:, 0] = np.asarray(
-        boundary.get("weighted_omega", 0.0)
+    state.g[:, 0] = np.asarray(boundary["g"])
+    state.Omega_trchi[:, 0] = np.asarray(boundary["Omega_trchi"])
+    state.Omega_chih[:, 0] = np.asarray(boundary["Omega_chih"])
+    state.Omega[:, 0] = np.asarray(boundary.get("Omega", 1.0))
+    state.Omega_omega[:, 0] = np.asarray(
+        boundary.get("Omega_omega", 0.0)
     )
-    if "weighted_omegab" in boundary:
-        state.weighted_omegab[:, 0] = np.asarray(
-            boundary["weighted_omegab"]
+    if "Omega_omegab" in boundary:
+        state.Omega_omegab[:, 0] = np.asarray(
+            boundary["Omega_omegab"]
         )
-    if "weighted_chib" in boundary:
-        state.weighted_chib[:, 0] = np.asarray(boundary["weighted_chib"])
-    if "zeta_up" in boundary:
-        state.zeta_up[:, 0] = np.asarray(boundary["zeta_up"])
-    if "shift" in boundary:
-        state.shift[:, 0] = np.asarray(boundary["shift"])
+    if "Omega_chib" in boundary:
+        state.Omega_chib[:, 0] = np.asarray(boundary["Omega_chib"])
+    if "zeta" in boundary:
+        state.zeta[:, 0] = np.asarray(boundary["zeta"])
+    if "b" in boundary:
+        state.b[:, 0] = np.asarray(boundary["b"])
     return state
 
 
@@ -529,35 +529,35 @@ def section_geometry(
     """Geometry using independent Omega*chib, never a u derivative of g."""
 
     if include_curvature:
-        curvature, difference, inverse = gaussian_curvature(grid, state.metric)
+        curvature, difference, inverse_g = gaussian_curvature(grid, state.g)
     else:
-        difference, inverse = connection_difference(grid, state.metric)
-        curvature = np.zeros_like(state.q)
-    weighted_tr_chib = tensor_trace(state.weighted_chib, inverse)
-    weighted_hatchib = tensor_tracefree(
-        state.weighted_chib, state.metric, inverse
+        difference, inverse_g = connection_difference(grid, state.g)
+        curvature = np.zeros_like(state.Omega_trchi)
+    Omega_trchib = tensor_trace(state.Omega_chib, inverse_g)
+    Omega_chibh = tensor_tracefree(
+        state.Omega_chib, state.g, inverse_g
     )
-    tr_chib = weighted_tr_chib / state.omega
-    hatchib = weighted_hatchib / state.omega[..., None, None]
-    grad_log_omega = scalar_gradient(grid, np.log(state.omega))
-    zeta_cov = np.einsum("n...ij,n...j->n...i", state.metric, state.zeta_up)
+    tr_chib = Omega_trchib / state.Omega
+    hatchib = Omega_chibh / state.Omega[..., None, None]
+    grad_log_omega = scalar_gradient(grid, np.log(state.Omega))
+    zeta_cov = np.einsum("n...ij,n...j->n...i", state.g, state.zeta)
     eta = zeta_cov + grad_log_omega
     etab = -zeta_cov + grad_log_omega
     return {
         "curvature": curvature,
         "difference": difference,
-        "inverse": inverse,
-        "weighted_tr_chib": weighted_tr_chib,
-        "weighted_hatchib": weighted_hatchib,
-        # Compatibility names used by the reusable half-shear solver.
+        "inverse_g": inverse_g,
+        "Omega_trchib": Omega_trchib,
+        "Omega_chibh": Omega_chibh,
+        # Compatibility names used by the reusable half-Omega_chih solver.
         "tr_chib": tr_chib,
         "hatchib": hatchib,
         "eta": eta,
         "etab": etab,
         "eta_grad_hat": tracefree_symmetric_gradient(
-            grid, eta, state.metric, difference, inverse
+            grid, eta, state.g, difference, inverse_g
         ),
-        "eta_square_hat": tracefree_square(eta, state.metric, inverse),
+        "eta_square_hat": tracefree_square(eta, state.g, inverse_g),
     }
 
 
@@ -572,7 +572,7 @@ def solve_half_shear(
     scalar_coordinates: CharacteristicLGLMesh | None = None,
     transport_cfl: float | None = None,
 ) -> Array:
-    """Advance the half-step outgoing shear with one projected RK RHS.
+    """Advance the half-step outgoing Omega_chih with one projected RK RHS.
 
     The formula is the same null-structure equation used in the numerical backend.  In
     Galerkin mode every *complete* tensor right-hand side is projected after
@@ -582,43 +582,43 @@ def solve_half_shear(
     derivative trace-free, which would omit the ``C_dot(g)c`` term.
     """
 
-    half = np.zeros_like(state.metric)
-    boundary_shear = np.asarray(boundary["shear"])
-    boundary_inverse = np.asarray(boundary["inverse"])
+    half = np.zeros_like(state.g)
+    boundary_shear = np.asarray(boundary["Omega_chih"])
+    boundary_inverse = np.asarray(boundary["inverse_g"])
     transfer = np.matmul(
-        np.matmul(boundary_shear, boundary_inverse), state.metric[:, 0]
+        np.matmul(boundary_shear, boundary_inverse), state.g[:, 0]
     )
     transfer = 0.5 * (transfer + np.swapaxes(transfer, -1, -2))
     half[:, 0] = _project_tracefree_sym2(
         angular,
         transfer,
-        state.metric[:, 0],
-        geometry["inverse"][:, 0],
+        state.g[:, 0],
+        geometry["inverse_g"][:, 0],
         projection_tails,
         "half_shear_boundary",
     )
-    tr_chi = state.omega * state.q
-    source = state.omega[..., None, None] ** 2 * (
+    tr_chi = state.Omega_trchi / state.Omega
+    source = state.Omega[..., None, None] ** 2 * (
         geometry["eta_grad_hat"]
         + geometry["eta_square_hat"]
         - 0.5 * tr_chi[..., None, None] * geometry["hatchib"]
     )
-    weighted_trace = state.omega * geometry["tr_chib"]
-    weighted_hatchib = (
-        state.omega[..., None, None] * geometry["hatchib"]
+    weighted_trace = state.Omega * geometry["tr_chib"]
+    Omega_chibh = (
+        state.Omega[..., None, None] * geometry["hatchib"]
     )
-    mixed_hatchib = np.matmul(weighted_hatchib, geometry["inverse"])
+    mixed_hatchib = np.matmul(Omega_chibh, geometry["inverse_g"])
     metric_u = _differentiate_u(
-        state.metric, u, axis=1, scalar_coordinates=scalar_coordinates
+        state.g, u, axis=1, scalar_coordinates=scalar_coordinates
     )
     midpoint_fields = {
         name: midpoint_values(value, u, axis=1)
         for name, value in {
-            "shift": state.shift,
+            "b": state.b,
             "trace": weighted_trace,
             "mixed": mixed_hatchib,
             "source": source,
-            "metric": state.metric,
+            "g": state.g,
             "metric_u": metric_u,
         }.items()
     }
@@ -626,16 +626,16 @@ def solve_half_shear(
         step = float(u[i + 1] - u[i])
         substeps = _transport_substeps(
             grid,
-            state.shift,
-            midpoint_fields["shift"],
+            state.b,
+            midpoint_fields["b"],
             u,
             i,
             transport_cfl,
         )
 
         def rhs(value: Array, alpha: float) -> Array:
-            shift = _quadratic_stage_value(
-                state.shift, midpoint_fields["shift"], i, alpha, axis=1
+            b = _quadratic_stage_value(
+                state.b, midpoint_fields["b"], i, alpha, axis=1
             )
             trace = _quadratic_stage_value(
                 weighted_trace,
@@ -660,8 +660,8 @@ def solve_half_shear(
             stage_inverse_u = None
             if angular is not None:
                 stage_metric = _quadratic_stage_value(
-                    state.metric,
-                    midpoint_fields["metric"],
+                    state.g,
+                    midpoint_fields["g"],
                     i,
                     alpha,
                     axis=1,
@@ -685,7 +685,7 @@ def solve_half_shear(
                 + np.matmul(mixed, stage_tensor)
                 + np.matmul(stage_tensor, np.swapaxes(mixed, -1, -2))
                 + stage_source
-                - lie_covariant_tensor(grid, shift, stage_tensor)
+                - lie_covariant_tensor(grid, b, stage_tensor)
             )
             if angular is not None:
                 _record_tail(
@@ -741,43 +741,43 @@ def solve_half_shear(
             half[:, i + 1] = candidate
         else:
             half[:, i + 1] = angular.project_g_tracefree(
-                candidate, geometry["inverse"][:, i + 1]
+                candidate, geometry["inverse_g"][:, i + 1]
             )
     if angular is None:
-        return tensor_tracefree(half, state.metric, geometry["inverse"])
+        return tensor_tracefree(half, state.g, geometry["inverse_g"])
     return half
 
 
 def solve_log_omega(
     grid: PointSphereGrid,
     state: FirstOrderState,
-    weighted_omegab: Array,
+    Omega_omegab: Array,
     u: Array,
     initial_log_omega: Array | None = None,
     angular: AngularGalerkin | None = None,
     projection_tails: ProjectionTails | None = None,
     transport_cfl: float | None = None,
 ) -> Array:
-    """Solve D3 log(Omega)=-2(Omega omegab) in scalar Galerkin space."""
+    """Solve Omega e_3 log(Omega)=-2(Omega omegab) in scalar Galerkin space."""
 
-    log_omega = np.zeros_like(state.omega)
+    log_Omega = np.zeros_like(state.Omega)
     if initial_log_omega is not None:
         boundary_log_omega = np.broadcast_to(
-            np.asarray(initial_log_omega), log_omega[:, 0].shape
+            np.asarray(initial_log_omega), log_Omega[:, 0].shape
         )
-        log_omega[:, 0] = _project_scalar(
+        log_Omega[:, 0] = _project_scalar(
             angular,
             boundary_log_omega,
             projection_tails,
             "log_omega_boundary",
         )
-    midpoint_shift = midpoint_values(state.shift, u, axis=1)
-    midpoint_source = midpoint_values(weighted_omegab, u, axis=1)
+    midpoint_shift = midpoint_values(state.b, u, axis=1)
+    midpoint_source = midpoint_values(Omega_omegab, u, axis=1)
     for i in range(len(u) - 1):
         step = float(u[i + 1] - u[i])
         substeps = _transport_substeps(
             grid,
-            state.shift,
+            state.b,
             midpoint_shift,
             u,
             i,
@@ -785,14 +785,14 @@ def solve_log_omega(
         )
 
         def rhs(value: Array, alpha: float) -> Array:
-            shift = _quadratic_stage_value(
-                state.shift, midpoint_shift, i, alpha, axis=1
+            b = _quadratic_stage_value(
+                state.b, midpoint_shift, i, alpha, axis=1
             )
             source = _quadratic_stage_value(
-                weighted_omegab, midpoint_source, i, alpha, axis=1
+                Omega_omegab, midpoint_source, i, alpha, axis=1
             )
             complete = -np.einsum(
-                "n...i,n...i->n...", shift, scalar_gradient(grid, value)
+                "n...i,n...i->n...", b, scalar_gradient(grid, value)
             ) - 2.0 * source
             return _project_scalar(
                 angular,
@@ -801,7 +801,7 @@ def solve_log_omega(
                 "log_omega_rhs",
             )
 
-        current = log_omega[:, i]
+        current = log_Omega[:, i]
         local_step = step / substeps
         for substep in range(substeps):
             alpha_left = substep / substeps
@@ -814,11 +814,11 @@ def solve_log_omega(
             current = current + local_step * (
                 k1 + 2.0 * k2 + 2.0 * k3 + k4
             ) / 6.0
-        log_omega[:, i + 1] = current
+        log_Omega[:, i + 1] = current
     # Omega is a nonlinear derived field; log(Omega), not Omega, is the
-    # retained scalar.  Re-projecting exp(log(Omega)) would change the lapse
+    # retained scalar.  Re-projecting exp(log(Omega)) would change the Omega
     # equation and can destroy positivity.
-    return np.exp(log_omega)
+    return np.exp(log_Omega)
 
 
 def solve_metric_and_expansion(
@@ -826,6 +826,7 @@ def solve_metric_and_expansion(
     state: FirstOrderState,
     half: Array,
     new_omega: Array,
+    new_Omega_omega: Array,
     u: Array,
     v: Array,
     substeps: int = 1,
@@ -834,15 +835,15 @@ def solve_metric_and_expansion(
     scalar_coordinates: CharacteristicLGLMesh | None = None,
     metric_parameterization: str = "direct",
     initial_metric: Array | None = None,
-    initial_q: Array | None = None,
+    initial_Omega_trchi: Array | None = None,
     expansion_excision_threshold: float | None = None,
     excision_diagnostics: dict[str, object] | None = None,
 ) -> tuple[Array, Array, Array]:
-    """Solve the coupled (g, Omega^-1 tr chi, shear) stage system.
+    """Solve the coupled ``(g, Omega_trchi, Omega_chih)`` stage system.
 
-    The transferred shear is formed from the current RK metric at every
+    The transferred Omega_chih is formed from the current RK g at every
     stage.  Pointwise trace removal is part of that nonlinear algebra; only
-    afterwards is each complete metric/scalar RHS projected to the retained
+    afterwards is each complete g/scalar RHS projected to the retained
     angular band.
     """
 
@@ -863,41 +864,42 @@ def solve_metric_and_expansion(
                 "expansion_excision_threshold must be finite and negative"
             )
 
-    metric = np.zeros_like(state.metric)
-    q = np.zeros_like(state.q)
+    g = np.zeros_like(state.g)
+    Omega_trchi = np.zeros_like(state.Omega_trchi)
     active_u = np.ones(len(u), dtype=bool)
     event_v = np.full(len(u), np.nan)
     event_angular_index = np.full(len(u), -1, dtype=int)
     projector = sphere_broadcast(grid, 1)
     if initial_metric is None:
-        metric[:, :, 0] = (-u[None, :])[:, :, None, None] ** 2 * projector
+        g[:, :, 0] = (-u[None, :])[:, :, None, None] ** 2 * projector
     else:
-        metric[:, :, 0] = np.broadcast_to(
-            np.asarray(initial_metric), metric[:, :, 0].shape
+        g[:, :, 0] = np.broadcast_to(
+            np.asarray(initial_metric), g[:, :, 0].shape
         )
-    if initial_q is None:
-        q[:, :, 0] = 2.0 / (-u[None, :])
+    if initial_Omega_trchi is None:
+        Omega_trchi[:, :, 0] = 2.0 / (-u[None, :])
     else:
-        q[:, :, 0] = np.broadcast_to(
-            np.asarray(initial_q), q[:, :, 0].shape
+        Omega_trchi[:, :, 0] = np.broadcast_to(
+            np.asarray(initial_Omega_trchi), Omega_trchi[:, :, 0].shape
         )
     factor = None
     if metric_parameterization == "cholesky":
         local_initial = np.einsum(
             "nia,n...ij,njb->n...ab",
             grid.frames,
-            metric[:, :, 0],
+            g[:, :, 0],
             grid.frames,
         )
         factor = np.zeros(
-            (*q.shape, 2, 2), dtype=metric.dtype
+            (*Omega_trchi.shape, 2, 2), dtype=g.dtype
         )
         factor[:, :, 0] = np.linalg.cholesky(local_initial)
-    old_inverse = tangent_inverse(grid, state.metric)
+    old_inverse = tangent_inverse(grid, state.g)
     fields = {
-        "log_omega": np.log(new_omega),
+        "log_Omega": np.log(new_omega),
+        "Omega_omega": new_Omega_omega,
         "half": half,
-        "old_metric": state.metric,
+        "old_metric": state.g,
     }
     fractions = sorted(
         {
@@ -965,13 +967,13 @@ def solve_metric_and_expansion(
         def stage_label(fraction: float) -> str:
             value_v = float(v[j] + fraction * full_step)
             return (
-                "metric/Raychaudhuri stage "
+                "g/Raychaudhuri stage "
                 f"v={value_v:.12g} in cell [{float(v[j]):.12g}, "
                 f"{float(v[j + 1]):.12g}]"
             )
 
         def record_crossings(
-            value_q: Array, fraction: float
+            value_Omega_trchi: Array, fraction: float
         ) -> None:
             """Freeze complete u-slices after the expansion event.
 
@@ -985,9 +987,9 @@ def solve_metric_and_expansion(
             if threshold is None:
                 return
             endpoint_omega = np.exp(
-                external("log_omega", j, fraction)
+                external("log_Omega", j, fraction)
             )
-            endpoint_expansion = endpoint_omega * value_q
+            endpoint_expansion = value_Omega_trchi / endpoint_omega
             row_minimum = np.min(endpoint_expansion, axis=0)
             crossed = active_u & (row_minimum < threshold)
             value_v = v[j] + fraction * full_step
@@ -999,31 +1001,32 @@ def solve_metric_and_expansion(
             active_u[crossed] = False
 
         def rhs(
-            value_q: Array, value_metric: Array, fraction: float
+            value_Omega_trchi: Array, value_metric: Array, fraction: float
         ) -> tuple[Array, Array]:
             # Interpolate the retained primitive log(Omega), then exponentiate
             # at the stage.  Interpolating exp(log(Omega)) would define a
-            # different semidiscrete lapse equation.
+            # different semidiscrete Omega equation.
             label = stage_label(fraction)
-            _require_finite(label, q=value_q, metric=value_metric)
+            _require_finite(label, Omega_trchi=value_Omega_trchi, g=value_metric)
             minimum_eigenvalue = _minimum_tangent_eigenvalue(
                 grid, value_metric
             )
             if minimum_eigenvalue <= 0.0:
                 raise FloatingPointError(
-                    f"{label}: metric left the positive cone; "
+                    f"{label}: g left the positive cone; "
                     f"min(g)={minimum_eigenvalue:.12g}, "
-                    f"max|q|={float(np.max(np.abs(value_q))):.12g}"
+                    f"max|Omega_trchi|={float(np.max(np.abs(value_Omega_trchi))):.12g}"
                 )
             with np.errstate(over="raise", invalid="raise"):
-                omega = np.exp(external("log_omega", j, fraction))
-            _require_finite(label, omega=omega)
-            if float(np.min(omega)) <= 0.0:
+                Omega = np.exp(external("log_Omega", j, fraction))
+            _require_finite(label, Omega=Omega)
+            if float(np.min(Omega)) <= 0.0:
                 raise FloatingPointError(
-                    f"{label}: lapse left the positive cone; "
-                    f"min(Omega)={float(np.min(omega)):.12g}"
+                    f"{label}: Omega left the positive cone; "
+                    f"min(Omega)={float(np.min(Omega)):.12g}"
                 )
             stage_half = external("half", j, fraction)
+            stage_Omega_omega = external("Omega_omega", j, fraction)
             stage_old_metric = external("old_metric", j, fraction)
             _require_finite(
                 label,
@@ -1035,54 +1038,53 @@ def solve_metric_and_expansion(
             )
             if old_minimum_eigenvalue <= 0.0:
                 raise FloatingPointError(
-                    f"{label}: interpolated previous metric left the "
+                    f"{label}: interpolated previous g left the "
                     f"positive cone; min(g_old)={old_minimum_eigenvalue:.12g}"
                 )
             stage_inverse = tangent_inverse(grid, stage_old_metric)
             stage_shear = transferred(
                 stage_half, stage_inverse, value_metric
             )
-            inverse = tangent_inverse(grid, value_metric)
-            norm_sq = tensor_norm_sq(stage_shear, inverse)
+            inverse_g = tangent_inverse(grid, value_metric)
+            norm_sq = tensor_norm_sq(stage_shear, inverse_g)
             try:
                 with np.errstate(
                     over="raise", invalid="raise", divide="raise"
                 ):
-                    q_rhs = (
-                        -0.5 * omega**2 * value_q**2
-                        - norm_sq / omega**2
+                    Omega_trchi_rhs = (
+                        -0.5 * value_Omega_trchi**2
+                        - 4.0 * stage_Omega_omega * value_Omega_trchi
+                        - norm_sq
                     )
                     metric_rhs = (
-                        omega[..., None, None] ** 2
-                        * value_q[..., None, None]
-                        * value_metric
+                        value_Omega_trchi[..., None, None] * value_metric
                         + 2.0 * stage_shear
                     )
             except FloatingPointError as error:
                 raise FloatingPointError(
-                    f"{label}: coupled metric/Raychaudhuri RHS overflow; "
-                    f"min/max Omega=({float(np.min(omega)):.12g},"
-                    f"{float(np.max(omega)):.12g}), "
-                    f"max|q|={float(np.max(np.abs(value_q))):.12g}, "
+                    f"{label}: coupled g/Raychaudhuri RHS overflow; "
+                    f"min/max Omega=({float(np.min(Omega)):.12g},"
+                    f"{float(np.max(Omega)):.12g}), "
+                    f"max|Omega_trchi|={float(np.max(np.abs(value_Omega_trchi))):.12g}, "
                     f"max|g|={float(np.max(np.abs(value_metric))):.12g}, "
                     f"max|hat_chi|^2={float(np.max(norm_sq)):.12g}"
                 ) from error
             _require_finite(
                 label,
                 transferred_shear=stage_shear,
-                raychaudhuri_rhs=q_rhs,
+                raychaudhuri_rhs=Omega_trchi_rhs,
                 metric_rhs=metric_rhs,
             )
             if threshold is not None and np.any(~active_u):
                 # No angular value on an excised S_{u,v} is advanced.  The
                 # mask is constant over the complete sphere, so this zeroing
                 # also commutes with the angular Galerkin projection.
-                q_rhs[:, ~active_u] = 0.0
+                Omega_trchi_rhs[:, ~active_u] = 0.0
                 metric_rhs[:, ~active_u] = 0.0
             return (
                 _project_scalar(
                     angular,
-                    q_rhs,
+                    Omega_trchi_rhs,
                     projection_tails,
                     "raychaudhuri_rhs",
                 ),
@@ -1094,31 +1096,31 @@ def solve_metric_and_expansion(
                 ),
             )
 
-        current_q = q[:, :, j]
+        current_Omega_trchi = Omega_trchi[:, :, j]
         if metric_parameterization == "direct":
-            current_metric = metric[:, :, j]
+            current_metric = g[:, :, j]
             for substep in range(substeps):
                 fraction = substep / substeps
                 half_fraction = (substep + 0.5) / substeps
                 end_fraction = (substep + 1.0) / substeps
-                k1_q, k1_metric = rhs(current_q, current_metric, fraction)
-                k2_q, k2_metric = rhs(
-                    current_q + 0.5 * step * k1_q,
+                k1_Omega_trchi, k1_metric = rhs(current_Omega_trchi, current_metric, fraction)
+                k2_Omega_trchi, k2_metric = rhs(
+                    current_Omega_trchi + 0.5 * step * k1_Omega_trchi,
                     current_metric + 0.5 * step * k1_metric,
                     half_fraction,
                 )
-                k3_q, k3_metric = rhs(
-                    current_q + 0.5 * step * k2_q,
+                k3_Omega_trchi, k3_metric = rhs(
+                    current_Omega_trchi + 0.5 * step * k2_Omega_trchi,
                     current_metric + 0.5 * step * k2_metric,
                     half_fraction,
                 )
-                k4_q, k4_metric = rhs(
-                    current_q + step * k3_q,
+                k4_Omega_trchi, k4_metric = rhs(
+                    current_Omega_trchi + step * k3_Omega_trchi,
                     current_metric + step * k3_metric,
                     end_fraction,
                 )
-                current_q = current_q + step * (
-                    k1_q + 2.0 * k2_q + 2.0 * k3_q + k4_q
+                current_Omega_trchi = current_Omega_trchi + step * (
+                    k1_Omega_trchi + 2.0 * k2_Omega_trchi + 2.0 * k3_Omega_trchi + k4_Omega_trchi
                 ) / 6.0
                 current_metric = current_metric + step * (
                     k1_metric
@@ -1128,28 +1130,28 @@ def solve_metric_and_expansion(
                 ) / 6.0
                 endpoint_fraction = (substep + 1.0) / substeps
                 label = stage_label(endpoint_fraction)
-                _require_finite(label, q=current_q, metric=current_metric)
+                _require_finite(label, Omega_trchi=current_Omega_trchi, g=current_metric)
                 minimum_eigenvalue = _minimum_tangent_eigenvalue(
                     grid, current_metric
                 )
                 if minimum_eigenvalue <= 0.0:
                     raise FloatingPointError(
-                        f"{label}: accepted metric update left the positive "
+                        f"{label}: accepted g update left the positive "
                         f"cone; min(g)={minimum_eigenvalue:.12g}, "
-                        f"max|q|={float(np.max(np.abs(current_q))):.12g}"
+                        f"max|Omega_trchi|={float(np.max(np.abs(current_Omega_trchi))):.12g}"
                     )
                 record_crossings(
-                    current_q, (substep + 1.0) / substeps
+                    current_Omega_trchi, (substep + 1.0) / substeps
                 )
         else:
             assert factor is not None
             current_factor = factor[:, :, j]
 
             def factor_rhs(
-                value_q: Array, value_factor: Array, fraction: float
+                value_Omega_trchi: Array, value_factor: Array, fraction: float
             ) -> tuple[Array, Array]:
                 value_metric = ambient_metric(value_factor)
-                q_rhs, metric_rhs = rhs(value_q, value_metric, fraction)
+                Omega_trchi_rhs, metric_rhs = rhs(value_Omega_trchi, value_metric, fraction)
                 local_rhs = np.einsum(
                     "nia,n...ij,njb->n...ab",
                     grid.frames,
@@ -1162,42 +1164,42 @@ def solve_metric_and_expansion(
                     )
                 except np.linalg.LinAlgError as error:
                     raise FloatingPointError(
-                        f"{stage_label(fraction)}: metric factor became singular"
+                        f"{stage_label(fraction)}: g factor became singular"
                     ) from error
                 value_factor_rhs = 0.5 * np.matmul(
                     local_rhs, inverse_transpose
                 )
                 _require_finite(
                     stage_label(fraction),
-                    q_rhs=q_rhs,
+                    Omega_trchi_rhs=Omega_trchi_rhs,
                     metric_factor_rhs=value_factor_rhs,
                 )
-                return q_rhs, value_factor_rhs
+                return Omega_trchi_rhs, value_factor_rhs
 
             for substep in range(substeps):
                 fraction = substep / substeps
                 half_fraction = (substep + 0.5) / substeps
                 end_fraction = (substep + 1.0) / substeps
-                k1_q, k1_factor = factor_rhs(
-                    current_q, current_factor, fraction
+                k1_Omega_trchi, k1_factor = factor_rhs(
+                    current_Omega_trchi, current_factor, fraction
                 )
-                k2_q, k2_factor = factor_rhs(
-                    current_q + 0.5 * step * k1_q,
+                k2_Omega_trchi, k2_factor = factor_rhs(
+                    current_Omega_trchi + 0.5 * step * k1_Omega_trchi,
                     current_factor + 0.5 * step * k1_factor,
                     half_fraction,
                 )
-                k3_q, k3_factor = factor_rhs(
-                    current_q + 0.5 * step * k2_q,
+                k3_Omega_trchi, k3_factor = factor_rhs(
+                    current_Omega_trchi + 0.5 * step * k2_Omega_trchi,
                     current_factor + 0.5 * step * k2_factor,
                     half_fraction,
                 )
-                k4_q, k4_factor = factor_rhs(
-                    current_q + step * k3_q,
+                k4_Omega_trchi, k4_factor = factor_rhs(
+                    current_Omega_trchi + step * k3_Omega_trchi,
                     current_factor + step * k3_factor,
                     end_fraction,
                 )
-                current_q = current_q + step * (
-                    k1_q + 2.0 * k2_q + 2.0 * k3_q + k4_q
+                current_Omega_trchi = current_Omega_trchi + step * (
+                    k1_Omega_trchi + 2.0 * k2_Omega_trchi + 2.0 * k3_Omega_trchi + k4_Omega_trchi
                 ) / 6.0
                 current_factor = current_factor + step * (
                     k1_factor
@@ -1209,32 +1211,32 @@ def solve_metric_and_expansion(
                 label = stage_label((substep + 1.0) / substeps)
                 _require_finite(
                     label,
-                    q=current_q,
+                    Omega_trchi=current_Omega_trchi,
                     metric_factor=current_factor,
-                    metric=current_metric,
+                    g=current_metric,
                 )
                 minimum_eigenvalue = _minimum_tangent_eigenvalue(
                     grid, current_metric
                 )
                 if minimum_eigenvalue <= 1.0e-14:
                     raise FloatingPointError(
-                        f"{label}: Cholesky metric approached singularity; "
+                        f"{label}: Cholesky g approached singularity; "
                         f"min(g)={minimum_eigenvalue:.12g}, "
-                        f"max|q|={float(np.max(np.abs(current_q))):.12g}"
+                        f"max|Omega_trchi|={float(np.max(np.abs(current_Omega_trchi))):.12g}"
                     )
                 record_crossings(
-                    current_q, (substep + 1.0) / substeps
+                    current_Omega_trchi, (substep + 1.0) / substeps
                 )
             factor[:, :, j + 1] = current_factor
             current_metric = ambient_metric(current_factor)
-        q[:, :, j + 1] = current_q
-        metric[:, :, j + 1] = current_metric
+        Omega_trchi[:, :, j + 1] = current_Omega_trchi
+        g[:, :, j + 1] = current_metric
 
-    transfer = np.matmul(np.matmul(half, old_inverse), metric)
+    transfer = np.matmul(np.matmul(half, old_inverse), g)
     transfer = 0.5 * (transfer + np.swapaxes(transfer, -1, -2))
-    inverse = tangent_inverse(grid, metric)
-    transfer = tensor_tracefree(transfer, metric, inverse)
-    # Like Omega=exp(log Omega), the full shear is an algebraically derived
+    inverse_g = tangent_inverse(grid, g)
+    transfer = tensor_tracefree(transfer, g, inverse_g)
+    # Like Omega=exp(log Omega), the full Omega_chih is an algebraically derived
     # nonlinear field.  Keep the exact pointwise transfer/trace constraint on
     # the oversampled work grid; it is not an independent hidden nodal state.
     # Every evolution RHS that consumes it is projected as a complete tensor
@@ -1246,7 +1248,7 @@ def solve_metric_and_expansion(
             projection_tails,
             "transferred_shear",
         )
-    shear = transfer
+    Omega_chih = transfer
     if excision_diagnostics is not None:
         excision_diagnostics.clear()
         excision_diagnostics.update(
@@ -1257,7 +1259,7 @@ def solve_metric_and_expansion(
                 "active_u_at_terminal_v": active_u,
             }
         )
-    return metric, q, shear
+    return g, Omega_trchi, Omega_chih
 
 
 def solve_metric_and_expansion_sdc(
@@ -1265,6 +1267,7 @@ def solve_metric_and_expansion_sdc(
     state: FirstOrderState,
     half: Array,
     new_omega: Array,
+    new_Omega_omega: Array,
     u: Array,
     v: Array,
     scalar_coordinates: CharacteristicLGLMesh,
@@ -1276,7 +1279,7 @@ def solve_metric_and_expansion_sdc(
 ) -> tuple[Array, Array, Array, list[dict[str, float | int | bool]]]:
     """Solve the coupled v system by panelwise LGL collocation/SDC.
 
-    The section metric is represented by a free tangent factor ``g=L L^T``.
+    The section g is represented by a free tangent factor ``g=L L^T``.
     This is an identity at the continuum level and keeps every SDC trial in
     the SPD cone.  All known Picard fields are interpolated by the same panel
     polynomial used by the collocation integral, rather than by an unrelated
@@ -1288,21 +1291,21 @@ def solve_metric_and_expansion_sdc(
     ):
         raise ValueError("the characteristic LGL grid does not match the SDC state")
 
-    metric = np.zeros_like(state.metric)
-    q = np.zeros_like(state.q)
+    g = np.zeros_like(state.g)
+    Omega_trchi = np.zeros_like(state.Omega_trchi)
     projector = sphere_broadcast(grid, 1)
-    metric[:, :, 0] = (-u[None, :])[:, :, None, None] ** 2 * projector
-    q[:, :, 0] = 2.0 / (-u[None, :])
+    g[:, :, 0] = (-u[None, :])[:, :, None, None] ** 2 * projector
+    Omega_trchi[:, :, 0] = 2.0 / (-u[None, :])
     local_initial = np.einsum(
         "nia,n...ij,njb->n...ab",
         grid.frames,
-        metric[:, :, 0],
+        g[:, :, 0],
         grid.frames,
     )
-    factor = np.zeros((*q.shape, 2, 2), dtype=metric.dtype)
+    factor = np.zeros((*Omega_trchi.shape, 2, 2), dtype=g.dtype)
     factor[:, :, 0] = np.linalg.cholesky(local_initial)
-    old_inverse = tangent_inverse(grid, state.metric)
-    log_omega = np.log(new_omega)
+    old_inverse = tangent_inverse(grid, state.g)
+    log_Omega = np.log(new_omega)
     diagnostics: list[dict[str, float | int | bool]] = []
 
     def ambient_metric(value_factor: Array) -> Array:
@@ -1319,9 +1322,10 @@ def solve_metric_and_expansion_sdc(
     for element, (segment, index) in enumerate(
         zip(scalar_coordinates.s.segments, scalar_coordinates.s.indices, strict=True)
     ):
-        local_log_omega = np.take(log_omega, index, axis=2)
+        local_log_omega = np.take(log_Omega, index, axis=2)
+        local_Omega_omega = np.take(new_Omega_omega, index, axis=2)
         local_half = np.take(half, index, axis=2)
-        local_old_metric = np.take(state.metric, index, axis=2)
+        local_old_metric = np.take(state.g, index, axis=2)
 
         def interpolate(field: Array, value_s: float) -> Array:
             weights = segment.interpolation_matrix(
@@ -1331,37 +1335,38 @@ def solve_metric_and_expansion_sdc(
             return np.tensordot(weights, moved, axes=(0, 0))
 
         def unpack(value: Array) -> tuple[Array, Array]:
-            value_q = value[..., 0]
-            value_factor = value[..., 1:].reshape((*value_q.shape, 2, 2))
-            return value_q, value_factor
+            value_Omega_trchi = value[..., 0]
+            value_factor = value[..., 1:].reshape((*value_Omega_trchi.shape, 2, 2))
+            return value_Omega_trchi, value_factor
 
         def rhs(value_s: float, packed: Array) -> Array:
-            value_q, value_factor = unpack(packed)
+            value_Omega_trchi, value_factor = unpack(packed)
             label = (
-                f"metric/Raychaudhuri SDC element {element + 1} "
+                f"g/Raychaudhuri SDC element {element + 1} "
                 f"at s={value_s:.12g}, v={scalar_coordinates.v1 * value_s**2:.12g}"
             )
             _require_finite(
-                label, q=value_q, metric_factor=value_factor
+                label, Omega_trchi=value_Omega_trchi, metric_factor=value_factor
             )
             value_metric = ambient_metric(value_factor)
-            _require_finite(label, metric=value_metric)
+            _require_finite(label, g=value_metric)
             minimum_eigenvalue = _minimum_tangent_eigenvalue(
                 grid, value_metric
             )
             if minimum_eigenvalue <= 1.0e-14:
                 raise FloatingPointError(
-                    f"{label}: metric factor approached singularity; "
+                    f"{label}: g factor approached singularity; "
                     f"min(g)={minimum_eigenvalue:.12g}, "
-                    f"max|q|={float(np.max(np.abs(value_q))):.12g}"
+                    f"max|Omega_trchi|={float(np.max(np.abs(value_Omega_trchi))):.12g}"
                 )
 
-            omega = np.exp(interpolate(local_log_omega, value_s))
+            Omega = np.exp(interpolate(local_log_omega, value_s))
+            Omega_omega = interpolate(local_Omega_omega, value_s)
             stage_half = interpolate(local_half, value_s)
             stage_old_metric = interpolate(local_old_metric, value_s)
             _require_finite(
                 label,
-                omega=omega,
+                Omega=Omega,
                 half_shear=stage_half,
                 previous_metric=stage_old_metric,
             )
@@ -1370,7 +1375,7 @@ def solve_metric_and_expansion_sdc(
             )
             if old_minimum <= 0.0:
                 raise FloatingPointError(
-                    f"{label}: interpolated previous metric is not SPD; "
+                    f"{label}: interpolated previous g is not SPD; "
                     f"min(g_old)={old_minimum:.12g}"
                 )
             stage_inverse = tangent_inverse(grid, stage_old_metric)
@@ -1380,21 +1385,23 @@ def solve_metric_and_expansion_sdc(
             raw_shear = 0.5 * (
                 raw_shear + np.swapaxes(raw_shear, -1, -2)
             )
-            inverse = tangent_inverse(grid, value_metric)
+            inverse_g = tangent_inverse(grid, value_metric)
             stage_shear = tensor_tracefree(
-                raw_shear, value_metric, inverse
+                raw_shear, value_metric, inverse_g
             )
-            norm_sq = tensor_norm_sq(stage_shear, inverse)
-            q_rhs = -0.5 * omega**2 * value_q**2 - norm_sq / omega**2
+            norm_sq = tensor_norm_sq(stage_shear, inverse_g)
+            Omega_trchi_rhs = (
+                -0.5 * value_Omega_trchi**2
+                - 4.0 * Omega_omega * value_Omega_trchi
+                - norm_sq
+            )
             metric_rhs = (
-                omega[..., None, None] ** 2
-                * value_q[..., None, None]
-                * value_metric
+                value_Omega_trchi[..., None, None] * value_metric
                 + 2.0 * stage_shear
             )
-            q_rhs = _project_scalar(
+            Omega_trchi_rhs = _project_scalar(
                 angular,
-                q_rhs,
+                Omega_trchi_rhs,
                 projection_tails,
                 "raychaudhuri_sdc_rhs",
             )
@@ -1416,7 +1423,7 @@ def solve_metric_and_expansion_sdc(
                 )
             except np.linalg.LinAlgError as error:
                 raise FloatingPointError(
-                    f"{label}: metric factor became singular"
+                    f"{label}: g factor became singular"
                 ) from error
             factor_rhs = 0.5 * np.matmul(
                 local_metric_rhs, inverse_transpose
@@ -1424,8 +1431,8 @@ def solve_metric_and_expansion_sdc(
             jacobian = 2.0 * scalar_coordinates.v1 * value_s
             packed_rhs = np.concatenate(
                 (
-                    q_rhs[..., None],
-                    factor_rhs.reshape((*value_q.shape, 4)),
+                    Omega_trchi_rhs[..., None],
+                    factor_rhs.reshape((*value_Omega_trchi.shape, 4)),
                 ),
                 axis=-1,
             )
@@ -1434,9 +1441,9 @@ def solve_metric_and_expansion_sdc(
 
         initial = np.concatenate(
             (
-                q[:, :, index[0], None],
+                Omega_trchi[:, :, index[0], None],
                 factor[:, :, index[0]].reshape(
-                    (*q[:, :, index[0]].shape, 4)
+                    (*Omega_trchi[:, :, index[0]].shape, 4)
                 ),
             ),
             axis=-1,
@@ -1481,20 +1488,20 @@ def solve_metric_and_expansion_sdc(
         )
         if not result.converged:
             raise MetricSDCFailure(
-                "metric/Raychaudhuri SDC did not converge on "
+                "g/Raychaudhuri SDC did not converge on "
                 f"v=[{scalar_coordinates.v1 * segment.left**2:.12g}, "
                 f"{scalar_coordinates.v1 * segment.right**2:.12g}]: "
                 f"collocation defect={result.collocation_defect:.6g}, "
                 f"overgrid defect={result.overgrid_defect:.6g}",
                 diagnostics.copy(),
             )
-        local_q = result.values[..., 0]
+        local_Omega_trchi = result.values[..., 0]
         local_factor = result.values[..., 1:].reshape(
-            (len(segment.nodes), *q[:, :, 0].shape, 2, 2)
+            (len(segment.nodes), *Omega_trchi[:, :, 0].shape, 2, 2)
         )
-        q[:, :, index] = np.moveaxis(local_q, 0, 2)
+        Omega_trchi[:, :, index] = np.moveaxis(local_Omega_trchi, 0, 2)
         factor[:, :, index] = np.moveaxis(local_factor, 0, 2)
-        metric[:, :, index] = ambient_metric(factor[:, :, index])
+        g[:, :, index] = ambient_metric(factor[:, :, index])
 
     underresolved = [item for item in diagnostics if not item["resolved"]]
     if underresolved:
@@ -1502,7 +1509,7 @@ def solve_metric_and_expansion_sdc(
             underresolved, key=lambda item: float(item["overgrid_defect"])
         )
         raise MetricSDCFailure(
-            f"{len(underresolved)} metric/Raychaudhuri SDC elements are "
+            f"{len(underresolved)} g/Raychaudhuri SDC elements are "
             "underresolved; worst element "
             f"{worst['element']} on v=[{worst['v_left']:.12g}, "
             f"{worst['v_right']:.12g}] has independent overgrid defect "
@@ -1510,18 +1517,18 @@ def solve_metric_and_expansion_sdc(
             diagnostics.copy(),
         )
 
-    transfer = np.matmul(np.matmul(half, old_inverse), metric)
+    transfer = np.matmul(np.matmul(half, old_inverse), g)
     transfer = 0.5 * (transfer + np.swapaxes(transfer, -1, -2))
-    inverse = tangent_inverse(grid, metric)
-    shear = tensor_tracefree(transfer, metric, inverse)
+    inverse_g = tangent_inverse(grid, g)
+    Omega_chih = tensor_tracefree(transfer, g, inverse_g)
     if angular is not None:
         _record_tail(
             angular.sym2,
-            shear,
+            Omega_chih,
             projection_tails,
             "transferred_shear_sdc",
         )
-    return metric, q, shear, diagnostics
+    return g, Omega_trchi, Omega_chih, diagnostics
 
 
 def solve_weighted_omega(
@@ -1535,9 +1542,9 @@ def solve_weighted_omega(
     projection_tails: ProjectionTails | None = None,
     transport_cfl: float | None = None,
 ) -> Array:
-    """Solve the attachment's D3(Omega omega) equation along u."""
+    """Solve the attachment's Omega e_3(Omega Omega) equation along u."""
 
-    value = np.zeros_like(old_state.weighted_omega)
+    value = np.zeros_like(old_state.Omega_omega)
     if initial_value is not None:
         boundary_value = np.broadcast_to(
             np.asarray(initial_value), value[:, 0].shape
@@ -1549,16 +1556,16 @@ def solve_weighted_omega(
             "weighted_omega_boundary",
         )
     grad_log_new_omega = scalar_gradient(grid, np.log(new_omega))
-    rhs_source = source - 2.0 * old_state.omega**2 * np.einsum(
-        "n...i,n...i->n...", old_state.zeta_up, grad_log_new_omega
+    rhs_source = source - 2.0 * old_state.Omega**2 * np.einsum(
+        "n...i,n...i->n...", old_state.zeta, grad_log_new_omega
     )
-    midpoint_shift = midpoint_values(old_state.shift, u, axis=1)
+    midpoint_shift = midpoint_values(old_state.b, u, axis=1)
     midpoint_source = midpoint_values(rhs_source, u, axis=1)
     for i in range(len(u) - 1):
         step = float(u[i + 1] - u[i])
         substeps = _transport_substeps(
             grid,
-            old_state.shift,
+            old_state.b,
             midpoint_shift,
             u,
             i,
@@ -1566,15 +1573,15 @@ def solve_weighted_omega(
         )
 
         def rhs(stage_value_scalar: Array, alpha: float) -> Array:
-            shift = _quadratic_stage_value(
-                old_state.shift, midpoint_shift, i, alpha, axis=1
+            b = _quadratic_stage_value(
+                old_state.b, midpoint_shift, i, alpha, axis=1
             )
             forcing = _quadratic_stage_value(
                 rhs_source, midpoint_source, i, alpha, axis=1
             )
             complete = forcing - np.einsum(
                 "n...i,n...i->n...",
-                shift,
+                b,
                 scalar_gradient(grid, stage_value_scalar),
             )
             return _project_scalar(
@@ -1620,11 +1627,11 @@ def complete_weighted_omegab(
 
     ``B_full = B_half - .5 (b_new-b_old).grad(log(Omega_new))``.
 
-    The returned derivative applies the product rule using the two shift
+    The returned derivative applies the product rule using the two b
     construction sources and ``partial_v log(Omega)=-2 Omega*omega``.
     """
 
-    shift_difference = new_shift - old_state.shift
+    shift_difference = new_shift - old_state.b
     grad_log_new_omega = scalar_gradient(grid, np.log(new_omega))
     weighted_omegab_full = weighted_omegab_half - 0.5 * np.einsum(
         "n...i,n...i->n...", shift_difference, grad_log_new_omega
@@ -1637,7 +1644,7 @@ def complete_weighted_omegab(
     )
     old_shift_source = _project_vector(
         angular,
-        -4.0 * old_state.omega[..., None] ** 2 * old_state.zeta_up,
+        -4.0 * old_state.Omega[..., None] ** 2 * old_state.zeta,
         projection_tails,
         "weighted_omegab_old_shift_source",
     )
@@ -1673,12 +1680,12 @@ def complete_weighted_omegab(
 
 def solve_weighted_chib(
     grid: PointSphereGrid,
-    metric: Array,
-    omega: Array,
-    zeta_up: Array,
-    shift: Array,
-    q: Array,
-    shear: Array,
+    g: Array,
+    Omega: Array,
+    zeta: Array,
+    b: Array,
+    Omega_trchi: Array,
+    Omega_chih: Array,
     u: Array,
     v: Array,
     angular: AngularGalerkin | None = None,
@@ -1688,27 +1695,26 @@ def solve_weighted_chib(
 ) -> tuple[Array, Array]:
     """Advance Omega*chib in v using equation 6 of the attachment."""
 
-    inverse = tangent_inverse(grid, metric)
-    difference, _ = connection_difference(grid, metric, inverse)
-    weighted_tr_chi = omega**2 * q
-    weighted_chi = shear + 0.5 * weighted_tr_chi[..., None, None] * metric
-    d3_weighted_chi = _differentiate_u(
-        weighted_chi, u, axis=1, scalar_coordinates=scalar_coordinates
+    inverse_g = tangent_inverse(grid, g)
+    difference, _ = connection_difference(grid, g, inverse_g)
+    Omega_chi = Omega_chih + 0.5 * Omega_trchi[..., None, None] * g
+    Lie_Omega_e3_Omega_chi = _differentiate_u(
+        Omega_chi, u, axis=1, scalar_coordinates=scalar_coordinates
     )
-    d3_weighted_chi += lie_covariant_tensor(grid, shift, weighted_chi)
+    Lie_Omega_e3_Omega_chi += lie_covariant_tensor(grid, b, Omega_chi)
 
-    zeta = np.einsum("n...ij,n...j->n...i", metric, zeta_up)
+    zeta = np.einsum("n...ij,n...j->n...i", g, zeta)
     nabla_zeta = one_form_covariant_derivative(grid, zeta, difference)
     sym_nabla_zeta = nabla_zeta + np.swapaxes(nabla_zeta, -1, -2)
-    grad_log_omega = scalar_gradient(grid, np.log(omega))
+    grad_log_omega = scalar_gradient(grid, np.log(Omega))
     sym_zeta_grad = np.einsum(
         "n...i,n...j->n...ij", zeta, grad_log_omega
     )
     sym_zeta_grad += np.swapaxes(sym_zeta_grad, -1, -2)
     source = (
-        d3_weighted_chi
-        - 2.0 * omega[..., None, None] ** 2 * sym_nabla_zeta
-        - 4.0 * omega[..., None, None] ** 2 * sym_zeta_grad
+        Lie_Omega_e3_Omega_chi
+        - 2.0 * Omega[..., None, None] ** 2 * sym_nabla_zeta
+        - 4.0 * Omega[..., None, None] ** 2 * sym_zeta_grad
     )
     source = _project_sym2(
         angular,
@@ -1720,61 +1726,61 @@ def solve_weighted_chib(
         projector = sphere_broadcast(grid, 1)
         initial_face = np.broadcast_to(
             u[None, :, None, None] * projector,
-            metric[:, :, 0].shape,
+            g[:, :, 0].shape,
         )
     else:
         initial_face = np.broadcast_to(
-            np.asarray(initial_value), metric[:, :, 0].shape
+            np.asarray(initial_value), g[:, :, 0].shape
         )
     initial = np.broadcast_to(
-        initial_face[:, :, None], metric.shape
+        initial_face[:, :, None], g.shape
     )
-    weighted_chib = initial + _integrate_v(
+    Omega_chib = initial + _integrate_v(
         source, v, axis=2, scalar_coordinates=scalar_coordinates
     )
-    weighted_chib = 0.5 * (
-        weighted_chib + np.swapaxes(weighted_chib, -1, -2)
+    Omega_chib = 0.5 * (
+        Omega_chib + np.swapaxes(Omega_chib, -1, -2)
     )
-    weighted_chib = _project_sym2(
+    Omega_chib = _project_sym2(
         angular,
-        weighted_chib,
+        Omega_chib,
         projection_tails,
         "weighted_chib_state",
     )
-    return weighted_chib, source
+    return Omega_chib, source
 
 
 def solve_incoming_metric(
     grid: PointSphereGrid,
     metric_on_hminus1: Array,
-    weighted_chib: Array,
-    shift: Array,
+    Omega_chib: Array,
+    b: Array,
     u: Array,
     kinematic_factor: float = 2.0,
     angular: AngularGalerkin | None = None,
     projection_tails: ProjectionTails | None = None,
     transport_cfl: float | None = None,
 ) -> Array:
-    """Integrate D3 g_tilde = 2 Omega chib from H_-1.
+    """Integrate Omega e_3 g_tilde = 2 Omega chib from H_-1.
 
     ``kinematic_factor=0.5`` is intentionally supported only for the mutation
     test of the inconsistent coefficient in the attachment's Task 1.
     """
 
-    result = np.zeros_like(weighted_chib)
+    result = np.zeros_like(Omega_chib)
     result[:, 0] = _project_sym2(
         angular,
         metric_on_hminus1,
         projection_tails,
         "incoming_metric_boundary",
     )
-    midpoint_shift = midpoint_values(shift, u, axis=1)
-    midpoint_chib = midpoint_values(weighted_chib, u, axis=1)
+    midpoint_shift = midpoint_values(b, u, axis=1)
+    midpoint_chib = midpoint_values(Omega_chib, u, axis=1)
     for i in range(len(u) - 1):
         step = float(u[i + 1] - u[i])
         substeps = _transport_substeps(
             grid,
-            shift,
+            b,
             midpoint_shift,
             u,
             i,
@@ -1783,10 +1789,10 @@ def solve_incoming_metric(
 
         def rhs(value_metric: Array, alpha: float) -> Array:
             stage_shift = _quadratic_stage_value(
-                shift, midpoint_shift, i, alpha, axis=1
+                b, midpoint_shift, i, alpha, axis=1
             )
             stage_chib = _quadratic_stage_value(
-                weighted_chib, midpoint_chib, i, alpha, axis=1
+                Omega_chib, midpoint_chib, i, alpha, axis=1
             )
             complete = kinematic_factor * stage_chib - lie_covariant_tensor(
                 grid, stage_shift, value_metric
@@ -1822,16 +1828,16 @@ def metric_closure(
     u: Array,
     scalar_coordinates: CharacteristicLGLMesh | None = None,
 ) -> dict[str, Array | float]:
-    inverse = tangent_inverse(grid, state.metric)
-    difference = reconstructed - state.metric
-    pointwise = np.sqrt(np.maximum(tensor_norm_sq(difference, inverse), 0.0))
+    inverse_g = tangent_inverse(grid, state.g)
+    difference = reconstructed - state.g
+    pointwise = np.sqrt(np.maximum(tensor_norm_sq(difference, inverse_g), 0.0))
     differential = _differentiate_u(
-        state.metric, u, axis=1, scalar_coordinates=scalar_coordinates
+        state.g, u, axis=1, scalar_coordinates=scalar_coordinates
     )
-    differential += lie_covariant_tensor(grid, state.shift, state.metric)
-    differential -= 2.0 * state.weighted_chib
+    differential += lie_covariant_tensor(grid, state.b, state.g)
+    differential -= 2.0 * state.Omega_chib
     differential_norm = np.sqrt(
-        np.maximum(tensor_norm_sq(differential, inverse), 0.0)
+        np.maximum(tensor_norm_sq(differential, inverse_g), 0.0)
     )
     return {
         "pointwise": pointwise,
@@ -1872,11 +1878,10 @@ def picard_step(
     ``incoming`` supplies non-Minkowski data on ``v=0`` for the direct-RK
     benchmark path.  Missing entries retain the flat-cone values,
     so every production Q1 caller is unchanged.  The dictionary may contain
-    ``metric``, ``expansion``, ``log_omega`` (or ``omega``),
-    ``weighted_omegab``, ``weighted_chib``, ``zeta_up``, and ``shift``.
-    For a restarted incoming face, ``weighted_tr_chi`` is the theory-native
-    datum ``Omega*tr(chi)``.  It is converted to the stored
-    ``q=Omega^{-1}tr(chi)`` only after the new lapse has been constructed.
+    ``g``, ``Omega_trchi``, ``log_Omega`` (or ``Omega``),
+    ``Omega_omegab``, ``Omega_chib``, ``zeta``, and ``b``.
+    For a restarted incoming face, ``Omega_trchi`` is the theory-native
+    stored datum ``Omega*tr(chi)``.  No inverse-Omega expansion is stored.
     """
 
     if u_integrator not in {"rk4", "sdc"}:
@@ -1886,7 +1891,7 @@ def picard_step(
     if incoming is not None and metric_integrator == "sdc":
         raise NotImplementedError(
             "general incoming characteristic data are currently implemented "
-            "only for the direct-RK metric march"
+            "only for the direct-RK g march"
         )
     u_sdc_diagnostics: dict[str, list[dict[str, object]]] = {}
     u_sdc_maps: dict[str, Array] = {}
@@ -1924,7 +1929,7 @@ def picard_step(
     geometry = section_geometry(grid, state)
     _require_finite(
         "section geometry",
-        inverse=geometry["inverse"],
+        inverse_g=geometry["inverse_g"],
         connection_difference=geometry["difference"],
         eta=geometry["eta"],
         etab=geometry["etab"],
@@ -1957,11 +1962,11 @@ def picard_step(
         )
         half = half_result.values
         record_u_sdc("half_shear", half_result)
-    _require_finite("half-shear solve", half_shear=half)
-    inverse = geometry["inverse"]
-    half_trace = tensor_trace(half, inverse)
+    _require_finite("half-Omega_chih solve", half_shear=half)
+    inverse_g = geometry["inverse_g"]
+    half_trace = tensor_trace(half, inverse_g)
     half_norm = np.sqrt(
-        np.maximum(tensor_norm_sq(half, inverse), 0.0)
+        np.maximum(tensor_norm_sq(half, inverse_g), 0.0)
     )
     half_trace_diagnostics = {
         "absolute_maximum": float(np.max(np.abs(half_trace))),
@@ -1996,33 +2001,33 @@ def picard_step(
     eta_etab = np.einsum(
         "n...i,n...ij,n...j->n...",
         geometry["eta"],
-        inverse,
+        inverse_g,
         geometry["etab"],
     )
     shear_dot = np.einsum(
         "n...ik,n...jl,n...ij,n...kl->n...",
-        inverse,
-        inverse,
+        inverse_g,
+        inverse_g,
         half,
-        geometry["weighted_hatchib"],
+        geometry["Omega_chibh"],
     )
-    weighted_tr_chi = state.omega**2 * state.q
-    weighted_tr_chib = geometry["weighted_tr_chib"]
-    eta_up = np.einsum("n...ij,n...j->n...i", inverse, geometry["eta"])
+    Omega_trchi = state.Omega_trchi
+    Omega_trchib = geometry["Omega_trchib"]
+    eta_up = np.einsum("n...ij,n...j->n...i", inverse_g, geometry["eta"])
     div_eta = vector_divergence(grid, eta_up, geometry["difference"])
-    d3_weighted_tr_chi = _differentiate_u(
-        weighted_tr_chi, u, axis=1, scalar_coordinates=scalar_coordinates
+    Omega_e3_Omega_trchi = _differentiate_u(
+        Omega_trchi, u, axis=1, scalar_coordinates=scalar_coordinates
     ) + np.einsum(
         "n...i,n...i->n...",
-        state.shift,
-        scalar_gradient(grid, weighted_tr_chi),
+        state.b,
+        scalar_gradient(grid, Omega_trchi),
     )
     omegab_source = 0.25 * (
         shear_dot
-        + 0.5 * weighted_tr_chi * weighted_tr_chib
-        - 4.0 * state.omega**2 * eta_etab
-        + d3_weighted_tr_chi
-        - 2.0 * state.omega**2 * div_eta
+        + 0.5 * Omega_trchi * Omega_trchib
+        - 4.0 * state.Omega**2 * eta_etab
+        + Omega_e3_Omega_trchi
+        - 2.0 * state.Omega**2 * div_eta
     )
     omegab_source = _project_scalar(
         angular,
@@ -2031,7 +2036,7 @@ def picard_step(
         "weighted_omegab_half_source",
     )
     _require_finite(
-        "incoming-lapse half source", omegab_source=omegab_source
+        "incoming-Omega half source", omegab_source=omegab_source
     )
     incoming_data = {} if incoming is None else incoming
 
@@ -2040,7 +2045,7 @@ def picard_step(
         return np.broadcast_to(value, template[:, :, 0].shape)
 
     new_weighted_omegab_half = incoming_face(
-        "weighted_omegab", state.weighted_omegab
+        "Omega_omegab", state.Omega_omegab
     )[:, :, None] + _integrate_v(
         omegab_source, v, axis=2, scalar_coordinates=scalar_coordinates
     )
@@ -2051,16 +2056,16 @@ def picard_step(
         "weighted_omegab_half_state",
     )
     _require_finite(
-        "incoming-lapse half integration",
+        "incoming-Omega half integration",
         weighted_omegab_half=new_weighted_omegab_half,
     )
-    if "weighted_omegab" in boundary:
+    if "Omega_omegab" in boundary:
         # On the imposed outgoing boundary b^(i+1)=b^i, so the full and
         # half-step coefficients coincide.
         new_weighted_omegab_half[:, 0] = np.asarray(
-            boundary["weighted_omegab"]
+            boundary["Omega_omegab"]
         )
-    boundary_omega = np.asarray(boundary.get("omega", 1.0))
+    boundary_omega = np.asarray(boundary.get("Omega", 1.0))
     if u_integrator == "rk4":
         new_omega = solve_log_omega(
             grid,
@@ -2089,11 +2094,11 @@ def picard_step(
         if log_omega_result.auxiliary is None:
             raise AssertionError("the tau log(Omega) solve omitted Omega")
         new_log_omega = log_omega_result.values
-        new_omega = np.asarray(log_omega_result.auxiliary["omega"])
-        record_u_sdc("log_omega", log_omega_result)
-    incoming_log_omega = incoming_data.get("log_omega")
-    if incoming_log_omega is None and "omega" in incoming_data:
-        incoming_log_omega = np.log(np.asarray(incoming_data["omega"]))
+        new_omega = np.asarray(log_omega_result.auxiliary["Omega"])
+        record_u_sdc("log_Omega", log_omega_result)
+    incoming_log_omega = incoming_data.get("log_Omega")
+    if incoming_log_omega is None and "Omega" in incoming_data:
+        incoming_log_omega = np.log(np.asarray(incoming_data["Omega"]))
     incoming_lapse_mismatch = 0.0
     if incoming_log_omega is not None:
         prescribed_log_omega = np.broadcast_to(
@@ -2111,10 +2116,10 @@ def picard_step(
         # from a separately relaxed Omega*omegab coefficient.
         new_log_omega[:, :, 0] = prescribed_log_omega
         new_omega[:, :, 0] = np.exp(prescribed_log_omega)
-    _require_finite("lapse solve", omega=new_omega)
+    _require_finite("Omega solve", Omega=new_omega)
     if float(np.min(new_omega)) <= 0.0:
         raise FloatingPointError(
-            "lapse solve left the positive cone: "
+            "Omega solve left the positive cone: "
             f"min(Omega)={float(np.min(new_omega)):.12g}"
         )
     if u_integrator == "rk4":
@@ -2124,7 +2129,7 @@ def picard_step(
             omegab_source,
             new_omega,
             u,
-            initial_value=np.asarray(boundary.get("weighted_omega", 0.0)),
+            initial_value=np.asarray(boundary.get("Omega_omega", 0.0)),
             angular=angular,
             projection_tails=projection_tails,
             transport_cfl=transport_cfl,
@@ -2136,7 +2141,7 @@ def picard_step(
             half,
             new_log_omega,
             scalar_coordinates,
-            np.asarray(boundary.get("weighted_omega", 0.0)),
+            np.asarray(boundary.get("Omega_omega", 0.0)),
             angular=angular,
             projection_tails=projection_tails,
             tolerance=u_sdc_tolerance,
@@ -2147,34 +2152,34 @@ def picard_step(
             maximum_corrections=u_sdc_maximum_corrections,
         )
         new_weighted_omega = weighted_omega_result.values
-        record_u_sdc("weighted_omega", weighted_omega_result)
+        record_u_sdc("Omega_omega", weighted_omega_result)
         if weighted_omega_result.auxiliary is None:
             raise AssertionError(
-                "the tau weighted-omega solve omitted its fresh source traces"
+                "the tau weighted-Omega solve omitted its fresh source traces"
             )
     _require_finite(
-        "outgoing-lapse-coefficient solve",
-        weighted_omega=new_weighted_omega,
+        "outgoing-Omega-coefficient solve",
+        Omega_omega=new_weighted_omega,
     )
 
     div_half = tensor_divergence(
-        grid, half, geometry["difference"], geometry["inverse"]
+        grid, half, geometry["difference"], geometry["inverse_g"]
     )
     grad_weighted_omega = scalar_gradient(grid, new_weighted_omega)
-    grad_weighted_tr_chi = scalar_gradient(grid, weighted_tr_chi)
+    grad_weighted_tr_chi = scalar_gradient(grid, Omega_trchi)
     grad_log_new_omega = scalar_gradient(grid, np.log(new_omega))
-    half_zeta = np.einsum("n...ij,n...j->n...i", half, state.zeta_up)
+    half_zeta = np.einsum("n...ij,n...j->n...i", half, state.zeta)
     zeta_source = (
-        -2.0 * weighted_tr_chi[..., None] * state.zeta_up
-        - 2.0 * np.einsum("n...ij,n...j->n...i", inverse, half_zeta)
+        -2.0 * Omega_trchi[..., None] * state.zeta
+        - 2.0 * np.einsum("n...ij,n...j->n...i", inverse_g, half_zeta)
         + 2.0 * np.einsum(
-            "n...ij,n...j->n...i", inverse, grad_weighted_omega
+            "n...ij,n...j->n...i", inverse_g, grad_weighted_omega
         )
-        + np.einsum("n...ij,n...j->n...i", inverse, div_half)
+        + np.einsum("n...ij,n...j->n...i", inverse_g, div_half)
         - 0.5
-        * np.einsum("n...ij,n...j->n...i", inverse, grad_weighted_tr_chi)
-        + weighted_tr_chi[..., None]
-        * np.einsum("n...ij,n...j->n...i", inverse, grad_log_new_omega)
+        * np.einsum("n...ij,n...j->n...i", inverse_g, grad_weighted_tr_chi)
+        + Omega_trchi[..., None]
+        * np.einsum("n...ij,n...j->n...i", inverse_g, grad_log_new_omega)
     )
     zeta_source = _project_vector(
         angular,
@@ -2184,7 +2189,7 @@ def picard_step(
     )
     _require_finite("zeta source", zeta_source=zeta_source)
     new_zeta = incoming_face(
-        "zeta_up", state.zeta_up
+        "zeta", state.zeta
     )[:, :, None] + _integrate_v(
         zeta_source, v, axis=2, scalar_coordinates=scalar_coordinates
     )
@@ -2208,7 +2213,7 @@ def picard_step(
         "shift_rhs",
     )
     new_shift = incoming_face(
-        "shift", state.shift
+        "b", state.b
     )[:, :, None] + _integrate_v(
         shift_source, v, axis=2, scalar_coordinates=scalar_coordinates
     )
@@ -2219,23 +2224,21 @@ def picard_step(
             projection_tails,
             "shift_state",
         )
-    _require_finite("shift integration", shift=new_shift)
-    incoming_q = incoming_data.get("expansion")
-    if "weighted_tr_chi" in incoming_data:
-        prescribed_weighted_tr_chi = np.broadcast_to(
-            np.asarray(incoming_data["weighted_tr_chi"]),
-            state.q[:, :, 0].shape,
-        )
-        incoming_q = (
-            prescribed_weighted_tr_chi / new_omega[:, :, 0] ** 2
+    _require_finite("b integration", b=new_shift)
+    incoming_Omega_trchi = incoming_data.get("Omega_trchi", incoming_data.get("Omega_trchi"))
+    if "Omega_trchi" in incoming_data:
+        incoming_Omega_trchi = np.broadcast_to(
+            np.asarray(incoming_data["Omega_trchi"]),
+            state.Omega_trchi[:, :, 0].shape,
         )
     if metric_integrator == "rk4":
         excision_diagnostics: dict[str, object] = {}
-        new_metric, new_q, new_shear = solve_metric_and_expansion(
+        new_metric, new_Omega_trchi, new_shear = solve_metric_and_expansion(
             grid,
             state,
             half,
             new_omega,
+            new_weighted_omega,
             u,
             v,
             substeps=metric_substeps,
@@ -2243,23 +2246,23 @@ def picard_step(
             projection_tails=projection_tails,
             scalar_coordinates=scalar_coordinates,
             metric_parameterization=metric_parameterization,
-            initial_metric=incoming_data.get("metric"),
-            initial_q=incoming_q,
+            initial_metric=incoming_data.get("g"),
+            initial_Omega_trchi=incoming_Omega_trchi,
             expansion_excision_threshold=expansion_excision_threshold,
             excision_diagnostics=excision_diagnostics,
         )
         metric_sdc_diagnostics: list[dict[str, float | int | bool]] = []
     elif metric_integrator == "sdc":
         if scalar_coordinates is None:
-            raise ValueError("the SDC metric integrator requires an LGL mesh")
+            raise ValueError("the SDC g integrator requires an LGL mesh")
         if metric_parameterization != "cholesky":
             raise ValueError(
-                "the SDC pilot currently requires the Cholesky metric "
+                "the SDC pilot currently requires the Cholesky g "
                 "parameterization"
             )
         (
             new_metric,
-            new_q,
+            new_Omega_trchi,
             new_shear,
             metric_sdc_diagnostics,
         ) = solve_metric_and_expansion_sdc(
@@ -2267,6 +2270,7 @@ def picard_step(
             state,
             half,
             new_omega,
+            new_weighted_omega,
             u,
             v,
             scalar_coordinates,
@@ -2279,17 +2283,17 @@ def picard_step(
     else:
         raise ValueError("metric_integrator must be 'rk4' or 'sdc'")
     _require_finite(
-        "metric/Raychaudhuri solve",
-        metric=new_metric,
-        q=new_q,
-        shear=new_shear,
+        "g/Raychaudhuri solve",
+        g=new_metric,
+        Omega_trchi=new_Omega_trchi,
+        Omega_chih=new_shear,
     )
-    boundary_inverse = np.asarray(boundary["inverse"])
+    boundary_inverse = np.asarray(boundary["inverse_g"])
     metric_boundary_difference = new_metric[:, 0] - np.asarray(
-        boundary["metric"]
+        boundary["g"]
     )
     shear_boundary_difference = new_shear[:, 0] - np.asarray(
-        boundary["shear"]
+        boundary["Omega_chih"]
     )
     boundary_mismatch = {
         "metric_maximum": float(
@@ -2306,7 +2310,7 @@ def picard_step(
         ),
         "expansion_maximum": float(
             np.max(
-                np.abs(new_q[:, 0] - np.asarray(boundary["expansion"]))
+                np.abs(new_Omega_trchi[:, 0] - np.asarray(boundary["Omega_trchi"]))
             )
         ),
         "shear_maximum": float(
@@ -2332,17 +2336,17 @@ def picard_step(
                             np.einsum(
                                 "nvi,nvij,nvj->nv",
                                 new_zeta[:, 0]
-                                - np.asarray(boundary["zeta_up"]),
-                                np.asarray(boundary["metric"]),
+                                - np.asarray(boundary["zeta"]),
+                                np.asarray(boundary["g"]),
                                 new_zeta[:, 0]
-                                - np.asarray(boundary["zeta_up"]),
+                                - np.asarray(boundary["zeta"]),
                             ),
                             0.0,
                         )
                     )
                 )
             )
-            if "zeta_up" in boundary
+            if "zeta" in boundary
             else 0.0
         ),
         "shift_maximum": (
@@ -2353,32 +2357,32 @@ def picard_step(
                             np.einsum(
                                 "nvi,nvij,nvj->nv",
                                 new_shift[:, 0]
-                                - np.asarray(boundary["shift"]),
-                                np.asarray(boundary["metric"]),
+                                - np.asarray(boundary["b"]),
+                                np.asarray(boundary["g"]),
                                 new_shift[:, 0]
-                                - np.asarray(boundary["shift"]),
+                                - np.asarray(boundary["b"]),
                             ),
                             0.0,
                         )
                     )
                 )
             )
-            if "shift" in boundary
+            if "b" in boundary
             else 0.0
         ),
     }
-    new_metric[:, 0] = np.asarray(boundary["metric"])
-    new_q[:, 0] = np.asarray(boundary["expansion"])
-    new_shear[:, 0] = np.asarray(boundary["shear"])
+    new_metric[:, 0] = np.asarray(boundary["g"])
+    new_Omega_trchi[:, 0] = np.asarray(boundary["Omega_trchi"])
+    new_shear[:, 0] = np.asarray(boundary["Omega_chih"])
     new_omega[:, 0] = boundary_omega
-    if "zeta_up" in boundary:
-        new_zeta[:, 0] = np.asarray(boundary["zeta_up"])
-    if "shift" in boundary:
-        new_shift[:, 0] = np.asarray(boundary["shift"])
+    if "zeta" in boundary:
+        new_zeta[:, 0] = np.asarray(boundary["zeta"])
+    if "b" in boundary:
+        new_shift[:, 0] = np.asarray(boundary["b"])
     new_weighted_omega[:, 0] = np.asarray(
-        boundary.get("weighted_omega", 0.0)
+        boundary.get("Omega_omega", 0.0)
     )
-    # Convert the half iterate in D3 log(Omega) into the full geometric
+    # Convert the half iterate in Omega e_3 log(Omega) into the full geometric
     # coefficient.  This is the value that must be stored and transferred to
     # the next characteristic slab.
     new_weighted_omegab, omegab_full_source = complete_weighted_omegab(
@@ -2394,8 +2398,8 @@ def picard_step(
         projection_tails=projection_tails,
     )
     _require_finite(
-        "full incoming-lapse coefficient",
-        weighted_omegab=new_weighted_omegab,
+        "full incoming-Omega coefficient",
+        Omega_omegab=new_weighted_omegab,
         omegab_full_source=omegab_full_source,
     )
 
@@ -2405,32 +2409,32 @@ def picard_step(
         new_omega,
         new_zeta,
         new_shift,
-        new_q,
+        new_Omega_trchi,
         new_shear,
         u,
         v,
         angular=angular,
         projection_tails=projection_tails,
         scalar_coordinates=scalar_coordinates,
-        initial_value=incoming_data.get("weighted_chib"),
+        initial_value=incoming_data.get("Omega_chib"),
     )
     _require_finite(
         "incoming-second-form solve",
-        weighted_chib=new_weighted_chib,
+        Omega_chib=new_weighted_chib,
         chib_source=chib_source,
     )
-    if "weighted_chib" in boundary:
-        new_weighted_chib[:, 0] = np.asarray(boundary["weighted_chib"])
+    if "Omega_chib" in boundary:
+        new_weighted_chib[:, 0] = np.asarray(boundary["Omega_chib"])
     new_state = FirstOrderState(
-        metric=new_metric,
-        omega=new_omega,
-        zeta_up=new_zeta,
-        shift=new_shift,
-        q=new_q,
-        shear=new_shear,
-        weighted_chib=new_weighted_chib,
-        weighted_omega=new_weighted_omega,
-        weighted_omegab=new_weighted_omegab,
+        g=new_metric,
+        Omega=new_omega,
+        zeta=new_zeta,
+        b=new_shift,
+        Omega_trchi=new_Omega_trchi,
+        Omega_chih=new_shear,
+        Omega_chib=new_weighted_chib,
+        Omega_omega=new_weighted_omega,
+        Omega_omegab=new_weighted_omegab,
     )
     validate_state(grid, new_state)
     # Retain the actual semidiscrete endpoint sources used by the Galerkin
@@ -2441,14 +2445,13 @@ def picard_step(
     new_shear_norm_sq = tensor_norm_sq(new_shear, new_inverse)
     raychaudhuri_source = _project_scalar(
         angular,
-        -0.5 * new_omega**2 * new_q**2
-        - new_shear_norm_sq / new_omega**2,
+        -0.5 * new_Omega_trchi**2
+        - 4.0 * new_weighted_omega * new_Omega_trchi
+        - new_shear_norm_sq,
     )
     metric_source = _project_sym2(
         angular,
-        new_omega[..., None, None] ** 2
-        * new_q[..., None, None]
-        * new_metric
+        new_Omega_trchi[..., None, None] * new_metric
         + 2.0 * new_shear,
     )
     if not compute_incoming_metric_closure:
@@ -2539,46 +2542,46 @@ def picard_step(
         ),
         "weighted_omega_fresh_v_source_semantics": (
             "distinct left/right one-sided tau traces actually used by the "
-            "weighted-omega composite-element RHS; never interface-averaged"
+            "weighted-Omega composite-element RHS; never interface-averaged"
         ),
     }
 
 
 def validate_state(grid: PointSphereGrid, state: FirstOrderState) -> None:
     local = np.einsum(
-        "nia,n...ij,njb->n...ab", grid.frames, state.metric, grid.frames
+        "nia,n...ij,njb->n...ab", grid.frames, state.g, grid.frames
     )
     eigenvalues = np.linalg.eigvalsh(local)
     arrays = (
-        state.metric,
-        state.omega,
-        state.q,
-        state.weighted_chib,
-        state.weighted_omega,
-        state.weighted_omegab,
+        state.g,
+        state.Omega,
+        state.Omega_trchi,
+        state.Omega_chib,
+        state.Omega_omega,
+        state.Omega_omegab,
     )
     if not all(np.all(np.isfinite(value)) for value in arrays):
         raise FloatingPointError("numerical state contains nonfinite values")
-    if float(np.min(eigenvalues)) <= 0.0 or float(np.min(state.omega)) <= 0.0:
+    if float(np.min(eigenvalues)) <= 0.0 or float(np.min(state.Omega)) <= 0.0:
         raise FloatingPointError(
             "numerical state left the positive region: "
             f"min(g)={float(np.min(eigenvalues)):.6g}, "
-            f"min(Omega)={float(np.min(state.omega)):.6g}"
+            f"min(Omega)={float(np.min(state.Omega)):.6g}"
         )
 
 
 def update_norm(new: FirstOrderState, old: FirstOrderState) -> float:
     values = []
     for name in (
-        "metric",
-        "omega",
-        "zeta_up",
-        "shift",
-        "q",
-        "shear",
-        "weighted_chib",
-        "weighted_omega",
-        "weighted_omegab",
+        "g",
+        "Omega",
+        "zeta",
+        "b",
+        "Omega_trchi",
+        "Omega_chih",
+        "Omega_chib",
+        "Omega_omega",
+        "Omega_omegab",
     ):
         current = getattr(new, name)
         previous = getattr(old, name)
@@ -2590,17 +2593,17 @@ def update_norm(new: FirstOrderState, old: FirstOrderState) -> float:
 def update_map(new: FirstOrderState, old: FirstOrderState) -> Array:
     """Return a normalized Picard-update RMS on every (u,v) section."""
 
-    result = np.zeros(new.q.shape[1:], dtype=float)
+    result = np.zeros(new.Omega_trchi.shape[1:], dtype=float)
     for name in (
-        "metric",
-        "omega",
-        "zeta_up",
-        "shift",
-        "q",
-        "shear",
-        "weighted_chib",
-        "weighted_omega",
-        "weighted_omegab",
+        "g",
+        "Omega",
+        "zeta",
+        "b",
+        "Omega_trchi",
+        "Omega_chih",
+        "Omega_chib",
+        "Omega_omega",
+        "Omega_omegab",
     ):
         current = getattr(new, name)
         previous = getattr(old, name)

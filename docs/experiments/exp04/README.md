@@ -2,21 +2,20 @@
 
 ## Setup
 
-A low-band outgoing shear pulse of unit strength and divisor 3.2 is evolved to
+A low-band outgoing Omega_chih pulse of unit strength and divisor 3.2 is evolved to
 \(v=0.005\) with \(L=10,W=20\), 550 angular points, four square-root coordinate
 elements, and six complete Picard sweeps. The identical zero-strength run is a
 control.
 
 ## Result and limitation
 
-The strong and numerical-zero runs complete all sweeps. Eleven settled-state
-arrays containing 11,416,400 values pass the same-grid array gate, with maximum
-absolute difference \(8.88\times10^{-16}\). An exact Minkowski component audit
-is bitwise identical. The strong-pulse independently masked component sum is
-0.0395199919.
+The fresh strong and numerical-zero runs complete all six sweeps. Their final
+weighted updates are \(1.68823\times10^{-10}\) and
+\(2.92684\times10^{-13}\), respectively. Every boundary SDC element is
+accepted; the strong-pulse maximum collocation and overgrid defects are
+\(6.36\times10^{-16}\) and \(1.47\times10^{-8}\).
 
-The reconstructed component summary differs from the retained summary by up to
-\(1.02\times10^{-7}\) absolute and \(5.26\times10^{-5}\) relative because tiny
-state perturbations are amplified by coordinate differentiation. The state
-array gate passes, but the residual-summary replay gate does not; this is
-reported without widening the tolerance.
+On the protected independent four-metric audit, the strong-pulse combined
+residual is 0.00245259. The numerical zero control is
+\(1.05944\times10^{-6}\) on the broadest protected region and decreases to
+\(1.11450\times10^{-7}\) away from the short-pulse endpoint.

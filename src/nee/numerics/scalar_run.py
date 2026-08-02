@@ -78,18 +78,18 @@ def save_state(
     arrays = {
         name: getattr(state, name)
         for name in (
-            "metric",
-            "omega",
-            "zeta_up",
-            "shift",
-            "q",
-            "shear",
-            "weighted_chib",
-            "weighted_omega",
-            "weighted_omegab",
+            "g",
+            "Omega",
+            "zeta",
+            "b",
+            "Omega_trchi",
+            "Omega_chih",
+            "Omega_chib",
+            "Omega_omega",
+            "Omega_omegab",
             "phi",
-            "scalar_p",
-            "incoming_scalar",
+            "Omega_e4phi",
+            "Omega_e3phi",
         )
     }
     arrays["u"] = u
@@ -153,16 +153,16 @@ def run(
             "update_norm": change,
             "update_map_maximum": float(np.max(change_map)),
             "residual": summary,
-            "minimum_q": float(np.min(state.q)),
-            "maximum_q": float(np.max(state.q)),
-            "minimum_omega": float(np.min(state.omega)),
+            "minimum_Omega_trchi": float(np.min(state.Omega_trchi)),
+            "maximum_Omega_trchi": float(np.max(state.Omega_trchi)),
+            "minimum_omega": float(np.min(state.Omega)),
             "minimum_metric_eigenvalue": float(
                 np.min(
                     np.linalg.eigvalsh(
                         np.einsum(
                             "nia,n...ij,njb->n...ab",
                             grid.frames,
-                            state.metric,
+                            state.g,
                             grid.frames,
                         )
                     )

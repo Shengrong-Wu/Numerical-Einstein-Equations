@@ -107,11 +107,11 @@ def _construction_omegab(
     context: dict[str, object],
     grad_log_omega: Array,
 ) -> dict[str, Array]:
-    """Recover the full integer-step incoming lapse coefficient.
+    """Recover the full integer-step incoming Omega coefficient.
 
     The context is produced by ``PicardStep(S^N)`` and therefore constructs
     the supplied ``state=S^(N+1)``.  Its half iterate is not a geometric Ricci
-    coefficient.  We independently apply the shift correction here, then
+    coefficient.  We independently apply the b correction here, then
     verify the duplicated full value/source stored by the sweep.  A modal
     Galerkin run projects the corrected products once more; in that case the
     stored projected values are authoritative and the raw-to-projected
@@ -122,16 +122,16 @@ def _construction_omegab(
     half_source = _context_array(
         context, "omegab_half_source", "omegab_source"
     )
-    shift_difference = state.shift - previous_state.shift
+    shift_difference = state.b - previous_state.b
     full_raw = half - 0.5 * np.einsum(
         "n...i,n...i->n...", shift_difference, grad_log_omega
     )
 
-    new_shift_source = -4.0 * state.omega[..., None] ** 2 * state.zeta_up
+    new_shift_source = -4.0 * state.Omega[..., None] ** 2 * state.zeta
     old_shift_source = (
         -4.0
-        * previous_state.omega[..., None] ** 2
-        * previous_state.zeta_up
+        * previous_state.Omega[..., None] ** 2
+        * previous_state.zeta
     )
     shift_source_difference = new_shift_source - old_shift_source
     full_source_raw = half_source - 0.5 * (
@@ -144,22 +144,22 @@ def _construction_omegab(
         * np.einsum(
             "n...i,n...i->n...",
             shift_difference,
-            scalar_gradient(grid, state.weighted_omega),
+            scalar_gradient(grid, state.Omega_omega),
         )
     )
 
     full = _context_array(context, "weighted_omegab_full")
     full_source = _context_array(context, "omegab_full_source")
     _assert_roundoff_match(
-        "S^(N+1).weighted_omegab versus context full iterate",
-        state.weighted_omegab,
+        "S^(N+1).Omega_omegab versus context full iterate",
+        state.Omega_omegab,
         full,
     )
     if not _context_applied_angular_projection(
         context, "weighted_omegab_full"
     ):
         _assert_roundoff_match(
-            "full weighted_omegab reconstructed from the half iterate",
+            "full Omega_omegab reconstructed from the half iterate",
             full,
             full_raw,
         )
@@ -167,7 +167,7 @@ def _construction_omegab(
         context, "weighted_omegab_full_source"
     ):
         _assert_roundoff_match(
-            "full weighted_omegab source reconstructed from the half source",
+            "full Omega_omegab source reconstructed from the half source",
             full_source,
             full_source_raw,
         )
@@ -201,46 +201,46 @@ def _differentiate_v(
     return scalar_coordinates.differentiate_v(value, axis=2)
 
 
-def _d3_scalar(
+def _Omega_e3_scalar(
     grid: PointSphereGrid,
     scalar: Array,
-    shift: Array,
+    b: Array,
     u: Array,
     scalar_coordinates: CharacteristicLGLMesh | None,
 ) -> Array:
     return _differentiate_u(scalar, u, scalar_coordinates) + np.einsum(
-        "n...i,n...i->n...", shift, scalar_gradient(grid, scalar)
+        "n...i,n...i->n...", b, scalar_gradient(grid, scalar)
     )
 
 
-def _d3_one_form(
+def _Omega_nabla3_one_form(
     grid: PointSphereGrid,
     form: Array,
-    shift: Array,
+    b: Array,
     weighted_chib_mixed: Array,
     u: Array,
     scalar_coordinates: CharacteristicLGLMesh | None,
 ) -> Array:
     coordinate_lie = _differentiate_u(form, u, scalar_coordinates)
-    coordinate_lie += one_form_lie_derivative(grid, shift, form)
+    coordinate_lie += one_form_lie_derivative(grid, b, form)
     return coordinate_lie - np.einsum(
         "n...ij,n...j->n...i", weighted_chib_mixed, form
     )
 
 
-def _d3_covariant_tensor(
+def _Omega_nabla3_covariant_tensor(
     grid: PointSphereGrid,
     tensor: Array,
-    shift: Array,
+    b: Array,
     weighted_chib_mixed: Array,
     u: Array,
     scalar_coordinates: CharacteristicLGLMesh | None,
 ) -> Array:
     coordinate_lie = _differentiate_u(tensor, u, scalar_coordinates)
     derivative_tensor = grid.reference_derivative(tensor, tensor_rank=2)
-    derivative_shift = grid.reference_derivative(shift, tensor_rank=1)
+    derivative_shift = grid.reference_derivative(b, tensor_rank=1)
     coordinate_lie += np.einsum(
-        "n...k,n...kij->n...ij", shift, derivative_tensor
+        "n...k,n...kij->n...ij", b, derivative_tensor
     )
     coordinate_lie += np.einsum(
         "n...kj,n...ik->n...ij", tensor, derivative_shift
@@ -272,17 +272,17 @@ def components(
     ``mode="construction"`` evaluates the Picard residual on
     ``state=S^(N+1)`` using the context returned by the *same* sweep
     ``PicardStep(S^N) -> (S^(N+1), context^N)``.  The supplied
-    ``previous_state`` is therefore ``S^N``.  The half-step incoming lapse
+    ``previous_state`` is therefore ``S^N``.  The half-step incoming Omega
     coefficient is converted to its full geometric value before it enters
     Ric33 or Ric3A.  Context/state invariants reject the common off-by-one
     mistake of evaluating ``S^N`` with ``context^N``.
 
     Construction sources replace only the v derivatives that their ODEs
-    actually constructed.  All D3 and angular terms remain current-state
+    actually constructed.  All Omega e_3 and angular terms remain current-state
     calculations, so the result still measures Picard and compatibility
     defects.  Fresh v differentiation is retained in separately named
     closure diagnostics.
-    ``mode="fresh"`` reconstructs both null lapse coefficients by
+    ``mode="fresh"`` reconstructs both null Omega coefficients by
     differentiating ``log(Omega)``.  The
     ``mode="established"`` is retained so existing experiment summaries
     remain reproducible.
@@ -300,53 +300,53 @@ def components(
     # The intrinsic Gauss curvature is needed only for the angular trace
     # sector.  Callers auditing the five first-order Ricci-coefficient
     # components can disable it and thereby avoid every second derivative of
-    # the section metric.
+    # the section g.
     geometry = section_geometry(
         grid, state, include_curvature=include_gauss_curvature
     )
-    inverse = geometry["inverse"]
-    omega = state.omega
-    omega_sq = omega**2
-    weighted_tr_chi = omega_sq * state.q
-    weighted_tr_chib = geometry["weighted_tr_chib"]
-    weighted_hatchib = geometry["weighted_hatchib"]
-    weighted_chib_mixed = np.matmul(state.weighted_chib, inverse)
+    inverse_g = geometry["inverse_g"]
+    Omega = state.Omega
+    omega_sq = Omega**2
+    Omega_trchi = state.Omega_trchi
+    Omega_trchib = geometry["Omega_trchib"]
+    Omega_chibh = geometry["Omega_chibh"]
+    weighted_chib_mixed = np.matmul(state.Omega_chib, inverse_g)
 
-    log_omega = np.log(omega)
-    grad_log_omega = scalar_gradient(grid, log_omega)
-    zeta = np.einsum("n...ij,n...j->n...i", state.metric, state.zeta_up)
+    log_Omega = np.log(Omega)
+    grad_log_omega = scalar_gradient(grid, log_Omega)
+    zeta = np.einsum("n...ij,n...j->n...i", state.g, state.zeta)
     eta = geometry["eta"]
     etab = geometry["etab"]
-    eta_up = np.einsum("n...ij,n...j->n...i", inverse, eta)
-    etab_up = np.einsum("n...ij,n...j->n...i", inverse, etab)
+    eta_up = np.einsum("n...ij,n...j->n...i", inverse_g, eta)
+    etab_up = np.einsum("n...ij,n...j->n...i", inverse_g, etab)
     div_eta = vector_divergence(grid, eta_up, geometry["difference"])
     div_etab = vector_divergence(grid, etab_up, geometry["difference"])
-    eta_norm = np.einsum("n...i,n...ij,n...j->n...", eta, inverse, eta)
-    etab_norm = np.einsum("n...i,n...ij,n...j->n...", etab, inverse, etab)
-    eta_etab = np.einsum("n...i,n...ij,n...j->n...", eta, inverse, etab)
+    eta_norm = np.einsum("n...i,n...ij,n...j->n...", eta, inverse_g, eta)
+    etab_norm = np.einsum("n...i,n...ij,n...j->n...", etab, inverse_g, etab)
+    eta_etab = np.einsum("n...i,n...ij,n...j->n...", eta, inverse_g, etab)
 
-    d3_weighted_tr_chi = _d3_scalar(
-        grid, weighted_tr_chi, state.shift, u, scalar_coordinates
+    Omega_e3_Omega_trchi = _Omega_e3_scalar(
+        grid, Omega_trchi, state.b, u, scalar_coordinates
     )
-    d3_weighted_tr_chib = _d3_scalar(
-        grid, weighted_tr_chib, state.shift, u, scalar_coordinates
+    Omega_e3_Omega_trchib = _Omega_e3_scalar(
+        grid, Omega_trchib, state.b, u, scalar_coordinates
     )
-    d3_shear = _d3_covariant_tensor(
-        grid, state.shear, state.shift, weighted_chib_mixed, u, scalar_coordinates
+    Omega_nabla3_Omega_chih = _Omega_nabla3_covariant_tensor(
+        grid, state.Omega_chih, state.b, weighted_chib_mixed, u, scalar_coordinates
     )
-    d3_zeta = _d3_one_form(
-        grid, zeta, state.shift, weighted_chib_mixed, u, scalar_coordinates
+    Omega_nabla3_zeta = _Omega_nabla3_one_form(
+        grid, zeta, state.b, weighted_chib_mixed, u, scalar_coordinates
     )
     raw_metric_v = (
-        weighted_tr_chi[..., None, None] * state.metric
-        + 2.0 * state.shear
+        Omega_trchi[..., None, None] * state.g
+        + 2.0 * state.Omega_chih
     )
     d4_zeta_fresh = _differentiate_v(zeta, v, scalar_coordinates)
     d4_weighted_omegab_fresh = _differentiate_v(
-        state.weighted_omegab, v, scalar_coordinates
+        state.Omega_omegab, v, scalar_coordinates
     )
     d4_weighted_tr_chib_fresh = _differentiate_v(
-        weighted_tr_chib, v, scalar_coordinates
+        Omega_trchib, v, scalar_coordinates
     )
     omegab_data: dict[str, Array] | None = None
     if mode == "construction":
@@ -359,90 +359,90 @@ def components(
             construction_context,
             grad_log_omega,
         )
-        weighted_omegab = omegab_data["value"]
+        Omega_omegab = omegab_data["value"]
         d4_weighted_omegab = omegab_data["source"]
-        weighted_omega = state.weighted_omega
+        Omega_omega = state.Omega_omega
         projected_zeta_source = _project_tangent_vector(
             grid, _context_array(construction_context, "zeta_source")
         )
         # Lower the newly constructed contravariant zeta with the current
-        # metric.  The metric factor obeys its all-current kinematic equation;
+        # g.  The g factor obeys its all-current kinematic equation;
         # a separately returned diagnostic records any Galerkin projection
-        # defect in the stored metric source.
+        # defect in the stored g source.
         d4_zeta_coordinate = np.einsum(
-            "n...ij,n...j->n...i", raw_metric_v, state.zeta_up
+            "n...ij,n...j->n...i", raw_metric_v, state.zeta
         ) + np.einsum(
-            "n...ij,n...j->n...i", state.metric, projected_zeta_source
+            "n...ij,n...j->n...i", state.g, projected_zeta_source
         )
     elif mode == "fresh":
-        weighted_omegab = -0.5 * _d3_scalar(
-            grid, log_omega, state.shift, u, scalar_coordinates
+        Omega_omegab = -0.5 * _Omega_e3_scalar(
+            grid, log_Omega, state.b, u, scalar_coordinates
         )
-        weighted_omega = -0.5 * _differentiate_v(
-            log_omega, v, scalar_coordinates
+        Omega_omega = -0.5 * _differentiate_v(
+            log_Omega, v, scalar_coordinates
         )
         d4_weighted_omegab = _differentiate_v(
-            weighted_omegab, v, scalar_coordinates
+            Omega_omegab, v, scalar_coordinates
         )
         d4_zeta_coordinate = d4_zeta_fresh
     else:
-        weighted_omegab = state.weighted_omegab
-        weighted_omega = state.weighted_omega
+        Omega_omegab = state.Omega_omegab
+        Omega_omega = state.Omega_omega
         d4_weighted_omegab = d4_weighted_omegab_fresh
         d4_zeta_coordinate = d4_zeta_fresh
 
     div_shear = tensor_divergence(
-        grid, state.shear, geometry["difference"], inverse
+        grid, state.Omega_chih, geometry["difference"], inverse_g
     )
     div_weighted_hatchib = tensor_divergence(
-        grid, weighted_hatchib, geometry["difference"], inverse
+        grid, Omega_chibh, geometry["difference"], inverse_g
     )
 
     weighted_ric33 = -(
-        d3_weighted_tr_chib
-        + 4.0 * weighted_omegab * weighted_tr_chib
-        + 0.5 * weighted_tr_chib**2
-        + tensor_norm_sq(weighted_hatchib, inverse)
+        Omega_e3_Omega_trchib
+        + 4.0 * Omega_omegab * Omega_trchib
+        + 0.5 * Omega_trchib**2
+        + tensor_norm_sq(Omega_chibh, inverse_g)
     )
     weighted_ric3 = (
-        d3_zeta
-        + 1.5 * weighted_tr_chib[..., None] * zeta
+        Omega_nabla3_zeta
+        + 1.5 * Omega_trchib[..., None] * zeta
         + np.einsum(
             "n...ij,n...j->n...i",
-            np.matmul(weighted_hatchib, inverse),
+            np.matmul(Omega_chibh, inverse_g),
             zeta,
         )
-        + 2.0 * scalar_gradient(grid, weighted_omegab)
+        + 2.0 * scalar_gradient(grid, Omega_omegab)
         + div_weighted_hatchib
-        - 0.5 * scalar_gradient(grid, weighted_tr_chib)
-        + weighted_tr_chib[..., None] * grad_log_omega
+        - 0.5 * scalar_gradient(grid, Omega_trchib)
+        + Omega_trchib[..., None] * grad_log_omega
     )
 
     # The displayed covariant formula simplifies to -partial_v(zeta_A)
     # - (Omega tr chi) zeta_A after expanding nabla_4 on a one-form.
     weighted_ric4 = (
         -d4_zeta_coordinate
-        - weighted_tr_chi[..., None] * zeta
-        + 2.0 * scalar_gradient(grid, weighted_omega)
+        - Omega_trchi[..., None] * zeta
+        + 2.0 * scalar_gradient(grid, Omega_omega)
         + div_shear
-        - 0.5 * scalar_gradient(grid, weighted_tr_chi)
-        + weighted_tr_chi[..., None] * grad_log_omega
+        - 0.5 * scalar_gradient(grid, Omega_trchi)
+        + Omega_trchi[..., None] * grad_log_omega
     )
 
     weighted_hat = (
-        d3_shear
-        + 0.5 * weighted_tr_chib[..., None, None] * state.shear
+        Omega_nabla3_Omega_chih
+        + 0.5 * Omega_trchib[..., None, None] * state.Omega_chih
         - omega_sq[..., None, None]
         * (geometry["eta_grad_hat"] + geometry["eta_square_hat"])
         + 0.5
-        * weighted_tr_chi[..., None, None]
-        * weighted_hatchib
+        * Omega_trchi[..., None, None]
+        * Omega_chibh
     )
-    weighted_hat = tensor_tracefree(weighted_hat, state.metric, inverse)
+    weighted_hat = tensor_tracefree(weighted_hat, state.g, inverse_g)
 
     trace_combo = (
-        d3_weighted_tr_chi
-        + weighted_tr_chi * weighted_tr_chib
+        Omega_e3_Omega_trchi
+        + Omega_trchi * Omega_trchib
         - 2.0 * omega_sq * div_eta
         - 2.0 * omega_sq * eta_norm
         + 2.0 * omega_sq * geometry["curvature"]
@@ -452,49 +452,55 @@ def components(
         chib_v = _project_symmetric_tangent_tensor(
             grid, _context_array(construction_context, "chib_source")
         )
-        inverse_v = -np.matmul(np.matmul(inverse, raw_metric_v), inverse)
-        d4_weighted_tr_chib = tensor_trace(chib_v, inverse) + np.einsum(
+        inverse_v = -np.matmul(np.matmul(inverse_g, raw_metric_v), inverse_g)
+        d4_weighted_tr_chib = tensor_trace(chib_v, inverse_g) + np.einsum(
             "n...ij,n...ij->n...",
             inverse_v,
-            state.weighted_chib,
+            state.Omega_chib,
         )
     else:
         d4_weighted_tr_chib = d4_weighted_tr_chib_fresh
     trace_combo_from_4 = (
         d4_weighted_tr_chib
-        + weighted_tr_chi * weighted_tr_chib
+        + Omega_trchi * Omega_trchib
         - 2.0 * omega_sq * div_etab
         - 2.0 * omega_sq * etab_norm
         + 2.0 * omega_sq * geometry["curvature"]
     )
     shear_dot = np.einsum(
         "n...ik,n...jl,n...ij,n...kl->n...",
-        inverse,
-        inverse,
-        state.shear,
-        weighted_hatchib,
+        inverse_g,
+        inverse_g,
+        state.Omega_chih,
+        Omega_chibh,
     )
     weighted_ric34 = (
         4.0 * d4_weighted_omegab
         - shear_dot
-        - 0.5 * weighted_tr_chi * weighted_tr_chib
+        - 0.5 * Omega_trchi * Omega_trchib
         + 4.0 * omega_sq * eta_etab
-        - d3_weighted_tr_chi
+        - Omega_e3_Omega_trchi
         + 2.0 * omega_sq * div_eta
     )
     weighted_scalar = trace_combo - weighted_ric34
-    shear_norm = tensor_norm_sq(state.shear, inverse)
-    ric44_fresh_closure = (
-        _differentiate_v(state.q, v, scalar_coordinates)
-        + 0.5 * omega_sq * state.q**2
-        + shear_norm / omega_sq
+    shear_norm = tensor_norm_sq(state.Omega_chih, inverse_g)
+    Omega2_ric44_fresh_closure = (
+        _differentiate_v(state.Omega_trchi, v, scalar_coordinates)
+        + 0.5 * state.Omega_trchi**2
+        + 4.0 * Omega_omega * state.Omega_trchi
+        + shear_norm
     )
+    ric44_fresh_closure = Omega2_ric44_fresh_closure / omega_sq
     if mode == "construction":
         assert construction_context is not None
-        ric44_construction_closure = (
+        Omega2_ric44_construction_closure = (
             _context_array(construction_context, "raychaudhuri_source")
-            + 0.5 * omega_sq * state.q**2
-            + shear_norm / omega_sq
+            + 0.5 * state.Omega_trchi**2
+            + 4.0 * Omega_omega * state.Omega_trchi
+            + shear_norm
+        )
+        ric44_construction_closure = (
+            Omega2_ric44_construction_closure / omega_sq
         )
     else:
         ric44_construction_closure = np.zeros_like(ric44_fresh_closure)
@@ -505,7 +511,7 @@ def components(
             np.maximum(
                 tensor_norm_sq(
                     metric_source - raw_metric_v,
-                    inverse,
+                    inverse_g,
                 ),
                 0.0,
             )
@@ -523,11 +529,11 @@ def components(
         zeta_source_closure = np.zeros_like(zeta)
         chib_trace_source_closure = np.zeros_like(ric44_fresh_closure)
     outgoing_lapse_closure = _differentiate_v(
-        log_omega, v, scalar_coordinates
-    ) + 2.0 * state.weighted_omega
+        log_Omega, v, scalar_coordinates
+    ) + 2.0 * state.Omega_omega
     incoming_lapse_closure = (
-        _d3_scalar(grid, log_omega, state.shift, u, scalar_coordinates)
-        + 2.0 * state.weighted_omegab
+        _Omega_e3_scalar(grid, log_Omega, state.b, u, scalar_coordinates)
+        + 2.0 * state.Omega_omegab
     )
     return {
         "Omega2_Ric33": weighted_ric33,
@@ -563,12 +569,12 @@ def components(
         "chib_trace_source_closure": chib_trace_source_closure,
         "d4_zeta_coordinate_used": d4_zeta_coordinate,
         "d4_weighted_tr_chib_used": d4_weighted_tr_chib,
-        "weighted_omega_used": weighted_omega,
-        "weighted_omegab_used": weighted_omegab,
+        "weighted_omega_used": Omega_omega,
+        "weighted_omegab_used": Omega_omegab,
         "weighted_omegab_full_raw": (
             omegab_data["raw_value"]
             if omegab_data is not None
-            else weighted_omegab
+            else Omega_omegab
         ),
         "omegab_full_source_raw": (
             omegab_data["raw_source"]
@@ -578,7 +584,7 @@ def components(
         "weighted_omegab_projection_defect": (
             omegab_data["value_projection_defect"]
             if omegab_data is not None
-            else np.zeros_like(weighted_omegab)
+            else np.zeros_like(Omega_omegab)
         ),
         "omegab_source_projection_defect": (
             omegab_data["source_projection_defect"]
@@ -594,9 +600,9 @@ def sphere_l2_maps(
     u: Array,
     values: dict[str, Array],
 ) -> dict[str, Array]:
-    inverse = tangent_inverse(grid, state.metric)
+    inverse_g = tangent_inverse(grid, state.g)
     local = np.einsum(
-        "nia,n...ij,njb->n...ab", grid.frames, state.metric, grid.frames
+        "nia,n...ij,njb->n...ab", grid.frames, state.g, grid.frames
     )
     area_ratio = np.sqrt(np.maximum(np.linalg.det(local), 0.0))
 
@@ -606,13 +612,13 @@ def sphere_l2_maps(
     def form_density(value: Array) -> Array:
         return np.sqrt(
             np.maximum(
-                np.einsum("n...i,n...ij,n...j->n...", value, inverse, value),
+                np.einsum("n...i,n...ij,n...j->n...", value, inverse_g, value),
                 0.0,
             )
         )
 
     def tensor_density(value: Array) -> Array:
-        return np.sqrt(np.maximum(tensor_norm_sq(value, inverse), 0.0))
+        return np.sqrt(np.maximum(tensor_norm_sq(value, inverse_g), 0.0))
 
     densities = {
         "r44": scalar_density(values["Ric44"]),
@@ -623,7 +629,7 @@ def sphere_l2_maps(
         # The displayed Ric4A identity naturally returns Omega*Ric4A.  The
         # attachment's later norm line asks for Omega^2*Ric4A, so retain both.
         "r4_Omega2": form_density(
-            state.omega[..., None] * values["Omega_Ric4A"]
+            state.Omega[..., None] * values["Omega_Ric4A"]
         ),
         "rhat": tensor_density(values["Omega2_hat_RicAB"]),
         "rR": scalar_density(values["Omega2_R"]),
@@ -657,14 +663,14 @@ def physical_component_l2_maps(
     comparable with ``f=(-u)||Ric||_L2``.
     """
 
-    inverse = tangent_inverse(grid, state.metric)
-    omega = state.omega
-    omega_sq = omega**2
+    inverse_g = tangent_inverse(grid, state.g)
+    Omega = state.Omega
+    omega_sq = Omega**2
     ric33 = values["Omega2_Ric33"] / omega_sq
     ric44 = values["Ric44"]
     ric34 = values["Omega2_Ric34"] / omega_sq
-    ric3 = values["Omega_Ric3A"] / omega[..., None]
-    ric4 = values["Omega_Ric4A"] / omega[..., None]
+    ric3 = values["Omega_Ric3A"] / Omega[..., None]
+    ric4 = values["Omega_Ric4A"] / Omega[..., None]
     hat_ab = values["Omega2_hat_RicAB"] / omega_sq[..., None, None]
     trace_ab = values["Omega2_R_plus_Ric34"] / omega_sq
     scalar = trace_ab - ric34
@@ -677,14 +683,14 @@ def physical_component_l2_maps(
         return np.sqrt(
             np.maximum(
                 np.einsum(
-                    "n...i,n...ij,n...j->n...", value, inverse, value
+                    "n...i,n...ij,n...j->n...", value, inverse_g, value
                 ),
                 0.0,
             )
         )
 
     def tensor_density(value: Array) -> Array:
-        return np.sqrt(np.maximum(tensor_norm_sq(value, inverse), 0.0))
+        return np.sqrt(np.maximum(tensor_norm_sq(value, inverse_g), 0.0))
 
     densities = {
         "Ric44": np.abs(ric44),
@@ -698,7 +704,7 @@ def physical_component_l2_maps(
         "trace_path_mismatch": np.abs(trace_path_mismatch),
     }
     local = np.einsum(
-        "nia,n...ij,njb->n...ab", grid.frames, state.metric, grid.frames
+        "nia,n...ij,njb->n...ab", grid.frames, state.g, grid.frames
     )
     area_ratio = np.sqrt(np.maximum(np.linalg.det(local), 0.0))
     maps = {}

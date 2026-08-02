@@ -47,23 +47,23 @@ class SymmetricTensorField:
 
 @dataclass(frozen=True)
 class PrimitiveFields:
-    """Four-metric primitive fields accepted by independent audits."""
+    """Four-g primitive fields accepted by independent audits."""
 
-    metric: Array
-    log_omega: Array
-    shift: Array
+    g: Array
+    log_Omega: Array
+    b: Array
     phi: Array | None = None
 
 
-def tangent_inverse(metric: Array) -> Array:
-    symmetric = 0.5 * (metric + np.swapaxes(metric, -1, -2))
+def tangent_inverse(g: Array) -> Array:
+    symmetric = 0.5 * (g + np.swapaxes(g, -1, -2))
     return np.linalg.pinv(symmetric, rcond=1.0e-13, hermitian=True)
 
 
-def tensor_trace(tensor: Array, inverse: Array) -> Array:
-    return np.einsum("n...ij,n...ij->n...", tensor, inverse)
+def tensor_trace(tensor: Array, inverse_g: Array) -> Array:
+    return np.einsum("n...ij,n...ij->n...", tensor, inverse_g)
 
 
-def tracefree(tensor: Array, metric: Array, inverse: Array | None = None) -> Array:
-    inverse = tangent_inverse(metric) if inverse is None else inverse
-    return tensor - 0.5 * tensor_trace(tensor, inverse)[..., None, None] * metric
+def tracefree(tensor: Array, g: Array, inverse_g: Array | None = None) -> Array:
+    inverse_g = tangent_inverse(g) if inverse_g is None else inverse_g
+    return tensor - 0.5 * tensor_trace(tensor, inverse_g)[..., None, None] * g

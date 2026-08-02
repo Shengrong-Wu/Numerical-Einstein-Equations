@@ -16,7 +16,7 @@ Array = np.ndarray
 class CharacteristicPowerMesh:
     """Tensor-product characteristic mesh.
 
-    ``s=(v/v_max)^delta`` makes the prescribed ``v^delta`` scalar and shear
+    ``s=(v/v_max)^delta`` makes the prescribed ``v^delta`` scalar and Omega_chih
     profiles linear at the singular corner.  Differentiation and integration
     use the same composite LGL polynomial in each coordinate.
     """

@@ -16,27 +16,27 @@ Array = np.ndarray
 
 
 def from_numerical(state: Any, grid: Any | None = None) -> PicardState:
-    lapse = np.asarray(state.omega)
-    outgoing_form = np.asarray(state.shear) + 0.5 * (
-        lapse**2 * np.asarray(state.q)
-    )[..., None, None] * np.asarray(state.metric)
+    Omega = np.asarray(state.Omega)
+    outgoing_form = np.asarray(state.Omega_chih) + 0.5 * (
+        np.asarray(state.Omega_trchi)
+    )[..., None, None] * np.asarray(state.g)
     is_scalar = hasattr(state, "phi")
     scalar_gradient = None
     if is_scalar and grid is not None:
         scalar_gradient = sphere.scalar_gradient(grid, np.asarray(state.phi))
     result = PicardState(
-        sphere_metric=np.asarray(state.metric).copy(),
-        shift=np.asarray(state.shift).copy(),
-        log_lapse=np.log(lapse).copy(),
-        outgoing_null_form=outgoing_form.copy(),
-        incoming_null_form=np.asarray(state.weighted_chib).copy(),
-        torsion=np.asarray(state.zeta_up).copy(),
-        outgoing_weighted_omega=np.asarray(state.weighted_omega).copy(),
-        incoming_weighted_omega=np.asarray(state.weighted_omegab).copy(),
-        scalar=np.asarray(state.phi).copy() if is_scalar else None,
-        scalar_e3=np.asarray(state.incoming_scalar).copy() if is_scalar else None,
-        scalar_e4=np.asarray(state.scalar_p).copy() if is_scalar else None,
-        scalar_sphere_gradient=scalar_gradient,
+        g=np.asarray(state.g).copy(),
+        b=np.asarray(state.b).copy(),
+        log_Omega=np.log(Omega).copy(),
+        Omega_chi=outgoing_form.copy(),
+        Omega_chib=np.asarray(state.Omega_chib).copy(),
+        zeta=np.asarray(state.zeta).copy(),
+        Omega_omega=np.asarray(state.Omega_omega).copy(),
+        Omega_omegab=np.asarray(state.Omega_omegab).copy(),
+        phi=np.asarray(state.phi).copy() if is_scalar else None,
+        Omega_e3phi=np.asarray(state.Omega_e3phi).copy() if is_scalar else None,
+        Omega_e4phi=np.asarray(state.Omega_e4phi).copy() if is_scalar else None,
+        nabla_phi=scalar_gradient,
     )
     if grid is not None:
         validate_state(result, grid.frames)
@@ -45,15 +45,15 @@ def from_numerical(state: Any, grid: Any | None = None) -> PicardState:
 
 def to_numerical(state: PicardState, *, scalar: bool = False) -> Any:
     common = dict(
-        metric=state.sphere_metric.copy(),
-        omega=state.lapse.copy(),
-        zeta_up=state.torsion.copy(),
-        shift=state.shift.copy(),
-        q=state.q.copy(),
-        shear=state.outgoing_shear.copy(),
-        weighted_chib=state.incoming_null_form.copy(),
-        weighted_omega=state.outgoing_weighted_omega.copy(),
-        weighted_omegab=state.incoming_weighted_omega.copy(),
+        g=state.g.copy(),
+        Omega=state.Omega.copy(),
+        zeta=state.zeta.copy(),
+        b=state.b.copy(),
+        Omega_trchi=state.Omega_trchi.copy(),
+        Omega_chih=state.Omega_chih.copy(),
+        Omega_chib=state.Omega_chib.copy(),
+        Omega_omega=state.Omega_omega.copy(),
+        Omega_omegab=state.Omega_omegab.copy(),
     )
     if not scalar:
         return vacuum_iteration.FirstOrderState(**common)
@@ -61,9 +61,9 @@ def to_numerical(state: PicardState, *, scalar: bool = False) -> Any:
         raise ValueError("scalar sweep requires scalar state fields")
     return scalar_iteration.ESEState(
         **common,
-        phi=np.asarray(state.scalar).copy(),
-        scalar_p=np.asarray(state.scalar_e4).copy(),
-        incoming_scalar=np.asarray(state.scalar_e3).copy(),
+        phi=np.asarray(state.phi).copy(),
+        Omega_e4phi=np.asarray(state.Omega_e4phi).copy(),
+        Omega_e3phi=np.asarray(state.Omega_e3phi).copy(),
     )
 
 
@@ -77,7 +77,7 @@ def vacuum_step(
     **kwargs: Any,
 ) -> tuple[PicardState, dict[str, Any]]:
     validate_state(state, grid.frames)
-    # The numerical kernel reads q and shear as derived views of the complete
+    # The numerical kernel reads Omega_trchi and Omega_chih as derived views of the complete
     # weighted forms. Passing a copied public state preserves that operation
     # order and prevents a redundant decompose/recompose roundoff cycle.
     working = state.copy()
@@ -138,7 +138,7 @@ def weighted_update_norm(new: PicardState, old: PicardState) -> float:
 
 
 def weighted_update_map(new: PicardState, old: PicardState) -> Array:
-    result = np.zeros(new.sphere_metric.shape[1:3], dtype=float)
+    result = np.zeros(new.g.shape[1:3], dtype=float)
     for name in new.__dataclass_fields__:
         current = getattr(new, name)
         previous = getattr(old, name)

@@ -47,7 +47,7 @@ def _run_one(
         "low-band-hemisphere",
         "--c",
         str(strength),
-        "--shear-divisor",
+        "--Omega_chih-divisor",
         "3.2",
         "--v1",
         "0.5",
@@ -73,7 +73,7 @@ def _run_one(
         str(v_count),
         "--iterations",
         str(iterations),
-        "--metric-substeps",
+        "--g-substeps",
         "1",
         "--u-halo",
         "1",
@@ -128,7 +128,7 @@ def _run_spectral_case(
     arguments = [
         "--boundary-mode", "low-band-hemisphere",
         "--c", str(strength),
-        "--shear-divisor", "3.2",
+        "--Omega_chih-divisor", "3.2",
         "--v1", "0.5",
         "--v-endpoint", "0.005",
         "--coordinate-method", "lgl",
@@ -143,9 +143,9 @@ def _run_spectral_case(
         "--galerkin-retained-degree", "10",
         "--galerkin-work-degree", "20",
         "--iterations", str(iterations),
-        "--metric-substeps", "2",
-        "--metric-parameterization", "cholesky",
-        "--metric-integrator", "sdc",
+        "--g-substeps", "2",
+        "--g-parameterization", "cholesky",
+        "--g-integrator", "sdc",
         "--sdc-tolerance", "1e-9",
         "--sdc-overgrid-tolerance", "1e-7",
         "--sdc-maximum-corrections", "12",
@@ -213,9 +213,9 @@ def _mapped_audit(output: Path, label: str) -> dict[str, Any]:
     result = evaluate_mapped_overgrid(
         grid,
         PrimitiveFields(
-            metric=state.metric,
-            log_omega=np.log(state.omega),
-            shift=state.shift,
+            g=state.g,
+            log_Omega=np.log(state.Omega),
+            b=state.b,
             phi=None,
         ),
         coordinates,
@@ -224,7 +224,7 @@ def _mapped_audit(output: Path, label: str) -> dict[str, Any]:
             fraction * maximum_s for fraction in (0.2, 0.4, 0.6, 0.8)
         ),
     )
-    (target / "independent-four-metric-audit.json").write_text(
+    (target / "independent-four-g-audit.json").write_text(
         json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
     )
@@ -239,12 +239,12 @@ def _exact_zero_control_audit() -> dict[str, Any]:
     return evaluate_mapped_overgrid(
         grid,
         PrimitiveFields(
-            metric=(
+            g=(
                 radius[..., None, None] ** 2
                 * grid.projector[:, None, None]
             ),
-            log_omega=np.zeros(scalar_shape),
-            shift=np.zeros(scalar_shape + (3,)),
+            log_Omega=np.zeros(scalar_shape),
+            b=np.zeros(scalar_shape + (3,)),
             phi=None,
         ),
         coordinates,

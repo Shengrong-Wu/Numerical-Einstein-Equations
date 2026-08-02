@@ -2,9 +2,9 @@
 
 This implements the quasi-spherical optical construction of Pretorius--Israel
 as presented by Franzen--Girão (arXiv:2008.13513), specialized to vacuum Kerr.
-The angular coordinate is transported so that the pulled-back metric has the
-numerical one-shift form.  The chart is built on a finite exterior patch and
-is verified by pulling the Boyer--Lindquist metric back independently.
+The angular coordinate is transported so that the pulled-back g has the
+numerical one-b form.  The chart is built on a finite exterior patch and
+is verified by pulling the Boyer--Lindquist g back independently.
 """
 
 from __future__ import annotations
@@ -351,7 +351,7 @@ def optical_map(
     if np.any(np.diff(values_s) <= 0.0):
         raise ValueError("s_values must be strictly increasing")
     if not (mass > 0.0 and 0.0 < abs(rotation) < mass):
-        raise ValueError("require a subextremal rotating Kerr metric")
+        raise ValueError("require a subextremal rotating Kerr g")
     outer_horizon = mass + math.sqrt(mass**2 - rotation**2)
     if reference_radius <= outer_horizon:
         raise ValueError("reference radius must lie outside the outer horizon")
@@ -488,7 +488,7 @@ def kerr_double_null_geometry(
     # Relative to the paper's scalar_coordinates, use
     # u_code=v_paper and v_code=-u_paper.  Hence
     # t=u+v and r_star=u-v; this gives the solver's negative du dv sign
-    # while keeping the single angular shift on du.
+    # while keeping the single angular b on du.
     s_grid = uu - vv
     # Tensor-product decimal nodes can produce nominally identical optical
     # scalar_coordinates separated only by binary roundoff.  Treating those as a
@@ -590,7 +590,7 @@ def kerr_double_null_geometry(
     orthonormal_gamma[..., 1, 0] /= sin_star[:, None, None]
     orthonormal_gamma[..., 1, 1] /= sin_star[:, None, None] ** 2
     angular_frame = np.stack((e_theta, e_phi), axis=-1)
-    metric = np.einsum(
+    g = np.einsum(
         "niA,n...AB,njB->n...ij",
         angular_frame,
         orthonormal_gamma,
@@ -598,7 +598,7 @@ def kerr_double_null_geometry(
     )
     shift_local = shift_coordinate.copy()
     shift_local[..., 1] *= sin_star[:, None, None]
-    shift = np.einsum("niA,n...A->n...i", angular_frame, shift_local)
+    b = np.einsum("niA,n...A->n...i", angular_frame, shift_local)
 
     gamma_shift_sq = np.einsum(
         "n...A,n...AB,n...B->n...",
@@ -630,9 +630,9 @@ def kerr_double_null_geometry(
         ),
     }
     return {
-        "metric": metric,
-        "omega": np.sqrt(omega_sq),
-        "shift": shift,
+        "g": g,
+        "Omega": np.sqrt(omega_sq),
+        "b": b,
         "radius": radius,
         "theta": theta,
         "offset": offset,
@@ -657,42 +657,41 @@ def kerr_exact_state(
         rotation=rotation,
         reference_radius=reference_radius,
     )
-    metric = geometry["metric"]
-    omega = geometry["omega"]
-    shift = geometry["shift"]
-    metric_v = high_order_differentiate(metric, v, axis=2)
-    weighted_chi = 0.5 * metric_v
-    inverse = tangent_inverse(grid, metric)
-    weighted_tr_chi = tensor_trace(weighted_chi, inverse)
-    shear = tensor_tracefree(weighted_chi, metric, inverse)
-    q = weighted_tr_chi / omega**2
+    g = geometry["g"]
+    Omega = geometry["Omega"]
+    b = geometry["b"]
+    metric_v = high_order_differentiate(g, v, axis=2)
+    Omega_chi = 0.5 * metric_v
+    inverse_g = tangent_inverse(grid, g)
+    Omega_trchi = tensor_trace(Omega_chi, inverse_g)
+    Omega_chih = tensor_tracefree(Omega_chi, g, inverse_g)
 
-    metric_u = high_order_differentiate(metric, u, axis=1)
-    weighted_chib = 0.5 * (
-        metric_u + lie_covariant_tensor(grid, shift, metric)
+    metric_u = high_order_differentiate(g, u, axis=1)
+    Omega_chib = 0.5 * (
+        metric_u + lie_covariant_tensor(grid, b, g)
     )
-    log_omega = np.log(omega)
-    weighted_omega = -0.5 * high_order_differentiate(
-        log_omega, v, axis=2
+    log_Omega = np.log(Omega)
+    Omega_omega = -0.5 * high_order_differentiate(
+        log_Omega, v, axis=2
     )
-    grad_log_omega = scalar_gradient(grid, log_omega)
-    weighted_omegab = -0.5 * (
-        high_order_differentiate(log_omega, u, axis=1)
-        + np.einsum("n...i,n...i->n...", shift, grad_log_omega)
+    grad_log_omega = scalar_gradient(grid, log_Omega)
+    Omega_omegab = -0.5 * (
+        high_order_differentiate(log_Omega, u, axis=1)
+        + np.einsum("n...i,n...i->n...", b, grad_log_omega)
     )
-    shift_v = high_order_differentiate(shift, v, axis=2)
-    zeta_up = -shift_v / (4.0 * omega[..., None] ** 2)
+    shift_v = high_order_differentiate(b, v, axis=2)
+    zeta = -shift_v / (4.0 * Omega[..., None] ** 2)
     return (
         FirstOrderState(
-            metric=metric,
-            omega=omega,
-            zeta_up=zeta_up,
-            shift=shift,
-            q=q,
-            shear=shear,
-            weighted_chib=weighted_chib,
-            weighted_omega=weighted_omega,
-            weighted_omegab=weighted_omegab,
+            g=g,
+            Omega=Omega,
+            zeta=zeta,
+            b=b,
+            Omega_trchi=Omega_trchi,
+            Omega_chih=Omega_chih,
+            Omega_chib=Omega_chib,
+            Omega_omega=Omega_omega,
+            Omega_omegab=Omega_omegab,
         ),
         diagnostics,
     )
@@ -746,10 +745,10 @@ def run(args: argparse.Namespace) -> dict[str, object]:
             "sweep": sweep,
             "seconds": time.perf_counter() - started,
             "picard_update": update_norm(new_state, state),
-            "metric_error": relative_field_error(new_state, exact, "metric"),
-            "lapse_error": relative_field_error(new_state, exact, "omega"),
-            "shift_error": relative_field_error(new_state, exact, "shift"),
-            "shear_error": relative_field_error(new_state, exact, "shear"),
+            "metric_error": relative_field_error(new_state, exact, "g"),
+            "lapse_error": relative_field_error(new_state, exact, "Omega"),
+            "shift_error": relative_field_error(new_state, exact, "b"),
+            "shear_error": relative_field_error(new_state, exact, "Omega_chih"),
         }
         records.append(record)
         print(json.dumps(record), flush=True)
@@ -777,7 +776,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         **{f"incoming_{name}": value for name, value in incoming.items()},
     )
     summary = {
-        "metric": "Kerr",
+        "g": "Kerr",
         "mass": args.mass,
         "rotation": args.rotation,
         "reference_radius": args.reference_radius,
@@ -817,7 +816,7 @@ def main() -> None:
     parser.add_argument("--v-min", type=float, default=0.0)
     parser.add_argument("--v-max", type=float, default=0.2)
     parser.add_argument("--iterations", type=int, default=5)
-    parser.add_argument("--metric-substeps", type=int, default=2)
+    parser.add_argument("--g-substeps", type=int, default=2)
     parser.add_argument("--gauge-tolerance", type=float, default=2.0e-6)
     parser.add_argument("--geometry-only", action="store_true")
     parser.add_argument(

@@ -145,11 +145,11 @@ class LGLSegment:
             derivative_basis[:, mode] = Legendre.basis(mode).deriv()(
                 reference_target
             )
-        inverse = np.linalg.inv(
+        inverse_g = np.linalg.inv(
             legvander(self.reference_nodes, self.degree)
         )
         return (2.0 / (self.right - self.left)) * (
-            derivative_basis @ inverse
+            derivative_basis @ inverse_g
         )
 
     def interpolate(self, values: Array, targets: Array, axis: int = 0) -> Array:
@@ -167,8 +167,8 @@ class LGLSegment:
         moved = np.moveaxis(values, axis, 0)
         if moved.shape[0] != len(self.nodes):
             raise ValueError("the modal axis does not match this element")
-        inverse = np.linalg.inv(legvander(self.reference_nodes, self.degree))
-        coefficients = np.tensordot(inverse, moved, axes=(1, 0))
+        inverse_g = np.linalg.inv(legvander(self.reference_nodes, self.degree))
+        coefficients = np.tensordot(inverse_g, moved, axes=(1, 0))
         return np.moveaxis(coefficients, 0, axis)
 
 

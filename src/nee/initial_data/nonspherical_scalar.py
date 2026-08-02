@@ -76,51 +76,51 @@ def _plan_free_data(rotation: Array) -> Callable[..., dict[str, Array]]:
         u = mesh.u
         radius = -u
         y20, vector_b, _ = _rotated_harmonic_fields(grid.points, rotation)
-        metric = (
+        g = (
             radius[None, :, None, None] ** 2
             * grid.projector[:, None, :, :]
         )
-        omega = np.sqrt(
+        Omega = np.sqrt(
             radius[None, :] ** data.lapse_radial_power
             * (
                 1.0
                 + data.lapse_angular_amplitude * y20[:, None]
             )
         )
-        shift = np.broadcast_to(
+        b = np.broadcast_to(
             data.shift_amplitude * vector_b[:, None, :],
             (grid.count, len(u), 3),
         ).copy()
 
-        metric_u = mesh.differentiate_u(metric, axis=1)
-        weighted_chib = 0.5 * (
-            metric_u + lie_covariant_tensor(grid, shift, metric)
+        metric_u = mesh.differentiate_u(g, axis=1)
+        Omega_chib = 0.5 * (
+            metric_u + lie_covariant_tensor(grid, b, g)
         )
-        log_omega = np.log(omega)
-        d3_log_omega = mesh.differentiate_u(log_omega, axis=1) + np.einsum(
-            "nui,nui->nu", shift, scalar_gradient(grid, log_omega)
+        log_Omega = np.log(Omega)
+        Omega_e3_log_Omega = mesh.differentiate_u(log_Omega, axis=1) + np.einsum(
+            "nui,nui->nu", b, scalar_gradient(grid, log_Omega)
         )
-        weighted_omegab = -0.5 * d3_log_omega
-        inverse = tangent_inverse(grid, metric)
-        weighted_trace = tensor_trace(weighted_chib, inverse)
-        weighted_hat = tensor_tracefree(weighted_chib, metric, inverse)
-        d3_trace = mesh.differentiate_u(weighted_trace, axis=1) + np.einsum(
+        Omega_omegab = -0.5 * Omega_e3_log_Omega
+        inverse_g = tangent_inverse(grid, g)
+        weighted_trace = tensor_trace(Omega_chib, inverse_g)
+        weighted_hat = tensor_tracefree(Omega_chib, g, inverse_g)
+        Omega_e3_Omega_trchib = mesh.differentiate_u(weighted_trace, axis=1) + np.einsum(
             "nui,nui->nu",
-            shift,
+            b,
             scalar_gradient(grid, weighted_trace),
         )
         radicand = (
-            -d3_trace
+            -Omega_e3_Omega_trchib
             - 0.5 * weighted_trace**2
-            - tensor_norm_sq(weighted_hat, inverse)
-            - 4.0 * weighted_omegab * weighted_trace
+            - tensor_norm_sq(weighted_hat, inverse_g)
+            - 4.0 * Omega_omegab * weighted_trace
         )
         return {
-            "metric": metric,
-            "omega": omega,
-            "shift": shift,
-            "weighted_chib_exact": weighted_chib,
-            "weighted_omegab_exact": weighted_omegab,
+            "g": g,
+            "Omega": Omega,
+            "b": b,
+            "weighted_chib_exact": Omega_chib,
+            "weighted_omegab_exact": Omega_omegab,
             "weighted_hatchib_exact": weighted_hat,
             "incoming_scalar_exact": np.sqrt(np.maximum(radicand, 0.0)),
         }
@@ -133,13 +133,13 @@ def _plan_reference_shear(rotation: Array) -> Callable[..., Array]:
         del profile
         _, _, vector_chi = _rotated_harmonic_fields(grid.points, rotation)
         vector_chi = (amplitude / 0.1) * vector_chi
-        metric = grid.projector
-        inverse = tangent_inverse(grid, metric)
-        difference, _ = connection_difference(grid, metric, inverse)
+        g = grid.projector
+        inverse_g = tangent_inverse(grid, g)
+        difference, _ = connection_difference(grid, g, inverse_g)
         # On the round unit sphere lowering an ambient tangent vector with the
         # projector leaves its components unchanged.
         return tracefree_symmetric_gradient(
-            grid, vector_chi, metric, difference, inverse
+            grid, vector_chi, g, difference, inverse_g
         )
 
     return generator
@@ -162,12 +162,12 @@ def _scaled_construct(
         data = config.scalar_initial_data
         v = mesh.v
         corner_p = data.corner_outgoing_scalar
-        scalar_p = (
+        Omega_e4phi = (
             corner_p
             + lambda_phi * v[None, :] ** data.outgoing_scalar_power
         )
-        scalar_p = np.broadcast_to(
-            scalar_p, (grid.count, len(v))
+        Omega_e4phi = np.broadcast_to(
+            Omega_e4phi, (grid.count, len(v))
         ).copy()
         phi = (
             corner_p * v[None, :]
@@ -175,31 +175,30 @@ def _scaled_construct(
             * v[None, :] ** (1.0 + data.outgoing_scalar_power)
             / (1.0 + data.outgoing_scalar_power)
         )
-        phi = np.broadcast_to(phi, scalar_p.shape).copy()
+        phi = np.broadcast_to(phi, Omega_e4phi.shape).copy()
         reference_shear = (
             np.zeros_like(outgoing["reference_shear"])
             if zero_shear
             else outgoing["reference_shear"]
         )
-        metric, expansion, shear = idata._solve_outgoing_metric(
+        g, expansion, Omega_chih = idata._solve_outgoing_metric(
             grid,
             angular,
             mesh,
-            incoming["metric"][:, 0],
-            incoming["weighted_expansion"][:, 0],
-            outgoing["omega"],
-            outgoing["weighted_omega"],
-            scalar_p,
+            incoming["g"][:, 0],
+            incoming["Omega_trchi"][:, 0],
+            outgoing["Omega"],
+            outgoing["Omega_omega"],
+            Omega_e4phi,
             reference_shear,
             data.boundary_substeps,
         )
         outgoing.update(
             {
-                "metric": metric,
-                "weighted_expansion": expansion,
-                "q": expansion / outgoing["omega"] ** 2,
-                "shear": shear,
-                "scalar_p": scalar_p,
+                "g": g,
+                "Omega_trchi": expansion,
+                "Omega_chih": Omega_chih,
+                "Omega_e4phi": Omega_e4phi,
                 "phi": phi,
                 "reference_shear": reference_shear,
             }
@@ -256,7 +255,7 @@ def _config(
             corner_outgoing_expansion=1.6,
             corner_outgoing_scalar=8.0 * math.sqrt(2.0) / 5.0,
             outgoing_scalar_power=0.1,
-            # The constraint generator rejects an exactly zero shear before
+            # The constraint generator rejects an exactly zero Omega_chih before
             # returning its otherwise valid incoming constraint solution.
             # A vanishing official case is generated through a harmless tiny seed
             # and then reconstructed with exact zero in _scaled_construct.

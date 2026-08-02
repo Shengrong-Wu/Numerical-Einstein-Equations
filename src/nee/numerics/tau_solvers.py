@@ -63,7 +63,7 @@ def _record_tail_coefficients(
     """Record a projection tail from coefficients already analyzed.
 
     This is algebraically identical to ``vacuum_iteration._record_tail``
-    but avoids analyzing the half-shear right-hand side a second time merely
+    but avoids analyzing the half-Omega_chih right-hand side a second time merely
     to obtain its retained rows.
     """
 
@@ -242,7 +242,7 @@ class TauConstructionFailure(FloatingPointError):
 def _check_coordinates(
     state: FirstOrderState, scalar_coordinates: CharacteristicLGLMesh
 ) -> None:
-    if state.q.shape[1:3] != (len(scalar_coordinates.u), len(scalar_coordinates.v)):
+    if state.Omega_trchi.shape[1:3] != (len(scalar_coordinates.u), len(scalar_coordinates.v)):
         raise ValueError("the characteristic tau/s grid does not match the state")
 
 
@@ -268,31 +268,31 @@ def _du_dtau(tau: float) -> float:
 
 def _stage_geometry(
     grid: PointSphereGrid,
-    metric: Array,
-    omega: Array,
-    zeta_up: Array,
-    weighted_chib: Array,
-    inverse: Array | None = None,
+    g: Array,
+    Omega: Array,
+    zeta: Array,
+    Omega_chib: Array,
+    inverse_g: Array | None = None,
 ) -> dict[str, Array]:
-    difference, inverse = connection_difference(grid, metric, inverse)
-    weighted_tr_chib = tensor_trace(weighted_chib, inverse)
-    weighted_hatchib = tensor_tracefree(weighted_chib, metric, inverse)
-    grad_log_omega = scalar_gradient(grid, np.log(omega))
-    zeta = np.einsum("n...ij,n...j->n...i", metric, zeta_up)
+    difference, inverse_g = connection_difference(grid, g, inverse_g)
+    Omega_trchib = tensor_trace(Omega_chib, inverse_g)
+    Omega_chibh = tensor_tracefree(Omega_chib, g, inverse_g)
+    grad_log_omega = scalar_gradient(grid, np.log(Omega))
+    zeta = np.einsum("n...ij,n...j->n...i", g, zeta)
     eta = zeta + grad_log_omega
     etab = -zeta + grad_log_omega
     return {
         "difference": difference,
-        "inverse": inverse,
-        "weighted_tr_chib": weighted_tr_chib,
-        "weighted_hatchib": weighted_hatchib,
-        "hatchib": weighted_hatchib / omega[..., None, None],
+        "inverse_g": inverse_g,
+        "Omega_trchib": Omega_trchib,
+        "Omega_chibh": Omega_chibh,
+        "hatchib": Omega_chibh / Omega[..., None, None],
         "eta": eta,
         "etab": etab,
         "eta_grad_hat": tracefree_symmetric_gradient(
-            grid, eta, metric, difference, inverse
+            grid, eta, g, difference, inverse_g
         ),
-        "eta_square_hat": tracefree_square(eta, metric, inverse),
+        "eta_square_hat": tracefree_square(eta, g, inverse_g),
     }
 
 
@@ -304,9 +304,9 @@ def _lie_covariant_tensor_known_vector_derivative(
 ) -> Array:
     """Evaluate a Lie derivative with a coordinate-known vector derivative.
 
-    The half-shear equation revisits the same ``(tau, v)`` shift at every SDC
+    The half-Omega_chih equation revisits the same ``(tau, v)`` b at every SDC
     correction.  Only the tensor derivative depends on the current unknown;
-    caching the shift derivative removes one unchanged global sphere
+    caching the b derivative removes one unchanged global sphere
     differentiation without changing the formula.
     """
 
@@ -326,8 +326,8 @@ def _lie_covariant_tensor_known_vector_derivative(
 def _moving_tracefree_derivative(
     tensor: Array,
     raw_derivative: Array,
-    metric: Array,
-    inverse: Array,
+    g: Array,
+    inverse_g: Array,
     inverse_derivative: Array,
     angular: AngularGalerkin | None,
 ) -> Array:
@@ -335,17 +335,17 @@ def _moving_tracefree_derivative(
         return angular.project_g_tracefree_derivative(
             tensor,
             raw_derivative,
-            inverse,
+            inverse_g,
             inverse_derivative,
         )
     symmetric = 0.5 * (raw_derivative + np.swapaxes(raw_derivative, -1, -2))
     desired_trace = -np.einsum(
         "n...ij,n...ij->n...", inverse_derivative, tensor
     )
-    raw_trace = tensor_trace(symmetric, inverse)
-    # The tangent metric has dimension two, so tr_g(alpha*g)=2 alpha.
+    raw_trace = tensor_trace(symmetric, inverse_g)
+    # The tangent g has dimension two, so tr_g(alpha*g)=2 alpha.
     correction = 0.5 * (desired_trace - raw_trace)
-    return symmetric + correction[..., None, None] * metric
+    return symmetric + correction[..., None, None] * g
 
 
 @dataclass(frozen=True)
@@ -406,22 +406,22 @@ def _weak_trace_modal_layout(angular: AngularGalerkin) -> _WeakTraceModalLayout:
 
 def _weak_trace_reduction(
     angular: AngularGalerkin,
-    inverse: Array,
+    inverse_g: Array,
     layout: _WeakTraceModalLayout,
 ) -> _WeakTraceReduction:
     """Build ``c_trace=A(tau)c_free`` for every batch value.
 
-    ``inverse`` has shape ``(sphere,batch,3,3)``.  The constraint is exactly
+    ``inverse_g`` has shape ``(sphere,batch,3,3)``.  The constraint is exactly
     the retained scalar analysis of ``tr_g S`` used by
     :meth:`AngularGalerkin.project_g_tracefree`.  Solving its square trace
     block eliminates the algebraic variables without a coordinate-dependent
     retraction in the SDC iteration.
     """
 
-    inverse_values = np.asarray(inverse, dtype=float)
+    inverse_values = np.asarray(inverse_g, dtype=float)
     if inverse_values.ndim != 4 or inverse_values.shape[0] != angular.grid.count:
         raise ValueError(
-            "a weak-trace reduction requires (sphere,batch,3,3) inverse data"
+            "a weak-trace reduction requires (sphere,batch,3,3) inverse_g data"
         )
     retained_basis = angular.sym2.retained_basis
     pointwise_traces = np.einsum(
@@ -459,7 +459,7 @@ def _weak_trace_reconstruct(
     expected = (len(layout.free_positions), reduction.trace_from_free.shape[0])
     if free.shape != expected:
         raise ValueError(
-            f"free half-shear coefficients have shape {free.shape}, "
+            f"free half-Omega_chih coefficients have shape {free.shape}, "
             f"expected {expected}"
         )
     retained = np.zeros(
@@ -561,7 +561,7 @@ def _relative_trace_profile(
     """
 
     if not np.isfinite(absolute_floor) or absolute_floor <= 0.0:
-        raise ValueError("the half-shear trace absolute floor must be positive")
+        raise ValueError("the half-Omega_chih trace absolute floor must be positive")
     trace_values = np.asarray(trace, dtype=float)
     norm_values = np.asarray(norm, dtype=float)
     if trace_values.shape != norm_values.shape or trace_values.ndim != 3:
@@ -600,15 +600,15 @@ def _interface_profile_map(
 
 def _primitive_cone_audit(
     grid: PointSphereGrid,
-    metric: Array,
-    omega: Array,
+    g: Array,
+    Omega: Array,
     scalar_coordinates: CharacteristicLGLMesh,
     *,
     overgrid_extra_degree: int,
     minimum_metric_eigenvalue: float,
     minimum_lapse: float,
 ) -> tuple[list[dict[str, Any]], dict[str, Array]]:
-    """Audit known metric/lapse primitives on independent overgrid nodes."""
+    """Audit known g/Omega primitives on independent overgrid nodes."""
 
     if (
         overgrid_extra_degree < 1
@@ -629,10 +629,10 @@ def _primitive_cone_audit(
             segment.left, segment.right, segment.degree + overgrid_extra_degree
         )
         metric_over = TauElementEvaluator(
-            segment, indices, metric, axis=1
+            segment, indices, g, axis=1
         ).values_at(over.nodes)
         lapse_over = TauElementEvaluator(
-            segment, indices, omega, axis=1
+            segment, indices, Omega, axis=1
         ).values_at(over.nodes)
 
         metric_finite = np.all(np.isfinite(metric_over), axis=(-2, -1))
@@ -751,7 +751,7 @@ def solve_half_shear_tau_sdc(
     known_cache_maximum_bytes: int = 256 * 1024 * 1024,
     require_acceptance: bool = True,
 ) -> TauConstructionResult:
-    """Construct the half outgoing shear with the moving trace-free DAE.
+    """Construct the half outgoing Omega_chih with the moving trace-free DAE.
 
     In angular-Galerkin mode only the retained electric/magnetic coefficients
     are evolved.  At every RHS coordinate the retained trace coefficients are
@@ -771,11 +771,11 @@ def solve_half_shear_tau_sdc(
         or not np.isfinite(trace_block_condition_limit)
         or trace_block_condition_limit <= 1.0
     ):
-        raise ValueError("the half-shear trace tolerance must be positive")
+        raise ValueError("the half-Omega_chih trace tolerance must be positive")
     cone_diagnostics, cone_maps = _primitive_cone_audit(
         grid,
-        state.metric,
-        state.omega,
+        state.g,
+        state.Omega,
         scalar_coordinates,
         overgrid_extra_degree=overgrid_extra_degree,
         minimum_metric_eigenvalue=minimum_primitive_metric_eigenvalue,
@@ -784,21 +784,21 @@ def solve_half_shear_tau_sdc(
     _reject_invalid_primitive_cone(
         "half_shear", cone_diagnostics, cone_maps
     )
-    result = np.zeros_like(state.metric)
-    boundary_shear = np.asarray(boundary["shear"])
-    if "inverse" in boundary:
-        boundary_inverse = np.asarray(boundary["inverse"])
+    result = np.zeros_like(state.g)
+    boundary_shear = np.asarray(boundary["Omega_chih"])
+    if "inverse_g" in boundary:
+        boundary_inverse = np.asarray(boundary["inverse_g"])
     else:
-        boundary_inverse = tangent_inverse(grid, np.asarray(boundary["metric"]))
+        boundary_inverse = tangent_inverse(grid, np.asarray(boundary["g"]))
     transfer = np.matmul(
-        np.matmul(boundary_shear, boundary_inverse), state.metric[:, 0]
+        np.matmul(boundary_shear, boundary_inverse), state.g[:, 0]
     )
     transfer = 0.5 * (transfer + np.swapaxes(transfer, -1, -2))
-    initial_inverse = tangent_inverse(grid, state.metric[:, 0])
+    initial_inverse = tangent_inverse(grid, state.g[:, 0])
     result[:, 0] = _project_tracefree_sym2(
         angular,
         transfer,
-        state.metric[:, 0],
+        state.g[:, 0],
         initial_inverse,
         projection_tails,
         "half_shear_tau_boundary",
@@ -825,12 +825,12 @@ def solve_half_shear_tau_sdc(
             dtype=float,
         )
     primitives = {
-        "metric": state.metric,
-        "omega": state.omega,
-        "zeta_up": state.zeta_up,
-        "q": state.q,
-        "weighted_chib": state.weighted_chib,
-        "shift": state.shift,
+        "g": state.g,
+        "Omega": state.Omega,
+        "zeta": state.zeta,
+        "Omega_trchi": state.Omega_trchi,
+        "Omega_chib": state.Omega_chib,
+        "b": state.b,
     }
     for element, (segment, indices) in enumerate(
         zip(scalar_coordinates.tau.segments, scalar_coordinates.tau.indices, strict=True)
@@ -846,27 +846,27 @@ def solve_half_shear_tau_sdc(
 
         def known_stage(tau: float) -> dict[str, Any]:
             def build() -> dict[str, Any]:
-                metric = evaluators["metric"].value(tau)
-                metric_tau = evaluators["metric"].derivative(tau)
-                inverse = tangent_inverse(grid, metric)
+                g = evaluators["g"].value(tau)
+                metric_tau = evaluators["g"].derivative(tau)
+                inverse_g = tangent_inverse(grid, g)
                 inverse_tau = -np.matmul(
-                    np.matmul(inverse, metric_tau), inverse
+                    np.matmul(inverse_g, metric_tau), inverse_g
                 )
-                omega = evaluators["omega"].value(tau)
-                zeta_up = evaluators["zeta_up"].value(tau)
-                weighted_chib = evaluators["weighted_chib"].value(tau)
-                q = evaluators["q"].value(tau)
-                shift = evaluators["shift"].value(tau)
+                Omega = evaluators["Omega"].value(tau)
+                zeta = evaluators["zeta"].value(tau)
+                Omega_chib = evaluators["Omega_chib"].value(tau)
+                Omega_trchi = evaluators["Omega_trchi"].value(tau)
+                b = evaluators["b"].value(tau)
                 geometry = _stage_geometry(
                     grid,
-                    metric,
-                    omega,
-                    zeta_up,
-                    weighted_chib,
-                    inverse,
+                    g,
+                    Omega,
+                    zeta,
+                    Omega_chib,
+                    inverse_g,
                 )
-                tr_chi = omega * q
-                source = omega[..., None, None] ** 2 * (
+                tr_chi = Omega_trchi / Omega
+                source = Omega[..., None, None] ** 2 * (
                     geometry["eta_grad_hat"]
                     + geometry["eta_square_hat"]
                     - 0.5
@@ -874,26 +874,26 @@ def solve_half_shear_tau_sdc(
                     * geometry["hatchib"]
                 )
                 stage: dict[str, Any] = {
-                    "metric": metric,
-                    "inverse": inverse,
+                    "g": g,
+                    "inverse_g": inverse_g,
                     "inverse_tau": inverse_tau,
                     "half_source": source,
                     "half_mixed": np.matmul(
-                        geometry["weighted_hatchib"], inverse
+                        geometry["Omega_chibh"], inverse_g
                     ),
                     "half_weighted_tr_chib": geometry[
-                        "weighted_tr_chib"
+                        "Omega_trchib"
                     ],
-                    "shift": shift,
+                    "b": b,
                     "shift_derivative": grid.reference_derivative(
-                        shift, tensor_rank=1
+                        b, tensor_rank=1
                     ),
                 }
                 if angular is not None:
                     if layout is None:
                         raise AssertionError("the weak-trace layout is missing")
                     stage["trace_reduction"] = _weak_trace_reduction(
-                        angular, inverse, layout
+                        angular, inverse_g, layout
                     )
                 return stage
 
@@ -901,11 +901,11 @@ def solve_half_shear_tau_sdc(
 
         def retract(tau: float, tensor: Array) -> Array:
             stage = known_stage(tau)
-            metric = stage["metric"]
-            inverse = stage["inverse"]
+            g = stage["g"]
+            inverse_g = stage["inverse_g"]
             if angular is None:
-                return tensor_tracefree(tensor, metric, inverse)
-            return angular.project_g_tracefree(tensor, inverse)
+                return tensor_tracefree(tensor, g, inverse_g)
+            return angular.project_g_tracefree(tensor, inverse_g)
 
         def physical_raw_rhs(
             tau: float,
@@ -915,7 +915,7 @@ def solve_half_shear_tau_sdc(
             record_tail: bool = True,
         ) -> Array:
             current = known_stage(tau) if stage is None else stage
-            shift = current["shift"]
+            b = current["b"]
             mixed = current["half_mixed"]
             physical_rhs = (
                 0.5
@@ -926,7 +926,7 @@ def solve_half_shear_tau_sdc(
                 + current["half_source"]
                 - _lie_covariant_tensor_known_vector_derivative(
                     grid,
-                    shift,
+                    b,
                     current["shift_derivative"],
                     stage_tensor,
                 )
@@ -947,8 +947,8 @@ def solve_half_shear_tau_sdc(
             return _moving_tracefree_derivative(
                 stage_tensor,
                 tau_rhs,
-                stage["metric"],
-                stage["inverse"],
+                stage["g"],
+                stage["inverse_g"],
                 stage["inverse_tau"],
                 angular,
             )
@@ -1025,7 +1025,7 @@ def solve_half_shear_tau_sdc(
                     angular.g_tracefree_derivative_retained_coefficients(
                         retained,
                         retained_derivative,
-                        stage["inverse"],
+                        stage["inverse_g"],
                         stage["inverse_tau"],
                     )
                 )
@@ -1068,21 +1068,21 @@ def solve_half_shear_tau_sdc(
             zip(over.nodes, over_tensor, strict=True)
         ):
             stage = known_stage(float(tau))
-            inverse = stage["inverse"]
-            over_trace[node] = tensor_trace(tensor, inverse)
+            inverse_g = stage["inverse_g"]
+            over_trace[node] = tensor_trace(tensor, inverse_g)
             over_norm[node] = np.sqrt(
-                np.maximum(tensor_norm_sq(tensor, inverse), 0.0)
+                np.maximum(tensor_norm_sq(tensor, inverse_g), 0.0)
             )
             if angular is None:
                 strong_tensor = retract(float(tau), tensor)
             else:
-                strong_tensor = angular.project_g_tracefree(tensor, inverse)
+                strong_tensor = angular.project_g_tracefree(tensor, inverse_g)
                 condition_samples.append(
                     stage["trace_reduction"].condition_by_batch
                 )
-            strong_trace[node] = tensor_trace(strong_tensor, inverse)
+            strong_trace[node] = tensor_trace(strong_tensor, inverse_g)
             strong_norm[node] = np.sqrt(
-                np.maximum(tensor_norm_sq(strong_tensor, inverse), 0.0)
+                np.maximum(tensor_norm_sq(strong_tensor, inverse_g), 0.0)
             )
         trace_defect, trace_profile, effective_trace_floor = (
             _relative_trace_profile(
@@ -1187,7 +1187,7 @@ def solve_half_shear_tau_sdc(
             scalar_coordinates.tau, established_trace_profiles
         )
     else:
-        inverse_nodes = tangent_inverse(grid, state.metric)
+        inverse_nodes = tangent_inverse(grid, state.g)
         node_trace = tensor_trace(result, inverse_nodes)
         retained_node_trace = angular.project_scalar(node_trace)
         node_norm = np.sqrt(
@@ -1259,9 +1259,9 @@ def solve_log_omega_tau_sdc(
 
     _check_coordinates(state, scalar_coordinates)
     source_values = np.asarray(weighted_omegab_half)
-    if source_values.shape != state.omega.shape:
+    if source_values.shape != state.Omega.shape:
         raise ValueError("weighted_omegab_half has the wrong state shape")
-    result = np.zeros_like(state.omega)
+    result = np.zeros_like(state.Omega)
     initial = np.broadcast_to(np.asarray(initial_log_omega), result[:, 0].shape)
     result[:, 0] = _project_scalar(
         angular,
@@ -1274,13 +1274,13 @@ def solve_log_omega_tau_sdc(
     for element, (segment, indices) in enumerate(
         zip(scalar_coordinates.tau.segments, scalar_coordinates.tau.indices, strict=True)
     ):
-        shift = TauElementEvaluator(segment, indices, state.shift, axis=1)
+        b = TauElementEvaluator(segment, indices, state.b, axis=1)
         source = TauElementEvaluator(segment, indices, source_values, axis=1)
 
         def rhs(tau: float, value: Array) -> Array:
             physical_rhs = -np.einsum(
                 "n...i,n...i->n...",
-                shift.value(tau),
+                b.value(tau),
                 scalar_gradient(grid, value),
             ) - 2.0 * source.value(tau)
             complete = _du_dtau(tau) * physical_rhs
@@ -1304,18 +1304,18 @@ def solve_log_omega_tau_sdc(
         assign_composite_element(result, indices, solved.values)
         diagnostics.append(
             tau_sdc_result_diagnostic(
-                solved, **_element_metadata("log_omega", element, segment)
+                solved, **_element_metadata("log_Omega", element, segment)
             )
         )
         profiles.append(solved.overgrid_defect_by_batch.copy())
 
     with np.errstate(over="ignore", invalid="ignore"):
-        lapse = np.exp(result)
-    if not np.all(np.isfinite(lapse)) or float(np.min(lapse)) <= 0.0:
+        Omega = np.exp(result)
+    if not np.all(np.isfinite(Omega)) or float(np.min(Omega)) <= 0.0:
         raise FloatingPointError("tau log(Omega) solve left the positive cone")
     maps = {"overgrid": expand_element_profiles(scalar_coordinates.tau, profiles)}
-    _raise_rejected("log_omega", diagnostics, maps, require_acceptance)
-    return TauConstructionResult(result, diagnostics, maps, {"omega": lapse})
+    _raise_rejected("log_Omega", diagnostics, maps, require_acceptance)
+    return TauConstructionResult(result, diagnostics, maps, {"Omega": Omega})
 
 
 def _fresh_omegab_v_source(
@@ -1325,53 +1325,50 @@ def _fresh_omegab_v_source(
     angular: AngularGalerkin | None,
     projection_tails: ProjectionTails | None,
 ) -> Array:
-    metric = evaluators["metric"].value(tau)
-    omega = evaluators["omega"].value(tau)
-    omega_tau = evaluators["omega"].derivative(tau)
-    q = evaluators["q"].value(tau)
-    q_tau = evaluators["q"].derivative(tau)
-    zeta_up = evaluators["zeta_up"].value(tau)
-    shift = evaluators["shift"].value(tau)
-    weighted_chib = evaluators["weighted_chib"].value(tau)
-    geometry = _stage_geometry(grid, metric, omega, zeta_up, weighted_chib)
-    inverse = geometry["inverse"]
+    g = evaluators["g"].value(tau)
+    Omega = evaluators["Omega"].value(tau)
+    Omega_trchi = evaluators["Omega_trchi"].value(tau)
+    Omega_trchi_tau = evaluators["Omega_trchi"].derivative(tau)
+    zeta = evaluators["zeta"].value(tau)
+    b = evaluators["b"].value(tau)
+    Omega_chib = evaluators["Omega_chib"].value(tau)
+    geometry = _stage_geometry(grid, g, Omega, zeta, Omega_chib)
+    inverse_g = geometry["inverse_g"]
     half_raw = evaluators["half"].value(tau)
     if angular is None:
-        half = tensor_tracefree(half_raw, metric, inverse)
+        half = tensor_tracefree(half_raw, g, inverse_g)
     else:
-        half = angular.project_g_tracefree(half_raw, inverse)
-    weighted_tr_chi = omega**2 * q
-    weighted_tr_chi_tau = 2.0 * omega * omega_tau * q + omega**2 * q_tau
+        half = angular.project_g_tracefree(half_raw, inverse_g)
     jacobian = _du_dtau(tau)
-    d3_weighted_tr_chi = weighted_tr_chi_tau / jacobian
-    d3_weighted_tr_chi += np.einsum(
+    Omega_e3_Omega_trchi = Omega_trchi_tau / jacobian
+    Omega_e3_Omega_trchi += np.einsum(
         "n...i,n...i->n...",
-        shift,
-        scalar_gradient(grid, weighted_tr_chi),
+        b,
+        scalar_gradient(grid, Omega_trchi),
     )
     eta_etab = np.einsum(
         "n...i,n...ij,n...j->n...",
         geometry["eta"],
-        inverse,
+        inverse_g,
         geometry["etab"],
     )
     eta_up = np.einsum(
-        "n...ij,n...j->n...i", inverse, geometry["eta"]
+        "n...ij,n...j->n...i", inverse_g, geometry["eta"]
     )
     div_eta = vector_divergence(grid, eta_up, geometry["difference"])
     shear_dot = np.einsum(
         "n...ik,n...jl,n...ij,n...kl->n...",
-        inverse,
-        inverse,
+        inverse_g,
+        inverse_g,
         half,
-        geometry["weighted_hatchib"],
+        geometry["Omega_chibh"],
     )
     source = 0.25 * (
         shear_dot
-        + 0.5 * weighted_tr_chi * geometry["weighted_tr_chib"]
-        - 4.0 * omega**2 * eta_etab
-        + d3_weighted_tr_chi
-        - 2.0 * omega**2 * div_eta
+        + 0.5 * Omega_trchi * geometry["Omega_trchib"]
+        - 4.0 * Omega**2 * eta_etab
+        + Omega_e3_Omega_trchi
+        - 2.0 * Omega**2 * div_eta
     )
     return _project_scalar(
         angular,
@@ -1385,7 +1382,7 @@ def solve_weighted_omega_tau_sdc(
     grid: PointSphereGrid,
     state: FirstOrderState,
     half_shear: Array,
-    log_omega: Array,
+    log_Omega: Array,
     scalar_coordinates: CharacteristicLGLMesh,
     initial_value: Array,
     *,
@@ -1417,14 +1414,14 @@ def solve_weighted_omega_tau_sdc(
     """
 
     _check_coordinates(state, scalar_coordinates)
-    if np.asarray(half_shear).shape != state.metric.shape:
+    if np.asarray(half_shear).shape != state.g.shape:
         raise ValueError("half_shear has the wrong state shape")
-    if np.asarray(log_omega).shape != state.omega.shape:
-        raise ValueError("log_omega has the wrong state shape")
+    if np.asarray(log_Omega).shape != state.Omega.shape:
+        raise ValueError("log_Omega has the wrong state shape")
     reference_values: Array | None = None
     if reference_v_source is not None:
         reference_values = np.asarray(reference_v_source)
-        if reference_values.shape != state.omega.shape:
+        if reference_values.shape != state.Omega.shape:
             raise ValueError("reference_v_source has the wrong state shape")
     if source_cross_equation_tolerance is None:
         source_cross_equation_tolerance = overgrid_tolerance
@@ -1438,22 +1435,22 @@ def solve_weighted_omega_tau_sdc(
         or not np.isfinite(source_scale_floor)
         or source_scale_floor <= 0.0
     ):
-        raise ValueError("invalid weighted-omega source audit tolerance")
+        raise ValueError("invalid weighted-Omega source audit tolerance")
 
     cone_diagnostics, cone_maps = _primitive_cone_audit(
         grid,
-        state.metric,
-        state.omega,
+        state.g,
+        state.Omega,
         scalar_coordinates,
         overgrid_extra_degree=overgrid_extra_degree,
         minimum_metric_eigenvalue=minimum_primitive_metric_eigenvalue,
         minimum_lapse=minimum_primitive_lapse,
     )
     _reject_invalid_primitive_cone(
-        "weighted_omega", cone_diagnostics, cone_maps
+        "Omega_omega", cone_diagnostics, cone_maps
     )
 
-    result = np.zeros_like(state.weighted_omega)
+    result = np.zeros_like(state.Omega_omega)
     boundary = np.broadcast_to(np.asarray(initial_value), result[:, 0].shape)
     result[:, 0] = _project_scalar(
         angular,
@@ -1466,19 +1463,19 @@ def solve_weighted_omega_tau_sdc(
     source_closure_profiles: list[Array] = []
     source_interface_profiles: list[Array] = []
     rhs_interface_profiles: list[Array] = []
-    fresh_source_left_trace = np.full_like(state.weighted_omega, np.nan)
-    fresh_source_right_trace = np.full_like(state.weighted_omega, np.nan)
+    fresh_source_left_trace = np.full_like(state.Omega_omega, np.nan)
+    fresh_source_right_trace = np.full_like(state.Omega_omega, np.nan)
     previous_interface_source: Array | None = None
     previous_interface_rhs: Array | None = None
     primitive_values = {
-        "metric": state.metric,
-        "omega": state.omega,
-        "q": state.q,
-        "zeta_up": state.zeta_up,
-        "shift": state.shift,
-        "weighted_chib": state.weighted_chib,
+        "g": state.g,
+        "Omega": state.Omega,
+        "Omega_trchi": state.Omega_trchi,
+        "zeta": state.zeta,
+        "b": state.b,
+        "Omega_chib": state.Omega_chib,
         "half": np.asarray(half_shear),
-        "log_omega": np.asarray(log_omega),
+        "log_Omega": np.asarray(log_Omega),
     }
     for element, (segment, indices) in enumerate(
         zip(scalar_coordinates.tau.segments, scalar_coordinates.tau.indices, strict=True)
@@ -1501,9 +1498,9 @@ def solve_weighted_omega_tau_sdc(
 
         def known_forcing(tau: float) -> dict[str, Array]:
             def build() -> dict[str, Array]:
-                omega = evaluators["omega"].value(tau)
-                zeta_up = evaluators["zeta_up"].value(tau)
-                shift = evaluators["shift"].value(tau)
+                Omega = evaluators["Omega"].value(tau)
+                zeta = evaluators["zeta"].value(tau)
+                b = evaluators["b"].value(tau)
                 source = _fresh_omegab_v_source(
                     grid,
                     tau,
@@ -1511,17 +1508,17 @@ def solve_weighted_omega_tau_sdc(
                     angular,
                     projection_tails,
                 )
-                fixed_forcing = source - 2.0 * omega**2 * np.einsum(
+                fixed_forcing = source - 2.0 * Omega**2 * np.einsum(
                     "n...i,n...i->n...",
-                    zeta_up,
+                    zeta,
                     scalar_gradient(
-                        grid, evaluators["log_omega"].value(tau)
+                        grid, evaluators["log_Omega"].value(tau)
                     ),
                 )
                 return {
                     "source": source,
                     "fixed_forcing": fixed_forcing,
-                    "shift": shift,
+                    "b": b,
                 }
 
             return known_cache.get(tau, build)
@@ -1530,7 +1527,7 @@ def solve_weighted_omega_tau_sdc(
             known = known_forcing(tau)
             physical_rhs = known["fixed_forcing"] - np.einsum(
                 "n...i,n...i->n...",
-                known["shift"],
+                known["b"],
                 scalar_gradient(grid, value),
             )
             return _project_scalar(
@@ -1633,7 +1630,7 @@ def solve_weighted_omega_tau_sdc(
         ).copy()
         diagnostic = tau_sdc_result_diagnostic(
             solved,
-            **_element_metadata("weighted_omega", element, segment),
+            **_element_metadata("Omega_omega", element, segment),
             source_semantics=(
                 "fresh primitive B_v reconstruction with distinct left/right "
                 "composite-interface traces"
@@ -1676,7 +1673,7 @@ def solve_weighted_omega_tau_sdc(
             }
         )
         if not isinstance(source_metadata, dict):
-            raise AssertionError("weighted-omega source diagnostic is not a mapping")
+            raise AssertionError("weighted-Omega source diagnostic is not a mapping")
         diagnostic.update(source_metadata)
         diagnostics.append(diagnostic)
         profiles.append(solved.overgrid_defect_by_batch.copy())
@@ -1687,7 +1684,7 @@ def solve_weighted_omega_tau_sdc(
     if not np.all(np.isfinite(fresh_source_left_trace)) or not np.all(
         np.isfinite(fresh_source_right_trace)
     ):
-        raise FloatingPointError("weighted-omega source traces are incomplete")
+        raise FloatingPointError("weighted-Omega source traces are incomplete")
     maps = {
         "overgrid": expand_element_profiles(scalar_coordinates.tau, profiles),
         "source_cross_equation_overgrid": expand_element_profiles(
@@ -1701,7 +1698,7 @@ def solve_weighted_omega_tau_sdc(
         ),
         **cone_maps,
     }
-    _raise_rejected("weighted_omega", diagnostics, maps, require_acceptance)
+    _raise_rejected("Omega_omega", diagnostics, maps, require_acceptance)
     return TauConstructionResult(
         result,
         diagnostics,
@@ -1716,8 +1713,8 @@ def solve_weighted_omega_tau_sdc(
 def solve_incoming_metric_tau_sdc(
     grid: PointSphereGrid,
     metric_on_hminus1: Array,
-    weighted_chib: Array,
-    shift: Array,
+    Omega_chib: Array,
+    b: Array,
     scalar_coordinates: CharacteristicLGLMesh,
     *,
     kinematic_factor: float = 2.0,
@@ -1731,11 +1728,11 @@ def solve_incoming_metric_tau_sdc(
     minimum_metric_eigenvalue: float = 1.0e-14,
     require_acceptance: bool = True,
 ) -> TauConstructionResult:
-    """Reconstruct the incoming metric through an SPD tangent factor."""
+    """Reconstruct the incoming g through an SPD tangent factor."""
 
     metric_values = np.asarray(metric_on_hminus1)
-    chib_values = np.asarray(weighted_chib)
-    shift_values = np.asarray(shift)
+    chib_values = np.asarray(Omega_chib)
+    shift_values = np.asarray(b)
     expected_tensor = (
         grid.count,
         len(scalar_coordinates.u),
@@ -1750,14 +1747,14 @@ def solve_incoming_metric_tau_sdc(
         3,
     )
     if chib_values.shape != expected_tensor or shift_values.shape != expected_vector:
-        raise ValueError("incoming metric primitive fields do not match the grid")
+        raise ValueError("incoming g primitive fields do not match the grid")
     expected_boundary = (grid.count, len(scalar_coordinates.v), 3, 3)
     if metric_values.shape != expected_boundary:
-        raise ValueError("incoming metric boundary has the wrong shape")
+        raise ValueError("incoming g boundary has the wrong shape")
     if physical_overgrid_tolerance is None:
         physical_overgrid_tolerance = overgrid_tolerance
     if physical_overgrid_tolerance <= 0.0 or minimum_metric_eigenvalue <= 0.0:
-        raise ValueError("invalid incoming metric acceptance tolerance")
+        raise ValueError("invalid incoming g acceptance tolerance")
 
     projected_initial = _project_sym2(
         angular,
@@ -1806,7 +1803,7 @@ def solve_incoming_metric_tau_sdc(
         def rhs(tau: float, value_factor: Array) -> Array:
             value_metric = ambient_metric(value_factor)
             if _minimum_tangent_eigenvalue(grid, value_metric) <= minimum_metric_eigenvalue:
-                raise FloatingPointError("incoming metric factor approached singularity")
+                raise FloatingPointError("incoming g factor approached singularity")
             metric_rhs = physical_tau_rhs(tau, value_metric)
             local_rhs = np.einsum(
                 "nia,n...ij,njb->n...ab", grid.frames, metric_rhs, grid.frames
@@ -1816,7 +1813,7 @@ def solve_incoming_metric_tau_sdc(
                     np.linalg.inv(value_factor), -1, -2
                 )
             except np.linalg.LinAlgError as error:
-                raise FloatingPointError("incoming metric factor became singular") from error
+                raise FloatingPointError("incoming g factor became singular") from error
             return 0.5 * np.matmul(local_rhs, inverse_transpose)
 
         solved = solve_tau_sdc(
@@ -1891,7 +1888,7 @@ def solve_incoming_metric_tau_sdc(
         factor_profiles.append(solved.overgrid_defect_by_batch.copy())
         physical_profiles.append(physical_profile)
 
-    metric = ambient_metric(factor)
+    g = ambient_metric(factor)
     maps = {
         "factor_overgrid": expand_element_profiles(
             scalar_coordinates.tau, factor_profiles
@@ -1901,4 +1898,4 @@ def solve_incoming_metric_tau_sdc(
         ),
     }
     _raise_rejected("incoming_metric", diagnostics, maps, require_acceptance)
-    return TauConstructionResult(metric, diagnostics, maps, {"factor": factor})
+    return TauConstructionResult(g, diagnostics, maps, {"factor": factor})

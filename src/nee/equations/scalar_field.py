@@ -15,11 +15,11 @@ class ScalarFieldEquations:
     has_scalar: bool = True
 
     def ricci_source(self, state: PicardState) -> dict[str, np.ndarray]:
-        if state.scalar_e3 is None or state.scalar_e4 is None:
+        if state.Omega_e3phi is None or state.Omega_e4phi is None:
             raise ValueError("scalar equations require both weighted null scalar derivatives")
         return {
-            "33": state.scalar_e3**2,
-            "44": state.scalar_e4**2,
-            "34": state.scalar_e3 * state.scalar_e4,
+            "33": state.Omega_e3phi**2,
+            "44": state.Omega_e4phi**2,
+            "34": state.Omega_e3phi * state.Omega_e4phi,
         }
 

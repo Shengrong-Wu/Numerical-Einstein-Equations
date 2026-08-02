@@ -210,7 +210,7 @@ class HarmonicFamily:
         # silently copies a large four-dimensional array.  Materialize the
         # retained flattened family once and recover a tensor-shaped view of
         # it.  At L=9 on 450 sphere points this avoids a roughly 9 MiB copy at
-        # every half-shear stage.
+        # every half-Omega_chih stage.
         retained_matrix = np.ascontiguousarray(matrix[:, retained_indices])
         slot_shape = (3,) * slot_rank
         retained_ordered = retained_matrix.reshape(
@@ -406,19 +406,19 @@ class AngularGalerkin:
         symmetric = 0.5 * (values + np.swapaxes(values, -1, -2))
         return self.sym2.project(symmetric)
 
-    def project_g_tracefree(self, tensor: Array, inverse: Array) -> Array:
+    def project_g_tracefree(self, tensor: Array, inverse_g: Array) -> Array:
         """Least-change retained coefficients with zero retained g-trace."""
 
-        if tensor.shape != inverse.shape:
-            raise ValueError("tensor and inverse must have identical shapes")
+        if tensor.shape != inverse_g.shape:
+            raise ValueError("tensor and inverse_g must have identical shapes")
 
         coefficients = self.sym2.analyze_retained(
             0.5 * (tensor + np.swapaxes(tensor, -1, -2))
         )
         retained_basis = self.sym2.retained_basis
-        batch_shape = inverse.shape[1:-2]
+        batch_shape = inverse_g.shape[1:-2]
         coefficient_flat = coefficients.reshape((coefficients.shape[0], -1))
-        inverse_flat = inverse.reshape((inverse.shape[0], -1, 3, 3))
+        inverse_flat = inverse_g.reshape((inverse_g.shape[0], -1, 3, 3))
         corrected = np.empty_like(coefficient_flat)
         for batch in range(coefficient_flat.shape[1]):
             traces = np.einsum(
@@ -438,7 +438,7 @@ class AngularGalerkin:
         self,
         coefficients: Array,
         derivative_coefficients: Array,
-        inverse: Array,
+        inverse_g: Array,
         inverse_derivative: Array,
     ) -> Array:
         """Apply the moving-constraint tangent projection in coefficient space.
@@ -455,7 +455,7 @@ class AngularGalerkin:
         derivative_values = np.asarray(derivative_coefficients, dtype=float)
         expected_shape = (
             len(self.sym2.retained_indices),
-            *inverse.shape[1:-2],
+            *inverse_g.shape[1:-2],
         )
         if coefficient_values.shape != expected_shape:
             raise ValueError(
@@ -467,9 +467,9 @@ class AngularGalerkin:
                 "retained derivative coefficients have shape "
                 f"{derivative_values.shape}, expected {expected_shape}"
             )
-        if inverse.shape != inverse_derivative.shape:
+        if inverse_g.shape != inverse_derivative.shape:
             raise ValueError(
-                "inverse and inverse derivative must have identical shapes"
+                "inverse_g and inverse_g derivative must have identical shapes"
             )
 
         retained_basis = self.sym2.retained_basis
@@ -479,9 +479,9 @@ class AngularGalerkin:
         derivative_flat = derivative_values.reshape(
             (derivative_values.shape[0], -1)
         )
-        inverse_flat = inverse.reshape((inverse.shape[0], -1, 3, 3))
+        inverse_flat = inverse_g.reshape((inverse_g.shape[0], -1, 3, 3))
         inverse_derivative_flat = inverse_derivative.reshape(
-            (inverse.shape[0], -1, 3, 3)
+            (inverse_g.shape[0], -1, 3, 3)
         )
         corrected = np.empty_like(derivative_flat)
         for batch in range(coefficient_flat.shape[1]):
@@ -511,7 +511,7 @@ class AngularGalerkin:
         self,
         tensor: Array,
         raw_derivative: Array,
-        inverse: Array,
+        inverse_g: Array,
         inverse_derivative: Array,
     ) -> Array:
         """Project a tensor derivative tangent to the moving trace constraint.
@@ -519,7 +519,7 @@ class AngularGalerkin:
         If retained coefficients ``c`` obey ``C(g)c=0``, their derivative
         must satisfy ``C c_dot + C_dot c=0``.  Merely making ``c_dot``
         trace-free drops the ``C_dot c`` term and is incorrect when the
-        section metric varies.  This routine first forms the retained raw
+        section g varies.  This routine first forms the retained raw
         Galerkin derivative and then applies the minimum-norm coefficient
         correction that satisfies the differentiated constraint.
         """
@@ -527,11 +527,11 @@ class AngularGalerkin:
         if not (
             tensor.shape
             == raw_derivative.shape
-            == inverse.shape
+            == inverse_g.shape
             == inverse_derivative.shape
         ):
             raise ValueError(
-                "tensor, derivative, inverse, and inverse derivative must "
+                "tensor, derivative, inverse_g, and inverse_g derivative must "
                 "have identical shapes"
             )
         coefficients = self.sym2.analyze_retained(
@@ -541,11 +541,11 @@ class AngularGalerkin:
             0.5
             * (raw_derivative + np.swapaxes(raw_derivative, -1, -2))
         )
-        batch_shape = inverse.shape[1:-2]
+        batch_shape = inverse_g.shape[1:-2]
         corrected = self.g_tracefree_derivative_retained_coefficients(
             coefficients,
             derivative_coefficients,
-            inverse,
+            inverse_g,
             inverse_derivative,
         )
         return self.sym2.synthesize_retained(
@@ -558,25 +558,25 @@ class AngularGalerkin:
         ``Omega`` is represented through retained ``log(Omega)`` so that the
         projection preserves positivity.  ``Omega*chib`` is a general
         symmetric tensor (its trace is an evolved coefficient), whereas only
-        the outgoing shear is subject to the g-trace-free constraint.
+        the outgoing Omega_chih is subject to the g-trace-free constraint.
         """
 
-        state.metric = self.project_sym2(state.metric)
-        inverse = tangent_inverse(self.grid, state.metric)
-        state.omega = np.exp(self.project_scalar(np.log(state.omega)))
-        state.zeta_up = self.project_vector(state.zeta_up)
-        state.shift = self.project_vector(state.shift)
-        state.q = self.project_scalar(state.q)
+        state.g = self.project_sym2(state.g)
+        inverse_g = tangent_inverse(self.grid, state.g)
+        state.Omega = np.exp(self.project_scalar(np.log(state.Omega)))
+        state.zeta = self.project_vector(state.zeta)
+        state.b = self.project_vector(state.b)
+        state.Omega_trchi = self.project_scalar(state.Omega_trchi)
         shear_trace = np.einsum(
-            "n...ij,n...ij->n...", inverse, state.shear
+            "n...ij,n...ij->n...", inverse_g, state.Omega_chih
         )
-        state.shear = (
-            0.5 * (state.shear + np.swapaxes(state.shear, -1, -2))
-            - 0.5 * shear_trace[..., None, None] * state.metric
+        state.Omega_chih = (
+            0.5 * (state.Omega_chih + np.swapaxes(state.Omega_chih, -1, -2))
+            - 0.5 * shear_trace[..., None, None] * state.g
         )
-        state.weighted_chib = self.project_sym2(state.weighted_chib)
-        state.weighted_omega = self.project_scalar(state.weighted_omega)
-        state.weighted_omegab = self.project_scalar(state.weighted_omegab)
+        state.Omega_chib = self.project_sym2(state.Omega_chib)
+        state.Omega_omega = self.project_scalar(state.Omega_omega)
+        state.Omega_omegab = self.project_scalar(state.Omega_omegab)
         return state
 
     def diagnostics(self) -> dict[str, float | int]:

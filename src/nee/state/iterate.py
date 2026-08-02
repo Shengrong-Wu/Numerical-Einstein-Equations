@@ -12,149 +12,67 @@ from .fields import tangent_inverse, tensor_trace, tracefree
 
 
 Array = np.ndarray
-STATE_SCHEMA = "nee-full-weighted-state-1"
+STATE_SCHEMA = "nee-theory-state-2"
 
 
 @dataclass
 class PicardState:
-    sphere_metric: Array
-    shift: Array
-    log_lapse: Array
-    outgoing_null_form: Array
-    incoming_null_form: Array
-    torsion: Array
-    outgoing_weighted_omega: Array
-    incoming_weighted_omega: Array
-    scalar: Array | None = None
-    scalar_e3: Array | None = None
-    scalar_e4: Array | None = None
-    scalar_sphere_gradient: Array | None = None
+    g: Array
+    b: Array
+    log_Omega: Array
+    Omega_chi: Array
+    Omega_chib: Array
+    zeta: Array
+    Omega_omega: Array
+    Omega_omegab: Array
+    phi: Array | None = None
+    Omega_e3phi: Array | None = None
+    Omega_e4phi: Array | None = None
+    nabla_phi: Array | None = None
 
     @property
-    def lapse(self) -> Array:
-        return np.exp(self.log_lapse)
+    def Omega(self) -> Array:
+        return np.exp(self.log_Omega)
 
     @property
-    def inverse_metric(self) -> Array:
-        return tangent_inverse(self.sphere_metric)
+    def inverse_g(self) -> Array:
+        return tangent_inverse(self.g)
 
     @property
-    def outgoing_expansion(self) -> Array:
-        return tensor_trace(self.outgoing_null_form, self.inverse_metric)
+    def Omega_trchi(self) -> Array:
+        return tensor_trace(self.Omega_chi, self.inverse_g)
 
     @property
-    def incoming_expansion(self) -> Array:
-        return tensor_trace(self.incoming_null_form, self.inverse_metric)
+    def Omega_trchib(self) -> Array:
+        return tensor_trace(self.Omega_chib, self.inverse_g)
 
     @property
-    def outgoing_shear(self) -> Array:
-        return tracefree(self.outgoing_null_form, self.sphere_metric, self.inverse_metric)
+    def Omega_chih(self) -> Array:
+        return tracefree(self.Omega_chi, self.g, self.inverse_g)
 
     @property
-    def incoming_shear(self) -> Array:
-        return tracefree(self.incoming_null_form, self.sphere_metric, self.inverse_metric)
+    def Omega_chibh(self) -> Array:
+        return tracefree(self.Omega_chib, self.g, self.inverse_g)
+
+    @property
+    def trchi(self) -> Array:
+        return self.Omega_trchi / self.Omega
+
+    @property
+    def trchib(self) -> Array:
+        return self.Omega_trchib / self.Omega
+
+    @property
+    def chih(self) -> Array:
+        return self.Omega_chih / self.Omega[..., None, None]
+
+    @property
+    def chibh(self) -> Array:
+        return self.Omega_chibh / self.Omega[..., None, None]
 
     @property
     def is_scalar(self) -> bool:
-        return self.scalar is not None
-
-    # Algebraic kernel views. These are derived aliases, never additional
-    # stored state variables.
-    @property
-    def metric(self) -> Array:
-        return self.sphere_metric
-
-    @property
-    def omega(self) -> Array:
-        return self.lapse
-
-    @property
-    def log_omega(self) -> Array:
-        return self.log_lapse
-
-    @property
-    def x_out(self) -> Array:
-        return self.outgoing_null_form
-
-    @property
-    def x_in(self) -> Array:
-        return self.incoming_null_form
-
-    @property
-    def zeta_up(self) -> Array:
-        return self.torsion
-
-    @property
-    def w_out(self) -> Array:
-        return self.outgoing_weighted_omega
-
-    @property
-    def w_in(self) -> Array:
-        return self.incoming_weighted_omega
-
-    @property
-    def phi(self) -> Array | None:
-        return self.scalar
-
-    @property
-    def p3(self) -> Array | None:
-        return self.scalar_e3
-
-    @property
-    def p4(self) -> Array | None:
-        return self.scalar_e4
-
-    @property
-    def grad_phi(self) -> Array | None:
-        return self.scalar_sphere_gradient
-
-    @property
-    def q(self) -> Array:
-        return self.outgoing_expansion / self.lapse**2
-
-    @property
-    def a_out(self) -> Array:
-        return self.outgoing_expansion
-
-    @property
-    def a_in(self) -> Array:
-        return self.incoming_expansion
-
-    @property
-    def sigma_out(self) -> Array:
-        return self.outgoing_shear
-
-    @property
-    def sigma_in(self) -> Array:
-        return self.incoming_shear
-
-    @property
-    def shear(self) -> Array:
-        return self.outgoing_shear
-
-    @property
-    def weighted_chib(self) -> Array:
-        return self.incoming_null_form
-
-    @property
-    def weighted_omega(self) -> Array:
-        return self.outgoing_weighted_omega
-
-    @property
-    def weighted_omegab(self) -> Array:
-        return self.incoming_weighted_omega
-
-    @property
-    def scalar_p(self) -> Array:
-        if self.scalar_e4 is None:
-            raise AttributeError("vacuum state has no outgoing scalar derivative")
-        return self.scalar_e4
-
-    @property
-    def incoming_scalar(self) -> Array:
-        if self.scalar_e3 is None:
-            raise AttributeError("vacuum state has no incoming scalar derivative")
-        return self.scalar_e3
+        return self.phi is not None
 
     def arrays(self) -> dict[str, Array]:
         return {

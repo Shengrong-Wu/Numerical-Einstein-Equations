@@ -68,8 +68,8 @@ Array = np.ndarray
 
 SOLVER_SEMANTICS = (
     "nee-galerkin-flat-bandlimited-pulse-common-coordinate-"
-    "operators-exact-derived-shear-full-omegab-boundary-compatible-seed-"
-    "reduced-coordinate-half-shear-optional-tau-sdc-u-marches"
+    "operators-exact-derived-Omega_chih-full-omegab-boundary-compatible-seed-"
+    "reduced-coordinate-half-Omega_chih-optional-tau-sdc-u-marches"
 )
 FINGERPRINT_SOURCE_PATHS = (
     (
@@ -462,7 +462,7 @@ def q1_resume_solver_parameters(
     return {
         "boundary": {
             "c": args.c,
-            "shear_divisor": args.shear_divisor,
+            "Omega_chih_divisor": args.Omega_chih_divisor,
             "mode": args.boundary_mode,
             "v1": args.v1,
             "v_endpoint": v_endpoint,
@@ -759,18 +759,18 @@ def mutation_test(
     state = initial_state(grid, u, v)
     correct = solve_incoming_metric(
         grid,
-        state.metric[:, 0],
-        state.weighted_chib,
-        state.shift,
+        state.g[:, 0],
+        state.Omega_chib,
+        state.b,
         u,
         kinematic_factor=2.0,
         angular=angular,
     )
     mutated = solve_incoming_metric(
         grid,
-        state.metric[:, 0],
-        state.weighted_chib,
-        state.shift,
+        state.g[:, 0],
+        state.Omega_chib,
+        state.b,
         u,
         kinematic_factor=0.5,
         angular=angular,
@@ -975,7 +975,7 @@ def run(args: argparse.Namespace) -> dict:
         boundary = solve_linear_fixed_boundary(grid, v)
     elif args.boundary_mode == "low-band-hemisphere":
         calibration = calibrate_low_band_profiles(
-            args.v1, args.c, divisor=args.shear_divisor
+            args.v1, args.c, divisor=args.Omega_chih_divisor
         )
         boundary = solve_low_band_boundary(
             grid,
@@ -988,7 +988,7 @@ def run(args: argparse.Namespace) -> dict:
         )
     else:
         base_calibration = calibrate_profiles(args.v1, args.c)
-        calibration = scaled_calibration(base_calibration, args.shear_divisor)
+        calibration = scaled_calibration(base_calibration, args.Omega_chih_divisor)
         boundary = solve_outgoing_boundary(grid, v, calibration)
 
     # Persist and reload the physical characteristic traces before building
@@ -998,19 +998,19 @@ def run(args: argparse.Namespace) -> dict:
     outgoing_fields = {
         name: np.asarray(boundary[name])
         for name in (
-            "metric", "inverse", "expansion", "shear", "zeta_up", "shift"
+            "g", "inverse_g", "Omega_trchi", "Omega_chih", "zeta", "b"
         )
         if name in boundary
     }
     incoming_fields = {
-        "metric": preview.metric[:, :, 0],
-        "expansion": preview.q[:, :, 0],
-        "omega": preview.omega[:, :, 0],
-        "weighted_chib": preview.weighted_chib[:, :, 0],
-        "weighted_omega": preview.weighted_omega[:, :, 0],
-        "weighted_omegab": preview.weighted_omegab[:, :, 0],
-        "zeta_up": preview.zeta_up[:, :, 0],
-        "shift": preview.shift[:, :, 0],
+        "g": preview.g[:, :, 0],
+        "Omega_trchi": preview.Omega_trchi[:, :, 0],
+        "Omega": preview.Omega[:, :, 0],
+        "Omega_chib": preview.Omega_chib[:, :, 0],
+        "Omega_omega": preview.Omega_omega[:, :, 0],
+        "Omega_omegab": preview.Omega_omegab[:, :, 0],
+        "zeta": preview.zeta[:, :, 0],
+        "b": preview.b[:, :, 0],
     }
     immutable_boundary = BoundaryData.create(
         outgoing_fields,
@@ -1038,7 +1038,7 @@ def run(args: argparse.Namespace) -> dict:
         if not (
             np.array_equal(saved_u, u)
             and np.array_equal(saved_v, v)
-            and state.metric.shape[0] == grid.count
+            and state.g.shape[0] == grid.count
         ):
             raise ValueError(
                 "operational restart grid does not match the requested Q1 grid"
@@ -1060,7 +1060,7 @@ def run(args: argparse.Namespace) -> dict:
         if not (
             np.array_equal(saved_u, u)
             and np.array_equal(saved_v, v)
-            and state.metric.shape[0] == grid.count
+            and state.g.shape[0] == grid.count
         ):
             raise ValueError(
                 "resume checkpoint grid does not match the requested Q1 grid"
@@ -1435,7 +1435,7 @@ def run(args: argparse.Namespace) -> dict:
         },
         "parameters": {
             "c": args.c,
-            "shear_divisor": args.shear_divisor,
+            "Omega_chih_divisor": args.Omega_chih_divisor,
             "boundary_mode": args.boundary_mode,
             "v1": args.v1,
             "v_endpoint": v_endpoint,
@@ -1553,7 +1553,7 @@ def run(args: argparse.Namespace) -> dict:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser()
     result.add_argument("--c", type=float, default=1.0)
-    result.add_argument("--shear-divisor", type=float, default=3.2)
+    result.add_argument("--Omega_chih-divisor", type=float, default=3.2)
     result.add_argument("--v1", type=float, default=0.5)
     result.add_argument(
         "--v-endpoint",
@@ -1672,15 +1672,19 @@ def parser() -> argparse.ArgumentParser:
         default=0,
         help="label the first new sweep as offset+1",
     )
-    result.add_argument("--metric-substeps", type=int, default=2)
     result.add_argument(
-        "--metric-parameterization",
-        choices=("direct", "cholesky"),
-        default="direct",
-        help="direct RK metric or an SPD-preserving metric factor",
+        "--g-substeps", dest="metric_substeps", type=int, default=2
     )
     result.add_argument(
-        "--metric-integrator",
+        "--g-parameterization",
+        dest="metric_parameterization",
+        choices=("direct", "cholesky"),
+        default="direct",
+        help="direct RK g or an SPD-preserving g factor",
+    )
+    result.add_argument(
+        "--g-integrator",
+        dest="metric_integrator",
         choices=("rk4", "sdc"),
         default="rk4",
     )
@@ -1712,7 +1716,7 @@ def parser() -> argparse.ArgumentParser:
         "--u-sdc-half-trace-tolerance",
         type=float,
         default=1.0e-9,
-        help="independent moving trace-free gate for the half shear",
+        help="independent moving trace-free gate for the half Omega_chih",
     )
     result.add_argument(
         "--u-sdc-half-trace-absolute-floor",
@@ -1720,7 +1724,7 @@ def parser() -> argparse.ArgumentParser:
         default=1.0e-14,
         help=(
             "small-field absolute floor in the scale-aware relative "
-            "half-shear trace gate"
+            "half-Omega_chih trace gate"
         ),
     )
     result.add_argument("--u-halo", type=int, default=4)

@@ -11,7 +11,7 @@ The two reference tensors are polynomial ambient tangent tensors.  The first
 has its only zero at the south pole and is bounded from below on the closed
 upper hemisphere; the second has the reflected property.  The time profiles
 have disjoint supports, flat interior endpoints, and the allowed ``sqrt(v)``
-corner behavior.  The outgoing metric, expansion, and transferred shear are
+corner behavior.  The outgoing g, expansion, and transferred Omega_chih are
 advanced simultaneously at every RK4 stage.
 """
 
@@ -270,11 +270,11 @@ def solve_low_band_boundary(
 
     tensors = polynomial_hemisphere_tensors(sphere)
     count = len(v)
-    metric = np.zeros((sphere.count, count, 3, 3), dtype=float)
+    g = np.zeros((sphere.count, count, 3, 3), dtype=float)
     expansion = np.zeros((sphere.count, count), dtype=float)
-    shear = np.zeros_like(metric)
-    reference = np.zeros_like(metric)
-    metric[:, 0] = sphere.projector
+    Omega_chih = np.zeros_like(g)
+    reference = np.zeros_like(g)
+    g[:, 0] = sphere.projector
     expansion[:, 0] = 2.0
 
     boundary_tails: dict[str, float] = {}
@@ -295,16 +295,16 @@ def solve_low_band_boundary(
 
     def constrained_shear(chi0: Array, value_metric: Array) -> Array:
         raw = transferred_shear(sphere, chi0, value_metric)
-        inverse = tangent_inverse(sphere, value_metric)
+        inverse_g = tangent_inverse(sphere, value_metric)
         # Pointwise trace removal is part of the nonlinear transfer.  The
         # retained coefficient constraint then prevents an invisible nodal
         # trace component from becoming an iteration variable.
-        trace = np.einsum("n...ij,n...ij->n...", inverse, raw)
+        trace = np.einsum("n...ij,n...ij->n...", inverse_g, raw)
         raw = raw - 0.5 * trace[..., None, None] * value_metric
         if angular is None:
             return raw
         record_tail("sym2", raw, "boundary_shear_transfer")
-        # The physical shear is an algebraic function of retained primitives,
+        # The physical Omega_chih is an algebraic function of retained primitives,
         # just like g^{-1}.  Keep its exact pointwise trace constraint on the
         # work grid and project only each complete evolution RHS that uses it.
         return raw
@@ -318,8 +318,8 @@ def solve_low_band_boundary(
             round_trace = np.einsum("nij,nij->n", sphere.projector, chi0)
             chi0 = chi0 - 0.5 * round_trace[:, None, None] * sphere.projector
         current_shear = constrained_shear(chi0, current_metric)
-        inverse = tangent_inverse(sphere, current_metric)
-        norm_sq = tensor_norm_sq(current_shear, inverse)
+        inverse_g = tangent_inverse(sphere, current_metric)
+        norm_sq = tensor_norm_sq(current_shear, inverse_g)
         metric_rhs = (
             current_expansion[:, None, None] * current_metric
             + 2.0 * current_shear
@@ -337,7 +337,7 @@ def solve_low_band_boundary(
         for j in range(count - 1):
             step = float(v[j + 1] - v[j])
             value = float(v[j])
-            current_metric = metric[:, j]
+            current_metric = g[:, j]
             current_expansion = expansion[:, j]
             with np.errstate(over="raise", invalid="raise", divide="raise"):
                 try:
@@ -377,14 +377,14 @@ def solve_low_band_boundary(
                 raise BoundaryDegeneracy(
                     float(v[j]), float(v[j + 1]), eigenvalue
                 )
-            metric[:, j + 1] = next_metric
+            g[:, j + 1] = next_metric
             expansion[:, j + 1] = next_expansion
     else:
         assert scalar_coordinates is not None
         local_initial = np.einsum(
             "nia,nij,njb->nab",
             sphere.frames,
-            metric[:, 0],
+            g[:, 0],
             sphere.frames,
         )
         factor = np.zeros((sphere.count, count, 2, 2), dtype=float)
@@ -484,9 +484,9 @@ def solve_low_band_boundary(
             )
             expansion[:, index] = np.moveaxis(local_expansion, 0, 1)
             factor[:, index] = np.moveaxis(local_factor, 0, 1)
-            metric[:, index] = ambient_metric(factor[:, index])
+            g[:, index] = ambient_metric(factor[:, index])
 
-    inverse = tangent_inverse(sphere, metric)
+    inverse_g = tangent_inverse(sphere, g)
     for j, value in enumerate(v):
         reference[:, j] = reference_shear(
             tensors, float(value), calibration
@@ -499,13 +499,13 @@ def solve_low_band_boundary(
             reference[:, j] -= (
                 0.5 * round_trace[:, None, None] * sphere.projector
             )
-        shear[:, j] = constrained_shear(reference[:, j], metric[:, j])
+        Omega_chih[:, j] = constrained_shear(reference[:, j], g[:, j])
 
     reference_norm = np.sqrt(
         np.maximum(np.einsum("nvij,nvij->nv", reference, reference), 0.0)
     )
     physical_norm = np.sqrt(
-        np.maximum(tensor_norm_sq(shear, inverse), 0.0)
+        np.maximum(tensor_norm_sq(Omega_chih, inverse_g), 0.0)
     )
     reference_integral = np.trapezoid(reference_norm, v, axis=1)
     physical_integral = np.trapezoid(physical_norm, v, axis=1)
@@ -524,34 +524,34 @@ def solve_low_band_boundary(
     second_integral = np.trapezoid(
         second_profile[None, :] * tensor_norms[1][:, None], v, axis=1
     )
-    trace = np.einsum("nvij,nvji->nv", inverse, shear)
+    trace = np.einsum("nvij,nvji->nv", inverse_g, Omega_chih)
     reference_trace = np.einsum(
         "nvij,nij->nv", reference, sphere.projector
     )
     if angular is None:
-        zeta, shift, zeta_source, zeta_iterations, zeta_update = (
-            solve_boundary_zeta(sphere, metric, expansion, shear, v)
+        zeta, b, zeta_source, zeta_iterations, zeta_update = (
+            solve_boundary_zeta(sphere, g, expansion, Omega_chih, v)
         )
     else:
-        difference, inverse = connection_difference(sphere, metric)
+        difference, inverse_g = connection_difference(sphere, g)
         div_shear = tensor_divergence(
-            sphere, shear, difference, inverse
+            sphere, Omega_chih, difference, inverse_g
         )
         grad_expansion = scalar_gradient(sphere, expansion)
         free_source = (
-            np.einsum("nvij,nvj->nvi", inverse, div_shear)
-            - 0.5 * np.einsum("nvij,nvj->nvi", inverse, grad_expansion)
+            np.einsum("nvij,nvj->nvi", inverse_g, div_shear)
+            - 0.5 * np.einsum("nvij,nvj->nvi", inverse_g, grad_expansion)
         )
         zeta = np.zeros(expansion.shape + (3,), dtype=float)
         zeta_source = free_source.copy()
         zeta_update = math.inf
         zeta_iterations = 0
         for iteration in range(48):
-            shear_zeta = np.einsum("nvij,nvj->nvi", shear, zeta)
+            shear_zeta = np.einsum("nvij,nvj->nvi", Omega_chih, zeta)
             zeta_source = (
                 -2.0 * expansion[..., None] * zeta
                 - 2.0
-                * np.einsum("nvij,nvj->nvi", inverse, shear_zeta)
+                * np.einsum("nvij,nvj->nvi", inverse_g, shear_zeta)
                 + free_source
             )
             record_tail("vector", zeta_source, "boundary_zeta_rhs")
@@ -566,7 +566,7 @@ def solve_low_band_boundary(
                             np.einsum(
                                 "nvi,nvij,nvj->nv",
                                 difference_zeta,
-                                metric,
+                                g,
                                 difference_zeta,
                             ),
                             0.0,
@@ -578,28 +578,28 @@ def solve_low_band_boundary(
             zeta_iterations = iteration + 1
             if zeta_update <= 1.0e-13:
                 break
-        shear_zeta = np.einsum("nvij,nvj->nvi", shear, zeta)
+        shear_zeta = np.einsum("nvij,nvj->nvi", Omega_chih, zeta)
         zeta_source = (
             -2.0 * expansion[..., None] * zeta
-            - 2.0 * np.einsum("nvij,nvj->nvi", inverse, shear_zeta)
+            - 2.0 * np.einsum("nvij,nvj->nvi", inverse_g, shear_zeta)
             + free_source
         )
         record_tail("vector", zeta_source, "boundary_zeta_rhs")
         zeta_source = angular.project_vector(zeta_source)
         shift_source = -4.0 * zeta
         record_tail("vector", shift_source, "boundary_shift_rhs")
-        shift = integrate_v(angular.project_vector(shift_source))
-        shift = angular.project_vector(shift)
+        b = integrate_v(angular.project_vector(shift_source))
+        b = angular.project_vector(b)
     return {
-        "metric": metric,
-        "inverse": inverse,
-        "expansion": expansion,
-        "shear": shear,
+        "g": g,
+        "inverse_g": inverse_g,
+        "Omega_trchi": expansion,
+        "Omega_chih": Omega_chih,
         "reference_shear": reference,
-        "zeta_up": zeta,
-        "shift": shift,
+        "zeta": zeta,
+        "b": b,
         "zeta_source": zeta_source,
-        "minimum_eigenvalue": minimum_tangent_eigenvalue(sphere, metric),
+        "minimum_eigenvalue": minimum_tangent_eigenvalue(sphere, g),
         "minimum_reference_l1": float(np.min(reference_integral)),
         "minimum_physical_l1": float(np.min(physical_integral)),
         "minimum_upper_first_l1": float(np.min(first_integral[upper])),

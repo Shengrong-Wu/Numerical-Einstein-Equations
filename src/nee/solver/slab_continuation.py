@@ -8,28 +8,28 @@ from typing import Iterable
 import numpy as np
 
 from nee.state.boundary import BoundaryData
-from nee.state.iterate import PicardState as WeightedState
+from nee.state.iterate import PicardState
 
 
 Array = np.ndarray
 
 
-def terminal_incoming_data(state: WeightedState) -> dict[str, Array]:
+def terminal_incoming_data(state: PicardState) -> dict[str, Array]:
     """Use one slab's terminal section as the next slab's fixed data."""
 
     return {
-        "metric": state.metric[:, :, -1].copy(),
-        "weighted_tr_chib": state.a_in[:, :, -1].copy(),
-        "weighted_hatchib": state.sigma_in[:, :, -1].copy(),
-        "weighted_chib": state.x_in[:, :, -1].copy(),
-        "weighted_tr_chi": state.a_out[:, :, -1].copy(),
-        "weighted_hatchi": state.sigma_out[:, :, -1].copy(),
-        "weighted_chi": state.x_out[:, :, -1].copy(),
-        "omega": state.omega[:, :, -1].copy(),
-        "weighted_omega": state.w_out[:, :, -1].copy(),
-        "weighted_omegab": state.w_in[:, :, -1].copy(),
-        "zeta_up": state.zeta_up[:, :, -1].copy(),
-        "shift": state.shift[:, :, -1].copy(),
+        "g": state.g[:, :, -1].copy(),
+        "Omega_trchib": state.Omega_trchib[:, :, -1].copy(),
+        "Omega_chibh": state.Omega_chibh[:, :, -1].copy(),
+        "Omega_chib": state.Omega_chib[:, :, -1].copy(),
+        "Omega_trchi": state.Omega_trchi[:, :, -1].copy(),
+        "Omega_chih": state.Omega_chih[:, :, -1].copy(),
+        "Omega_chi": state.Omega_chi[:, :, -1].copy(),
+        "Omega": state.Omega[:, :, -1].copy(),
+        "Omega_omega": state.Omega_omega[:, :, -1].copy(),
+        "Omega_omegab": state.Omega_omegab[:, :, -1].copy(),
+        "zeta": state.zeta[:, :, -1].copy(),
+        "b": state.b[:, :, -1].copy(),
     }
 
 
@@ -64,7 +64,7 @@ def slab_boundary(
 ) -> BoundaryData:
     """Create and corner-check one slab's immutable data."""
 
-    for name in ("metric", "zeta_up", "shift"):
+    for name in ("g", "zeta", "b"):
         mismatch = float(
             np.max(
                 np.abs(
@@ -80,14 +80,14 @@ def slab_boundary(
     return BoundaryData.create(outgoing, incoming)
 
 
-def concatenate_states(states: Iterable[WeightedState]) -> WeightedState:
+def concatenate_states(states: Iterable[PicardState]) -> PicardState:
     """Join settled slabs, retaining a shared interface only once."""
 
     materialized = list(states)
     if not materialized:
         raise ValueError("at least one settled slab is required")
     arrays: dict[str, Array | None] = {}
-    for item in fields(WeightedState):
+    for item in fields(PicardState):
         pieces = [getattr(state, item.name) for state in materialized]
         if pieces[0] is None:
             if any(piece is not None for piece in pieces):
@@ -103,4 +103,4 @@ def concatenate_states(states: Iterable[WeightedState]) -> WeightedState:
             ],
             axis=2,
         )
-    return WeightedState(**arrays)
+    return PicardState(**arrays)

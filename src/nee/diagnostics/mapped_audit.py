@@ -1,4 +1,4 @@
-"""Independent four-metric audit on native power-coordinate LGL meshes."""
+"""Independent four-g audit on native power-coordinate LGL meshes."""
 
 from __future__ import annotations
 
@@ -93,7 +93,7 @@ def evaluate_mapped_overgrid(
     summary.update(
         {
             "method": (
-                "four-metric connection difference on an independent "
+                "four-g connection difference on an independent "
                 "higher-degree (tau,s) LGL overgrid"
             ),
             "overgrid": overgrid.diagnostics,

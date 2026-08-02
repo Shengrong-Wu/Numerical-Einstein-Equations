@@ -30,10 +30,10 @@ def run(
     with np.load(state_path, allow_pickle=False) as archive:
         u = archive["u"]
         v = archive["v"]
-        q = archive["q"]
-        omega = archive["omega"]
-        metric = archive["metric"]
-        weighted_chib = archive["weighted_chib"]
+        Omega_trchi = archive["Omega_trchi"]
+        Omega = archive["Omega"]
+        g = archive["g"]
+        Omega_chib = archive["Omega_chib"]
         terminal_update = (
             archive["update_maps"][-1]
             if "update_maps" in archive.files
@@ -45,19 +45,19 @@ def run(
             else None
         )
 
-    coefficients = angular.scalar.analyze_retained(q)
+    coefficients = angular.scalar.analyze_retained(Omega_trchi)
     target_points = fibonacci_sphere(target_count)
     _, target_basis, target_condition = spherical_harmonic_collocation(
         target_points, scalar_config.angular.retained_degree
     )
-    target_q = np.einsum(
+    target_Omega_trchi = np.einsum(
         "nm,muv->nuv", target_basis, coefficients, optimize=True
     )
-    target_infimum = np.min(target_q, axis=0)
-    target_supremum = np.max(target_q, axis=0)
+    target_infimum = np.min(target_Omega_trchi, axis=0)
+    target_supremum = np.max(target_Omega_trchi, axis=0)
 
-    inverse = tangent_inverse(source_grid, metric)
-    tr_chib = tensor_trace(weighted_chib, inverse) / omega
+    inverse_g = tangent_inverse(source_grid, g)
+    tr_chib = tensor_trace(Omega_chib, inverse_g) / Omega
     incoming_supremum = np.max(tr_chib, axis=0)
     trapped = (target_supremum <= 0.0) & (incoming_supremum < 0.0)
     candidate = np.unravel_index(
@@ -71,8 +71,8 @@ def run(
             "v_index": index[1],
             "u": float(u[index[0]]),
             "v": float(v[index[1]]),
-            "supremum_q": float(target_supremum[index]),
-            "infimum_q": float(target_infimum[index]),
+            "supremum_Omega_trchi": float(target_supremum[index]),
+            "infimum_Omega_trchi": float(target_infimum[index]),
             "sampled_supremum_tr_chib": float(incoming_supremum[index]),
         }
         if terminal_update is not None:
@@ -110,13 +110,13 @@ def run(
         "state": str(state_path.resolve()),
         "scalar_config": str(config_path.resolve()),
         "criterion": (
-            "sup_S q<=0 and sup_S tr(chib)<0; "
-            "q=Omega^(-1)tr(chi) has the same sign as tr(chi)"
+            "sup_S Omega_trchi<=0 and sup_S tr(chib)<0; "
+            "Omega_trchi=Omega tr(chi) has the same sign as tr(chi)"
         ),
         "source_sphere_count": source_grid.count,
         "independent_sphere_count": target_count,
         "independent_scalar_basis_condition": float(target_condition),
-        "minimum_lapse": float(np.min(omega)),
+        "minimum_lapse": float(np.min(Omega)),
         "sampled_maximum_incoming_expansion": float(np.max(tr_chib)),
         "trapped_section_count": int(np.count_nonzero(trapped)),
         "first_trapped_section": first,
@@ -128,7 +128,7 @@ def run(
         "most_focused_section": {
             **section_record((int(candidate[0]), int(candidate[1]))),
             "sampled_supremum_tr_chi": float(
-                np.max((omega * q)[:, candidate[0], candidate[1]])
+                np.max((Omega_trchi / Omega)[:, candidate[0], candidate[1]])
             ),
         },
     }
@@ -181,10 +181,10 @@ def run(
     axes[1].set_title("Near-singularity sign crossing")
     figure.suptitle(
         r"Independent angular $(-u)\sup_{S_{u,v}}"
-        r"(\Omega^{-1}\mathrm{tr}\chi)$"
+        r"(\Omega\,\mathrm{tr}\chi)$"
     )
     assert image is not None
-    figure.colorbar(image, ax=axes, label=r"$(-u)\sup_S q$")
+    figure.colorbar(image, ax=axes, label=r"$(-u)\sup_S Omega_trchi$")
     figure.savefig(output_directory / "trapped-surface-region.png", dpi=220)
     figure.savefig(output_directory / "trapped-surface-region.pdf")
     plt.close(figure)

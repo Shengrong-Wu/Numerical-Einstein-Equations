@@ -437,7 +437,7 @@ def half_shear_trace_certificate(
     retained_overgrid_tolerance: float = 1.0e-7,
     strong_angular_tolerance: float = 1.0e-5,
 ) -> dict[str, Any]:
-    """Build the three non-conflated half-shear trace certificates.
+    """Build the three non-conflated half-Omega_chih trace certificates.
 
     Callers must supply already projected retained traces:
 
@@ -563,7 +563,7 @@ def half_shear_trace_certificate(
         }
     )
     if not isinstance(diagnostics, dict):
-        raise AssertionError("half-shear trace diagnostics are not a mapping")
+        raise AssertionError("half-Omega_chih trace diagnostics are not a mapping")
     maps = {
         "trace_retained_nodes": node.by_node_v.copy(),
         "trace_retained_overgrid": expand_element_profiles(

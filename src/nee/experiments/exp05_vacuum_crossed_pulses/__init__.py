@@ -1,1 +1,1 @@
-"""Crossed characteristic vacuum shear pulses."""
+"""Crossed characteristic vacuum Omega_chih pulses."""

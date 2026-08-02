@@ -1,4 +1,4 @@
-"""Crossed characteristic vacuum shear data and constraint solves."""
+"""Crossed characteristic vacuum Omega_chih data and constraint solves."""
 
 from __future__ import annotations
 
@@ -88,13 +88,13 @@ def tensor_norm_certificates(
 def _transferred_shear(
     grid: PointSphereGrid,
     reference: Array,
-    metric: Array,
+    g: Array,
     amplitude: float,
 ) -> Array:
-    raw = np.matmul(np.matmul(reference, grid.projector), metric)
+    raw = np.matmul(np.matmul(reference, grid.projector), g)
     raw = 0.5 * (raw + np.swapaxes(raw, -1, -2))
-    inverse = tangent_inverse(grid, metric)
-    return amplitude * tensor_tracefree(raw, metric, inverse)
+    inverse_g = tangent_inverse(grid, g)
+    return amplitude * tensor_tracefree(raw, g, inverse_g)
 
 
 def _rk4_nodes(
@@ -157,27 +157,27 @@ def solve_outgoing_face(
     def metric_rhs(
         value_v: float, state: tuple[Array, ...]
     ) -> tuple[Array, ...]:
-        metric, expansion = state
-        shear = _transferred_shear(
-            grid, x1, metric, math.sqrt(max(value_v, 0.0))
+        g, expansion = state
+        Omega_chih = _transferred_shear(
+            grid, x1, g, math.sqrt(max(value_v, 0.0))
         )
-        inverse = tangent_inverse(grid, metric)
-        shear_norm_sq = tensor_norm_sq(shear, inverse)
+        inverse_g = tangent_inverse(grid, g)
+        shear_norm_sq = tensor_norm_sq(Omega_chih, inverse_g)
         return (
-            expansion[:, None, None] * metric + 2.0 * shear,
+            expansion[:, None, None] * g + 2.0 * Omega_chih,
             -0.5 * expansion**2 - shear_norm_sq,
         )
 
-    metric, expansion = _rk4_nodes(
+    g, expansion = _rk4_nodes(
         v,
         (initial_metric, initial_expansion),
         metric_rhs,
         substeps,
     )
-    inverse = tangent_inverse(grid, metric)
-    shear = np.stack(
+    inverse_g = tangent_inverse(grid, g)
+    Omega_chih = np.stack(
         [
-            _transferred_shear(grid, x1, metric[:, index], math.sqrt(value))
+            _transferred_shear(grid, x1, g[:, index], math.sqrt(value))
             for index, value in enumerate(v)
         ],
         axis=1,
@@ -198,11 +198,11 @@ def solve_outgoing_face(
     def torsion_rhs(
         value_v: float, state: tuple[Array, ...]
     ) -> tuple[Array, ...]:
-        zeta_up, _shift = state
-        value_metric = interpolate(metric, value_v)
+        zeta, _shift = state
+        value_metric = interpolate(g, value_v)
         value_inverse = tangent_inverse(grid, value_metric)
         value_expansion = interpolate(expansion, value_v)
-        value_shear = interpolate(shear, value_v)
+        value_shear = interpolate(Omega_chih, value_v)
         difference, _ = connection_difference(
             grid, value_metric, value_inverse
         )
@@ -214,29 +214,29 @@ def solve_outgoing_face(
         # Sigma^A_B zeta^B; the first factor is raised with g^{-1}.
         mixed = np.matmul(value_inverse, value_shear)
         derivative_zeta = (
-            -2.0 * value_expansion[:, None] * zeta_up
-            - 2.0 * np.einsum("nij,nj->ni", mixed, zeta_up)
+            -2.0 * value_expansion[:, None] * zeta
+            - 2.0 * np.einsum("nij,nj->ni", mixed, zeta)
             + np.einsum("nij,nj->ni", value_inverse, divergence)
             - 0.5 * np.einsum("nij,nj->ni", value_inverse, gradient)
         )
-        derivative_shift = -4.0 * zeta_up
+        derivative_shift = -4.0 * zeta
         return derivative_zeta, derivative_shift
 
-    zeta_up, shift = _rk4_nodes(
+    zeta, b = _rk4_nodes(
         v,
         (initial_zeta, initial_shift),
         torsion_rhs,
         substeps,
     )
     return {
-        "metric": metric,
-        "inverse": inverse,
-        "expansion": expansion,
-        "shear": shear,
-        "omega": np.ones_like(expansion),
-        "weighted_omega": np.zeros_like(expansion),
-        "zeta_up": zeta_up,
-        "shift": shift,
+        "g": g,
+        "inverse_g": inverse_g,
+        "Omega_trchi": expansion,
+        "Omega_chih": Omega_chih,
+        "Omega": np.ones_like(expansion),
+        "Omega_omega": np.zeros_like(expansion),
+        "zeta": zeta,
+        "b": b,
     }
 
 
@@ -248,7 +248,7 @@ def solve_incoming_face(
     substeps: int,
 ) -> dict[str, Array]:
     round_metric = grid.projector
-    shift = rotation_shift(grid.points)
+    b = rotation_shift(grid.points)
     initial_metric = round_metric.copy()
     initial_in_expansion = np.full(grid.count, -2.0)
     initial_zeta = np.zeros((grid.count, 3))
@@ -257,68 +257,68 @@ def solve_incoming_face(
     def rhs(
         value_u: float, state: tuple[Array, ...]
     ) -> tuple[Array, ...]:
-        metric, in_expansion, zeta, out_expansion = state
-        inverse = tangent_inverse(grid, metric)
-        shear = _transferred_shear(
-            grid, x2, metric, math.sqrt(max(value_u + 1.0, 0.0))
+        g, in_expansion, zeta, out_expansion = state
+        inverse_g = tangent_inverse(grid, g)
+        Omega_chih = _transferred_shear(
+            grid, x2, g, math.sqrt(max(value_u + 1.0, 0.0))
         )
-        weighted_chib = (
-            0.5 * in_expansion[:, None, None] * metric + shear
+        Omega_chib = (
+            0.5 * in_expansion[:, None, None] * g + Omega_chih
         )
-        difference, _ = connection_difference(grid, metric, inverse)
-        lie_metric = lie_covariant_tensor(grid, shift, metric)
+        difference, _ = connection_difference(grid, g, inverse_g)
+        lie_metric = lie_covariant_tensor(grid, b, g)
         gradient_in = scalar_gradient(grid, in_expansion)
         advected_in = np.einsum(
-            "ni,ni->n", shift, gradient_in
+            "ni,ni->n", b, gradient_in
         )
         metric_rhs = (
-            in_expansion[:, None, None] * metric
-            + 2.0 * shear
+            in_expansion[:, None, None] * g
+            + 2.0 * Omega_chih
             - lie_metric
         )
         in_rhs = (
             -0.5 * in_expansion**2
-            - tensor_norm_sq(shear, inverse)
+            - tensor_norm_sq(Omega_chih, inverse_g)
             - advected_in
         )
 
         divergence_shear = tensor_divergence(
-            grid, shear, difference, inverse
+            grid, Omega_chih, difference, inverse_g
         )
-        shear_mixed = np.matmul(shear, inverse)
-        target_d3_zeta = (
+        shear_mixed = np.matmul(Omega_chih, inverse_g)
+        target_Omega_nabla3_zeta = (
             -1.5 * in_expansion[:, None] * zeta
             - np.einsum("nij,nj->ni", shear_mixed, zeta)
             - divergence_shear
             + 0.5 * gradient_in
         )
         coordinate_zeta_rhs = (
-            target_d3_zeta
-            - one_form_lie_derivative(grid, shift, zeta)
+            target_Omega_nabla3_zeta
+            - one_form_lie_derivative(grid, b, zeta)
             + np.einsum(
                 "nij,nj->ni",
-                np.matmul(weighted_chib, inverse),
+                np.matmul(Omega_chib, inverse_g),
                 zeta,
             )
         )
 
-        eta_up = np.einsum("nij,nj->ni", inverse, zeta)
+        eta_up = np.einsum("nij,nj->ni", inverse_g, zeta)
         div_eta = vector_divergence(grid, eta_up, difference)
         eta_norm_sq = np.einsum(
-            "ni,nij,nj->n", zeta, inverse, zeta
+            "ni,nij,nj->n", zeta, inverse_g, zeta
         )
-        curvature, _, _ = gaussian_curvature(grid, metric)
+        curvature, _, _ = gaussian_curvature(grid, g)
         gradient_out = scalar_gradient(grid, out_expansion)
         out_rhs = (
             -out_expansion * in_expansion
             + 2.0 * div_eta
             + 2.0 * eta_norm_sq
             - 2.0 * curvature
-            - np.einsum("ni,ni->n", shift, gradient_out)
+            - np.einsum("ni,ni->n", b, gradient_out)
         )
         return metric_rhs, in_rhs, coordinate_zeta_rhs, out_rhs
 
-    metric, in_expansion, zeta, out_expansion = _rk4_nodes(
+    g, in_expansion, zeta, out_expansion = _rk4_nodes(
         u,
         (
             initial_metric,
@@ -329,31 +329,31 @@ def solve_incoming_face(
         rhs,
         substeps,
     )
-    inverse = tangent_inverse(grid, metric)
-    shear = np.stack(
+    inverse_g = tangent_inverse(grid, g)
+    Omega_chih = np.stack(
         [
             _transferred_shear(
-                grid, x2, metric[:, index], math.sqrt(value + 1.0)
+                grid, x2, g[:, index], math.sqrt(value + 1.0)
             )
             for index, value in enumerate(u)
         ],
         axis=1,
     )
-    weighted_chib = (
-        0.5 * in_expansion[..., None, None] * metric + shear
+    Omega_chib = (
+        0.5 * in_expansion[..., None, None] * g + Omega_chih
     )
-    zeta_up = np.einsum("nuij,nuj->nui", inverse, zeta)
+    zeta = np.einsum("nuij,nuj->nui", inverse_g, zeta)
     return {
-        "metric": metric,
-        "weighted_tr_chib": in_expansion,
-        "weighted_hatchib": shear,
-        "weighted_chib": weighted_chib,
-        "weighted_tr_chi": out_expansion,
-        "omega": np.ones_like(in_expansion),
-        "weighted_omegab": np.zeros_like(in_expansion),
-        "zeta_up": zeta_up,
-        "shift": np.broadcast_to(
-            shift[:, None], (grid.count, len(u), 3)
+        "g": g,
+        "Omega_trchib": in_expansion,
+        "Omega_chibh": Omega_chih,
+        "Omega_chib": Omega_chib,
+        "Omega_trchi": out_expansion,
+        "Omega": np.ones_like(in_expansion),
+        "Omega_omegab": np.zeros_like(in_expansion),
+        "zeta": zeta,
+        "b": np.broadcast_to(
+            b[:, None], (grid.count, len(u), 3)
         ).copy(),
     }
 
@@ -377,7 +377,7 @@ def construct_boundary_data(
     incoming = solve_incoming_face(
         grid, mesh.u, tensors[1], substeps=substeps
     )
-    for name in ("metric", "zeta_up", "shift"):
+    for name in ("g", "zeta", "b"):
         mismatch = float(
             np.max(np.abs(outgoing[name][:, 0] - incoming[name][:, 0]))
         )

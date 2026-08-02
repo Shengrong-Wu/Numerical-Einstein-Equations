@@ -2,7 +2,7 @@
 
 Only ``(gamma, log(Omega), b, phi)`` enter this module.  No Picard source,
 previous iterate, null coefficient, or construction context is accepted.
-Curvature is computed from the four-metric connection difference relative to
+Curvature is computed from the four-g connection difference relative to
 the flat ``(u,v)`` product with the unit round-sphere connection.
 """
 
@@ -135,37 +135,37 @@ def spacetime_reference_derivative(
 def build_metric_and_inverse(
     grid: PointSphereGrid,
     metric_sphere: Array,
-    log_omega: Array,
-    shift: Array,
+    log_Omega: Array,
+    b: Array,
 ) -> tuple[Array, Array, Array]:
-    omega = np.exp(log_omega)
-    shape = omega.shape
-    metric = np.zeros(shape + (5, 5), dtype=float)
-    inverse = np.zeros_like(metric)
+    Omega = np.exp(log_Omega)
+    shape = Omega.shape
+    g = np.zeros(shape + (5, 5), dtype=float)
+    inverse_g = np.zeros_like(g)
     sphere_inverse = tangent_inverse(grid, metric_sphere)
-    shift_cov = np.einsum("n...ij,n...j->n...i", metric_sphere, shift)
-    shift_norm_sq = np.einsum("n...i,n...i->n...", shift_cov, shift)
+    shift_cov = np.einsum("n...ij,n...j->n...i", metric_sphere, b)
+    shift_norm_sq = np.einsum("n...i,n...i->n...", shift_cov, b)
 
-    metric[..., 0, 0] = shift_norm_sq
-    metric[..., 0, 1] = -2.0 * omega**2
-    metric[..., 1, 0] = metric[..., 0, 1]
-    metric[..., 0, 2:5] = -shift_cov
-    metric[..., 2:5, 0] = -shift_cov
-    metric[..., 2:5, 2:5] = metric_sphere
+    g[..., 0, 0] = shift_norm_sq
+    g[..., 0, 1] = -2.0 * Omega**2
+    g[..., 1, 0] = g[..., 0, 1]
+    g[..., 0, 2:5] = -shift_cov
+    g[..., 2:5, 0] = -shift_cov
+    g[..., 2:5, 2:5] = metric_sphere
 
-    null_inverse = -0.5 / omega**2
-    inverse[..., 0, 1] = null_inverse
-    inverse[..., 1, 0] = null_inverse
-    inverse[..., 1, 2:5] = null_inverse[..., None] * shift
-    inverse[..., 2:5, 1] = inverse[..., 1, 2:5]
-    inverse[..., 2:5, 2:5] = sphere_inverse
-    return metric, inverse, sphere_inverse
+    null_inverse = -0.5 / Omega**2
+    inverse_g[..., 0, 1] = null_inverse
+    inverse_g[..., 1, 0] = null_inverse
+    inverse_g[..., 1, 2:5] = null_inverse[..., None] * b
+    inverse_g[..., 2:5, 1] = inverse_g[..., 1, 2:5]
+    inverse_g[..., 2:5, 2:5] = sphere_inverse
+    return g, inverse_g, sphere_inverse
 
 
 def connection_difference(
     grid: PointSphereGrid,
-    metric: Array,
-    inverse: Array,
+    g: Array,
+    inverse_g: Array,
     u: Array,
     v: Array,
     *,
@@ -174,7 +174,7 @@ def connection_difference(
 ) -> Array:
     derivative = spacetime_reference_derivative(
         grid,
-        metric,
+        g,
         2,
         u,
         v,
@@ -186,13 +186,13 @@ def connection_difference(
         + np.swapaxes(derivative, -3, -2)
         - np.einsum("n...kij->n...ijk", derivative)
     )
-    return np.einsum("n...lk,n...ijk->n...lij", inverse, lower)
+    return np.einsum("n...lk,n...ijk->n...lij", inverse_g, lower)
 
 
 def direct_ricci(
     grid: PointSphereGrid,
-    metric: Array,
-    inverse: Array,
+    g: Array,
+    inverse_g: Array,
     difference: Array,
     u: Array,
     v: Array,
@@ -202,7 +202,7 @@ def direct_ricci(
 ) -> Array:
     """Compute Ricci from ``D C + C*C`` without null-equation intermediates."""
 
-    ricci = np.zeros_like(metric)
+    ricci = np.zeros_like(g)
     # Ricci of the unit round reference sphere.
     ricci[..., 2:5, 2:5] = grid.projector[:, None, None]
     derivative_u = _differentiate_u(
@@ -290,7 +290,7 @@ def scalar_covector(
 def wave_operator(
     grid: PointSphereGrid,
     phi: Array,
-    inverse: Array,
+    inverse_g: Array,
     difference: Array,
     u: Array,
     v: Array,
@@ -318,34 +318,34 @@ def wave_operator(
     hessian = derivative - np.einsum(
         "n...lij,n...l->n...ij", difference, dphi
     )
-    wave = np.einsum("n...ij,n...ij->n...", inverse, hessian)
+    wave = np.einsum("n...ij,n...ij->n...", inverse_g, hessian)
     return wave, dphi
 
 
 def null_components(
-    tensor: Array, omega: Array, shift: Array
+    tensor: Array, Omega: Array, b: Array
 ) -> dict[str, Array]:
     angular = tensor[..., 2:5, 2:5]
     return {
         "33": (
             tensor[..., 0, 0]
             + 2.0
-            * np.einsum("n...i,n...i->n...", shift, tensor[..., 0, 2:5])
-            + np.einsum("n...i,n...ij,n...j->n...", shift, angular, shift)
+            * np.einsum("n...i,n...i->n...", b, tensor[..., 0, 2:5])
+            + np.einsum("n...i,n...ij,n...j->n...", b, angular, b)
         )
-        / omega**2,
-        "44": tensor[..., 1, 1] / omega**2,
+        / Omega**2,
+        "44": tensor[..., 1, 1] / Omega**2,
         "34": (
             tensor[..., 0, 1]
-            + np.einsum("n...i,n...i->n...", shift, tensor[..., 2:5, 1])
+            + np.einsum("n...i,n...i->n...", b, tensor[..., 2:5, 1])
         )
-        / omega**2,
+        / Omega**2,
         "3A": (
             tensor[..., 0, 2:5]
-            + np.einsum("n...i,n...ij->n...j", shift, angular)
+            + np.einsum("n...i,n...ij->n...j", b, angular)
         )
-        / omega[..., None],
-        "4A": tensor[..., 1, 2:5] / omega[..., None],
+        / Omega[..., None],
+        "4A": tensor[..., 1, 2:5] / Omega[..., None],
         "AB": angular,
     }
 
@@ -439,9 +439,9 @@ def _slice_fields(
     fields: PrimitiveFields, u_slice: slice, v_slice: slice
 ) -> PrimitiveFields:
     return PrimitiveFields(
-        metric=fields.metric[:, u_slice, v_slice],
-        log_omega=fields.log_omega[:, u_slice, v_slice],
-        shift=fields.shift[:, u_slice, v_slice],
+        g=fields.g[:, u_slice, v_slice],
+        log_Omega=fields.log_Omega[:, u_slice, v_slice],
+        b=fields.b[:, u_slice, v_slice],
         phi=(
             None
             if fields.phi is None
@@ -462,13 +462,13 @@ def evaluate(
 ) -> ResidualResult:
     """Evaluate the independent EVE/ESE residual on one audit grid."""
 
-    metric, inverse, sphere_inverse = build_metric_and_inverse(
-        grid, fields.metric, fields.log_omega, fields.shift
+    g, inverse_g, sphere_inverse = build_metric_and_inverse(
+        grid, fields.g, fields.log_Omega, fields.b
     )
     difference = connection_difference(
         grid,
-        metric,
-        inverse,
+        g,
+        inverse_g,
         u,
         v,
         stencil=stencil,
@@ -476,8 +476,8 @@ def evaluate(
     )
     ricci = direct_ricci(
         grid,
-        metric,
-        inverse,
+        g,
+        inverse_g,
         difference,
         u,
         v,
@@ -491,7 +491,7 @@ def evaluate(
         wave, dphi = wave_operator(
             grid,
             fields.phi,
-            inverse,
+            inverse_g,
             difference,
             u,
             v,
@@ -501,15 +501,15 @@ def evaluate(
         residual = ricci - np.einsum(
             "n...i,n...j->n...ij", dphi, dphi
         )
-    omega = np.exp(fields.log_omega)
-    components = null_components(residual, omega, fields.shift)
+    Omega = np.exp(fields.log_Omega)
+    components = null_components(residual, Omega, fields.b)
     einstein_pointwise = positive_null_norm(components, sphere_inverse)
     pointwise = einstein_pointwise
     if wave is not None:
         pointwise = np.sqrt(pointwise**2 + wave**2)
 
     local_metric = np.einsum(
-        "nia,n...ij,njb->n...ab", grid.frames, fields.metric, grid.frames
+        "nia,n...ij,njb->n...ab", grid.frames, fields.g, grid.frames
     )
     area_ratio = np.sqrt(np.maximum(np.linalg.det(local_metric), 0.0))
     section_l2 = np.sqrt(
@@ -552,7 +552,7 @@ def evaluate(
     }
     summary: dict[str, Any] = {
         "method": (
-            "four-metric connection difference from primitive "
+            "four-g connection difference from primitive "
             "(gamma,logOmega,b,phi); no construction context"
         ),
         "stencil": stencil,
@@ -734,7 +734,7 @@ def evaluate_blocked(
         wave_masked = wave_raw
     summary: dict[str, Any] = {
         "method": (
-            "blocked four-metric connection difference from primitive "
+            "blocked four-g connection difference from primitive "
             "(gamma,logOmega,b,phi); no construction context"
         ),
         "stencil": stencil,
