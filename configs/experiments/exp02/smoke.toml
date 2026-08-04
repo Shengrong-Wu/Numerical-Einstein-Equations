@@ -13,11 +13,11 @@ family = "kruskal"
 u_min = -1.0
 u_max = -0.5
 v_min = 0.0
-v_max = 0.1
+v_max = 0.5
 u_map = "affine"
 v_map = "affine"
 u_breakpoints = [-1.0, -0.5]
-v_breakpoints = [0.0, 0.1]
+v_breakpoints = [0.0, 0.5]
 u_degrees = [16]
 v_degrees = [16]
 [angular]

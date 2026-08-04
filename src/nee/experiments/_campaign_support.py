@@ -579,7 +579,7 @@ def run_experiment_2(output: Path) -> dict[str, Any]:
                         )
                     ),
                     u=np.linspace(-1.0, -0.5, nu),
-                    v=np.linspace(0.0, 0.1, nv),
+                    v=np.linspace(0.0, 0.5, nv),
                     points=50,
                     retained_degree=5,
                     iterations=8,
@@ -609,7 +609,7 @@ def run_experiment_2(output: Path) -> dict[str, Any]:
                     v_offset=1.0,
                 ),
                 u=np.linspace(-1.0, -0.5, nu),
-                v=np.linspace(0.0, 0.1, nv),
+                v=np.linspace(0.0, 0.5, nv),
                 points=50,
                 retained_degree=5,
                 iterations=8,

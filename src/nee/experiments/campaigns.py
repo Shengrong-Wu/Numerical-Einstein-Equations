@@ -46,7 +46,7 @@ def schwarzschild_horizon(config: ExperimentConfig, output: Path) -> dict[str, A
             grid, u, v, 1.0, u_offset=0.75, v_offset=1.0
         ),
         u=np.linspace(-1.0, -0.5, 17),
-        v=np.linspace(0.0, 0.1, 17),
+        v=np.linspace(0.0, 0.5, 17),
         points=40,
         retained_degree=3,
         iterations=1,

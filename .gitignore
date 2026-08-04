@@ -1,6 +1,8 @@
 /AGENT.md
 /results/
 /tmp/
+/docs/*
+!/docs/article.pdf
 /.venv/
 /.pytest_cache/
 **/__pycache__/
@@ -17,4 +19,3 @@
 *.out
 *.toc
 .DS_Store
-

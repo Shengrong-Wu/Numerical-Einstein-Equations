@@ -608,7 +608,7 @@ def run_experiment_2(root: Path, quick: bool) -> dict[str, Any]:
                         near_horizon_static_state(grid, u, v, mass, e)
                     ),
                     u=np.linspace(-1.0, -0.5, nu),
-                    v=np.linspace(0.0, 0.1, nv),
+                    v=np.linspace(0.0, 0.5, nv),
                     points=50,
                     retained_degree=5,
                     iterations=5 if quick else 8,
@@ -650,7 +650,7 @@ def run_experiment_2(root: Path, quick: bool) -> dict[str, Any]:
                     v_offset=1.0,
                 ),
                 u=np.linspace(-1.0, -0.5, nu),
-                v=np.linspace(0.0, 0.1, nv),
+                v=np.linspace(0.0, 0.5, nv),
                 points=50,
                 retained_degree=5,
                 iterations=5 if quick else 8,
