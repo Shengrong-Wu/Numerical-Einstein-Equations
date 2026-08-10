@@ -3,11 +3,11 @@ import numpy as np
 from nee.initial_data.nonspherical_scalar import _config
 from nee.exact_solutions import vacuum_benchmarks
 from nee.experiments.exp08_scalar_trapped_section.campaign import (
-    _finite_prefix_config,
-    numerical_config,
+    _mots_control_specs,
+    _production_specs,
 )
+from nee.config import load_config
 from nee.numerics.coordinate_differentiation import high_order_differentiate
-from nee.numerics.scalar_coordinates import mesh_from_config
 from nee.numerics.scalar_initial_data import construct_initial_data
 from nee.numerics.sphere import scalar_gradient
 
@@ -77,13 +77,16 @@ def test_outgoing_raychaudhuri_evolves_Omega_trchi() -> None:
     )
 
 
-def test_exp08_finite_prefix_preserves_whole_base_elements() -> None:
-    base = numerical_config(control=False, continued=False, quick=False)
-    prefix = _finite_prefix_config(base)
-    base_mesh = mesh_from_config(base.scalar_coordinates)
-    prefix_mesh = mesh_from_config(prefix.scalar_coordinates)
+def test_exp08_rectangles_lie_inside_configured_curved_region() -> None:
+    config = load_config(
+        "configs/experiments/exp08/standard.toml"
+    )
+    constant = float(config.physics["curved_constant"])
+    exponent = float(config.physics["curved_exponent"])
+    for spec in (*_production_specs(config), *_mots_control_specs(config)):
+        assert spec.v_cap <= constant * (-spec.u_right) ** exponent + 1.0e-14
+        assert spec.v_cap <= float(config.physics["v_max"])
 
-    assert prefix.scalar_coordinates.tau_elements == 4
-    assert prefix.scalar_coordinates.u_right == base_mesh.u[32]
-    np.testing.assert_array_equal(prefix_mesh.u, base_mesh.u[:33])
-    np.testing.assert_array_equal(prefix_mesh.v, base_mesh.v)
+    target_u = float(config.physics["target_u"])
+    target_v = float(config.physics["target_v"])
+    assert target_v < constant * (-target_u) ** exponent

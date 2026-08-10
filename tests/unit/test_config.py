@@ -25,15 +25,17 @@ def test_reported_crossed_pulse_dimensions() -> None:
     assert (config.angular.work_degree, config.angular.differentiation_degree) == (14, 15)
 
 
-def test_trapped_section_control_changes_only_angular_resolution() -> None:
+def test_apparent_horizon_control_changes_only_angular_resolution() -> None:
     standard = load_config(ROOT / "configs/experiments/exp08/standard.toml")
     control = load_config(ROOT / "configs/experiments/exp08/angular-control.toml")
     assert standard.coordinates == control.coordinates
     assert standard.physics == control.physics
     assert standard.initial_data == control.initial_data
     assert standard.initial_data["scalar_amplitude"] == -2.0
-    assert (standard.angular.retained_degree, standard.angular.work_degree) == (5, 10)
+    assert (standard.angular.retained_degree, standard.angular.work_degree) == (4, 7)
     assert (control.angular.retained_degree, control.angular.work_degree) == (7, 14)
+    assert standard.physics["curved_exponent"] == pytest.approx(25.0 / 24.0)
+    assert standard.physics["target_v"] < standard.physics["v_max"]
 
 
 def test_unknown_top_level_key_is_rejected(tmp_path: Path) -> None:

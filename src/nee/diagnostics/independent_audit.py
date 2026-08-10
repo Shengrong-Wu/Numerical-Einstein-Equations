@@ -406,8 +406,20 @@ def summarize_result_on_mask(
     summary: dict[str, Any] = {
         "label": label,
         "cell_count": int(np.count_nonzero(selected)),
+        "combined_median_uv_L2_sphere": float(
+            np.median(result.section_l2[selected])
+        ),
+        "combined_mean_uv_L2_sphere": float(
+            np.mean(result.section_l2[selected])
+        ),
         "combined_Linf_uv_L2_sphere": float(
             np.max(result.section_l2[selected])
+        ),
+        "einstein_median_uv_L2_sphere": float(
+            np.median(result.einstein_section_l2[selected])
+        ),
+        "einstein_mean_uv_L2_sphere": float(
+            np.mean(result.einstein_section_l2[selected])
         ),
         "einstein_Linf_uv_L2_sphere": float(
             np.max(result.einstein_section_l2[selected])
@@ -422,6 +434,12 @@ def summarize_result_on_mask(
     }
     if result.wave is not None:
         assert result.wave_section_l2 is not None
+        summary["wave_median_uv_L2_sphere"] = float(
+            np.median(result.wave_section_l2[selected])
+        )
+        summary["wave_mean_uv_L2_sphere"] = float(
+            np.mean(result.wave_section_l2[selected])
+        )
         summary["wave_Linf_uv_L2_sphere"] = float(
             np.max(result.wave_section_l2[selected])
         )

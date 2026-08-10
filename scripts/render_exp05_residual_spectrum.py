@@ -169,7 +169,7 @@ def render(
         axis.axhline(value, color="white", linewidth=0.45, alpha=0.55)
 
     colorbar = figure.colorbar(spectrum, ax=axis, pad=0.025)
-    colorbar.set_label(r"$r(u,v)$")
+    colorbar.set_label(r"$E_{\mathrm{Ric}}(u,v)$")
     colorbar.set_ticks(np.arange(-5.0, 4.0))
     colorbar.set_ticklabels(
         [rf"$10^{{{power}}}$" for power in range(-5, 4)]
@@ -180,7 +180,7 @@ def render(
         xlabel=r"$v$",
         ylabel=r"$u$",
         title=(
-            rf"Six-component Ricci residual spectrum "
+            rf"Aggregate Ricci residual spectrum "
             rf"($L={resolution['retained']}$)"
             "\n"
             r"white contours: $10^{-4},10^{-3},10^{-2},10^{-1}$; "

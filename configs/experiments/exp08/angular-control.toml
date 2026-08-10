@@ -1,35 +1,61 @@
 schema_version = 1
+
 [experiment]
 identifier = "exp08"
-title = "Scalar-pulse trapped-section angular control"
+title = "Scalar-pulse apparent-horizon angular control"
 equation_system = "scalar_field"
+
 [physics]
 kappa = 0.25
 delta = 0.1
-v_max = 0.04
+u_right = -0.05
+v_max = 0.05
+curved_constant = 0.1
+curved_exponent = 1.0416666666666667
+target_u = -0.4696271025
+target_v = 0.04
+horizon_v_min = 0.00441
+
 [initial_data]
 scalar_amplitude = -2.0
 profile_scale = 0.01
 shear_amplitude = 0.1
 shear_profile = "quadrupole"
 incoming_scalar_branch = "negative"
-base_tau_elements = 12
-continued_tau_elements = 13
 tau_degree = 8
-s_elements = 3
 s_degree = 11
-continued_u_max = -0.0144360760729319
+atlas_names = ["atlas-u052", "anchor-standard", "atlas-u035", "atlas-u025", "atlas-u015", "atlas-u010", "atlas-u005-refined"]
+atlas_u_rights = [-0.52, -0.45, -0.35, -0.25, -0.15, -0.10, -0.05]
+atlas_tau_elements = [3, 3, 4, 5, 6, 8, 12]
+atlas_s_elements = [3, 3, 3, 3, 3, 3, 4]
+atlas_point_counts = [90, 170, 90, 90, 90, 90, 90]
+atlas_retained_degrees = [4, 5, 4, 4, 4, 4, 4]
+atlas_work_degrees = [7, 10, 7, 7, 7, 7, 7]
+mots_anchor_u = -0.42
+mots_standard_tau_elements = 3
+mots_standard_s_elements = 3
+mots_refined_tau_elements = 4
+mots_refined_s_elements = 4
+mots_point_count = 170
+mots_retained_degree = 5
+mots_work_degree = 10
+mots_graph_degree = 5
+horizon_graph_degree = 4
+horizon_control_degree = 3
+support_u_rights = [-0.357134241489, -0.287027603206, -0.214476589230, -0.172374122545, -0.128803687816, -0.089484658624, -0.071918522434, -0.057800677796]
+
 [coordinates]
 u_min = -1.0
-u_max = -0.02
+u_max = -0.05
 v_min = 0.0
-v_max = 0.04
-u_map = "tau_negative_log"
+v_max = 0.05
+u_map = "curved_inner_atlas_tau_negative_log"
 v_map = "power_0.1"
-u_breakpoints = [-1.0, -0.7218038036465944, -0.5210007309586914, -0.3760603093086394, -0.2714417616594907, -0.1959276960343527, -0.1414213562373095, -0.10207847284895, -0.0736806299728077, -0.0531829589694499, -0.0383876620733297, -0.0277083604976295, -0.02]
-v_breakpoints = [0.0, 6.774035123372111e-7, 0.0006936611966333042, 0.04]
-u_degrees = [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8]
-v_degrees = [11, 11, 11]
+u_breakpoints = [-1.0, -0.05]
+v_breakpoints = [0.0, 0.05]
+u_degrees = [8]
+v_degrees = [11]
+
 [angular]
 construction = "fibonacci"
 point_count = 300
@@ -38,8 +64,9 @@ seed = 0
 retained_degree = 7
 work_degree = 14
 differentiation_degree = 15
+
 [solver]
-maximum_sweeps = 14
+maximum_sweeps = 8
 tolerance = 1e-8
 relaxation = 1.0
 slab_direction = "u"
@@ -48,11 +75,13 @@ sdc_sweeps = 1
 metric_substeps = 4
 boundary_substeps = 16
 stopping_norm = "weighted_maximum"
+
 [projection]
 nonlinear_products = "work_band"
 retained_projection = "least_squares"
 filter = "none"
 filter_strength = 0.0
+
 [audit]
 coordinate_overgrid_increment = 4
 angular_overgrid_degree = 3
@@ -61,6 +90,7 @@ derivative_halo_u = 3
 derivative_halo_v = 3
 endpoint_mask_u = 3
 endpoint_mask_v = 3
+
 [output]
 checkpoints = false
 checkpoint_every = 1

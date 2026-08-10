@@ -194,5 +194,4 @@ def nonspherical_scalar(config: ExperimentConfig, output: Path) -> dict[str, Any
 def trapped_scalar(config: ExperimentConfig, output: Path) -> dict[str, Any]:
     from .exp08_scalar_trapped_section.campaign import run_configuration
 
-    control = config.source_path is not None and config.source_path.stem == "angular-control"
-    return run_configuration(output, control=control, quick=_smoke(config))
+    return run_configuration(output, config)

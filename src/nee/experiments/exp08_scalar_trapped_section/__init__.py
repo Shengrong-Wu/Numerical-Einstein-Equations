@@ -1,1 +1,1 @@
-"""Scalar-pulse trapped-section search with angular control."""
+"""Scalar-pulse trapped-region and apparent-horizon reconstruction."""

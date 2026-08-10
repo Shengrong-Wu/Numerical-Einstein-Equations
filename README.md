@@ -13,7 +13,7 @@ g_4 = -4 Omega^2 du dv
 The project is designed for freely prescribed characteristic geometry beyond
 spherical symmetry. It includes one reusable numerical package, validated
 configurations for eight experiments, exact-solution comparisons, independent
-curvature audits, and a search for trapped two-spheres.
+curvature audits, and a trapped-region/apparent-horizon reconstruction.
 
 The research article is available as [docs/article.pdf](docs/article.pdf).
 
@@ -35,9 +35,9 @@ The main contributions are:
   equation right-hand sides employed by the Picard sweep.
 - Numerical evolution of strong nonspherical characteristic geometry,
   crossed low-regularity data, and nonspherical Einstein--scalar data.
-- An angularly controlled numerical candidate for a strictly trapped
-  two-sphere. This is a trapped-section result, not yet a coordinate-refined
-  apparent-horizon reconstruction.
+- A curved-domain characteristic atlas that resolves a trapped region and
+  reconstructs an apparent-horizon tube from 18 independently evaluated
+  marginally outer trapped surfaces, with coordinate and angular controls.
 
 AI-assisted software development was used for implementation, refactoring,
 testing, and documentation. Mathematical conventions, iteration design,
@@ -56,7 +56,7 @@ studies, and independent residuals.
 | 5. Crossed characteristic shears | `nee.experiments.exp05_vacuum_crossed_pulses` | Prescribes square-root profiles on both initial null hypersurfaces. The shears are finite, while the corresponding transverse curvature is unbounded at the corner. The full rectangle is evolved by slab continuation and audited component by component. |
 | 6. Exact Einstein--scalar benchmarks | `nee.experiments.exp06_regular_exact_scalar` | Evolves four Fisher--JNW solutions and the Schwarzschild vacuum limit. On the finest coordinate grid, the maximum section-metric error remains below `5.4e-10` for all four scalar cases. |
 | 7. Nonspherical Einstein--scalar data | `nee.experiments.exp07_nonspherical_scalar` | Evolves angularly varying lapse, shift, scalar field, and trace-free metric data with fractional-power behavior at the outgoing corner. The protected independent Einstein--scalar curvature residual decreases under coordinate refinement to a maximum of `3.470e-2`. |
-| 8. Scalar-pulse trapped section | `nee.experiments.exp08_scalar_trapped_section` | Evolves a stronger scalar pulse together with anisotropic trace-free metric data. Standard and angular-control runs agree on a finite converged prefix and select the trapped-section candidate `(u, v) = (-0.4696271025, 0.04)`, where the two expansion suprema are `-0.0593348` and `-4.9754530`. |
+| 8. Scalar-pulse apparent horizon | `nee.experiments.exp08_scalar_trapped_section` | Covers `-1 <= u <= -0.05`, `0 <= v <= min(0.1*(-u)^(25/24), 0.05)` with an overlapping inner atlas. The run locates a trapped region and reconstructs 18 MOTSs over `0.00441 <= v <= 0.05`. At `v = 0.04`, the horizon has mean `u = -0.479401999`, area `3.05516039`, and coordinate-refinement graph difference `1.50e-7`. |
 
 Experiments without an explicit interior solution are assessed using
 independently reconstructed curvature residuals. Low-regularity endpoint
