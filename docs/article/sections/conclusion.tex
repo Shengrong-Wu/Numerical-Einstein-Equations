@@ -1,0 +1,50 @@
+\section[Conclusion and Outlook]{\hspace{0.4em}Conclusion and Outlook}%
+\label{sec:conclusion}
+
+We have developed a first-order Picard iteration for the characteristic
+initial value problem for the Einstein vacuum and Einstein--massless-scalar
+equations in double-null gauge.  The construction follows the geometric
+dependency structure of the equations and combines characteristic constraint
+solves with spectral elements in the two null coordinates, pole-free angular
+operators, and independent curvature audits.  This provides a unified
+numerical framework for exact benchmarks and for characteristic data with no
+explicit interior solution.
+
+The regular exact tests cover vacuum Schwarzschild and Kerr geometries and the
+scalar Fisher--JNW family.  Metric errors remain small in regular domains and
+across a Schwarzschild horizon.  The Schwarzschild-interior experiment also
+identifies the present method's loss of accuracy as the curvature singularity
+is approached.  Beyond the explicit families, the vacuum calculations evolve
+a strong nonspherical outgoing perturbation and crossed characteristic data
+with singular limiting initial curvature.  The Einstein--scalar calculations
+further demonstrate
+coordinate convergence for nonspherical, low-regularity characteristic data
+on the protected numerical region.
+
+The final experiment gives numerical evidence for a trapped region and
+reconstructs its apparent horizon.  On the curved characteristic domain, both
+angular discretizations identify the section
+\begin{equation}
+  (u,v)=(-0.4696271025,0.04),
+\end{equation}
+where the two future null expansions are strictly negative on the entire
+sphere.  Eighteen independently reconstructed MOTSs form a sampled
+apparent-horizon tube over $0.00441\leq v\leq0.05$.  Coordinate refinement
+changes its $v=0.04$ graph by $1.50\times10^{-7}$ in maximum norm, while an
+independent higher-angular-band evolution changes its mean location by
+$7.80\times10^{-10}$.  The distinction between exact metric errors,
+independently evaluated curvature residuals, trapped-section sign tests, and
+the graph MOTS equation remains essential when interpreting the experiments.
+
+Three directions are particularly important for future work.  First, the
+angular MOTS solve should be extended with adaptive coordinate refinement
+toward the singular endpoint and across alternative foliations, thereby
+resolving the anisotropic apparent horizon more completely.  Second, varying
+the scalar-pulse and anisotropic-perturbation
+amplitudes would reveal the threshold for trapping and the dependence of the
+first trapped location on the initial data.  Third, improved coordinates,
+adaptive refinement, and more robust iteration strategies are needed to
+improve the approximation near curvature singularities.  These developments
+would extend the present double-null framework from a local numerical
+construction toward a more precise study of anisotropic black-hole formation
+and singular spacetime geometry.

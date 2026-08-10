@@ -1,0 +1,139 @@
+\section{Introduction}
+
+The characteristic initial value problem is a natural formulation of the
+Einstein equations when radiation, null focusing, and the formation of
+trapped surfaces are central.  Instead of prescribing data on a spacelike
+hypersurface, one prescribes compatible data on two intersecting null
+hypersurfaces and evolves their future domain of dependence.  Local
+well-posedness for this problem is known under suitable regularity
+assumptions~\cite{rendall-90,luk-12,cabet-16,hilditch-20}, but its direct
+numerical realization becomes substantially more difficult once spherical
+symmetry is removed.  The use of null hypersurfaces as an evolution framework
+goes back to the Bondi--Sachs description of gravitational radiation and the
+early analysis of characteristic data~\cite{bondi-62,sachs-civp-62}; its
+development as a numerical method is surveyed in~\cite{winicour-12}.
+
+Characteristic numerical relativity has progressed from double-null vacuum
+evolutions with two Killing symmetries~\cite{corkill-stewart-83} and
+spherically symmetric scalar collapse in null coordinates
+~\cite{garfinkle-95,hamade-stewart-96} to axisymmetric vacuum evolution on
+outgoing null cones~\cite{gomez-94} and generic angular data for accurate
+Cauchy--characteristic waveform extraction~\cite{moxon-23}.  Numerical
+relativity has also long evolved nonspherical spacetimes in spacelike
+foliations.  Fully three-dimensional Cauchy calculations have studied
+scalar-field collapse without symmetry assumptions~\cite{deppe-19}, and
+axisymmetric pseudospectral calculations have reached strongly aspherical
+regimes in which the center of collapse bifurcates~\cite{marouda-24}.  The
+first null-coordinate simulations of nonspherical regular data collapsing
+to a black hole were obtained in twist-free axisymmetry for the massless
+scalar field~\cite{gundlach-24}; that work describes the accessible data as
+moderately nonspherical and identifies larger deviations from spherical
+symmetry, as well as vacuum collapse, as important challenges.  Thus the gap
+addressed here is not an absence of nonspherical numerical solutions in
+general.  It is the relative scarcity of direct characteristic evolutions
+with strongly nonspherical, freely prescribed initial geometry in a fully
+angular double-null gauge.
+
+Let $(u,v,\theta^A)$ be double-null coordinates.  We write the spacetime
+metric as
+\begin{equation}\label{eq:introduction-double-null-metric}
+  \bg=-2\Omega^2(\dd u\otimes\dd v+\dd v\otimes\dd u)
+  +g_{AB}(\dd\theta^A-b^A\dd u)\otimes
+   (\dd\theta^B-b^B\dd u).
+\end{equation}
+The metric is therefore represented by the section metric $g_{AB}$, the
+lapse $\Omega$, and the angular shift $b$.  This formulation gives
+considerable freedom to choose the geometry on the two initial null
+hypersurfaces, subject to the characteristic constraints and corner
+compatibility.  In particular, the nonspherical part of the initial metric
+variation can be prescribed directly rather than produced only indirectly
+from a matter perturbation or a spacelike constraint solve.  The fourth
+experiment gives a quantitatively strong example: on its outgoing initial
+hypersurface, where $\Omega=1$, the prescribed data satisfy
+\begin{equation}\label{eq:introduction-strong-asymmetry}
+  \norm{\tf\Lie_{\partial_v}g(-1,0.005)}_{L^2(S)}=7.50960,
+  \qquad
+  \norm{\tf\Lie_{\partial_v}g(-1,0.005)}_{L^\infty(S)}=2.53468.
+\end{equation}
+The perturbation is consequently a substantial geometric departure from
+spherical symmetry, rather than a nonspherical profile whose effect on the
+initial metric is numerically negligible.
+
+This paper develops a first-order Picard iteration for both the Einstein
+vacuum equations
+\begin{equation}
+  \Rc(\bg)=0
+\end{equation}
+and the Einstein--massless-scalar system
+\begin{equation}
+  \Rc(\bg)=\dd\phi\otimes\dd\phi,
+  \qquad \Boxg\phi=0,
+\end{equation}
+in the gauge \eqref{eq:introduction-double-null-metric}.  The iteration is
+organized by the geometry of the characteristic problem.  Data that are
+free, data fixed by the null constraints, and quantities transported in the
+two characteristic directions play different roles in each sweep.  The
+resulting construction is therefore not obtained by treating all coordinate
+components as an undifferentiated system of equations: its update order
+follows the causal and geometric dependency structure of the double-null
+equations.
+
+Two difficulties are particularly important.  The first is to obtain an
+executable form of the equations.  Analytic arguments can often group
+lower-order terms schematically or pass between conventionally equivalent
+forms, whereas numerical evolution requires every displayed sign and
+numerical factor to be fixed consistently.  We address this by checking the
+formulas against identities derived from the four-metric, by testing exact
+solutions, and by evaluating curvature residuals independently of the
+quantities used to construct a Picard sweep.  The second difficulty is the
+iteration itself.  Its design requires identifying a closed hierarchy that
+respects the characteristic constraints, transports information in the
+correct direction, preserves the two initial traces, and remains meaningful
+as the null hypersurfaces focus.  This construction comes from the geometric
+structure of the equations rather than from a generic fixed-point template.
+
+The numerical implementation combines Legendre--Gauss--Lobatto spectral
+elements in the two null coordinates with pole-free spherical
+differentiation, angular Galerkin projection, characteristic constraint
+solves, and independent overgrid audits.  Extensive AI-assisted software
+development made it practical to implement, refactor, and test this large
+coupled system.  The mathematical conventions, iteration design, experiment
+definitions, acceptance criteria, and scientific interpretation remain
+author-controlled; confidence in the computations is based on exact
+benchmarks, convergence studies, immutable characteristic data, and
+independent residual evaluation rather than on code generation itself.
+
+Eight numerical experiments test complementary aspects of the method.  The
+exact-solution tests cover Schwarzschild, Kerr, and Fisher--JNW spacetimes.
+They measure the metric error in regular regions, across a Schwarzschild
+horizon, and toward a curvature singularity.  The vacuum experiments evolve a
+strong nonspherical outgoing perturbation and crossed characteristic data
+whose initial curvature is singular at the corner.  The final experiments
+evolve nonspherical Einstein--scalar data and a stronger scalar pulse toward
+a trapped region.  In the last experiment, an inner atlas of characteristic
+rectangles covers a curved domain adapted to null focusing.  Independent
+four-metric evaluation finds the section
+\begin{equation}\label{eq:introduction-trapped-section}
+  (u,v)=(-0.4696271025,0.04)
+\end{equation}
+on which the two future null expansions are strictly negative everywhere,
+with respective spherical suprema $-0.0802152$ and $-4.28011$.  Solving the
+angular marginally outer trapped surface equation on successive incoming
+null cones then reconstructs an apparent-horizon tube of 18 sections over
+$0.00441\leq v\leq0.05$.  Coordinate and angular controls agree on its
+$v=0.04$ section to better than $1.6\times10^{-7}$ in the graph location.
+
+This trapped-section computation is motivated by An's proof that anisotropic
+outgoing characteristic perturbations of Christodoulou's naked-singularity
+data generate an anisotropic apparent horizon that censors the
+singularity~\cite{an-25}.  The numerical experiment does not constitute a
+proof of that theorem, and the reconstructed tube is tied to the chosen
+incoming-null foliation.  It does, however, provide a coordinate- and
+angularly controlled numerical realization of the associated trapped-region
+mechanism and its anisotropic apparent horizon.
+
+Section~2 fixes the double-null equations and records the analytic framework.
+Section~3 constructs the Picard map and its numerical discretization.
+Sections~4 and~5 present the vacuum and Einstein--scalar experiments,
+respectively, and distinguish exact metric errors from independently
+evaluated curvature residuals.
