@@ -26,8 +26,8 @@ we can define Ricci coefficients, or connection components
 Their transport equations are listed below:
 \begin{equation}\label{eq:Ricci_coefficients_propagation_1}
     \begin{aligned}
-        \nabla_4 \operatorname{tr} \chi+\frac{1}{2}(\operatorname{tr} \chi)^2=&-\operatorname{Ric}_{44}-|\hat{\chi}|^2-2 \omega \operatorname{tr} \chi, \\
-     \nabla_3 \operatorname{tr} \underline{\chi}+\frac{1}{2}(\operatorname{tr} \underline{\chi})^2=&-\operatorname{Ric}_{33}-|\underline{\hat{\chi}}|^2-2 \underline{\omega} \operatorname{tr} \underline{\chi},
+        \nabla_4 \operatorname{tr} \chi+|{\chi}|^2 =&-\operatorname{Ric}_{44}-2 \omega \operatorname{tr} \chi, \quad 
+     \nabla_3 \operatorname{tr} \underline{\chi}+|\underline{{\chi}}|^2 =-\operatorname{Ric}_{33}-2 \underline{\omega} \operatorname{tr} \underline{\chi},
     \end{aligned}
 \end{equation}
 \begin{equation}\label{eq:Ricci_coefficients_propagation_2}
@@ -38,23 +38,19 @@ Their transport equations are listed below:
 \end{equation}
 \begin{equation}
     \begin{aligned}
-        \nabla_3 \operatorname{tr} \chi
-        % =&-\frac{1}{2} \operatorname{tr} \chi \operatorname{tr} \underline{\chi}+\sg^{A B} R_{3 A B 4}+2 \underline{\omega} \operatorname{tr} \chi+2 \sdiv \eta+2|\eta|^2-\hat{\chi} \cdot \underline{\hat{\chi}}\\
+        \nabla_3 \operatorname{tr} \chi 
         =&-\tr\chi\tr\chib+2\omegab\tr\chi+2\sdiv\eta+2\left|\eta\right|^2-2K+R+\Rc_{34}, \\
-        \nabla_4 \operatorname{tr} \underline{\chi}
-        % =&-\frac{1}{2} \operatorname{tr} \chi \operatorname{tr} \underline{\chi}+\sg^{A B} R_{3 A B 4}+2 \omega \operatorname{tr} \underline{\chi}+2 \sdiv \underline{\eta}+2|\underline{\eta}|^2-\hat{\chi} \cdot \underline{\hat{\chi}}\\
+        \nabla_4 \operatorname{tr} \underline{\chi} 
         =&-\tr\chi\tr\chib+2\omega\tr\chib+2\sdiv\etab+2\left|\etab\right|^2-2K+R+\Rc_{34}.
     \end{aligned}
 \end{equation} 
 \begin{equation}\label{eq:Ricci_coefficients_propagation_3}
     \begin{aligned}
-        \nabla_4 \eta=&-\chi \cdot(\eta-\underline{\eta})-\frac{1}{2} R_{A 434}, \\
-        \nabla_3 \underline{\eta}=&-\underline{\chi} \cdot(\underline{\eta}-\eta)-\frac{1}{2} R_{A 343}, \\
-        \nabla_4 \underline{\omega}
-        % =&\frac{1}{4}\left(\operatorname{Ric}_{34}+\sg^{A B} R_{3 A B 4}\right)+2 \underline{\omega} \omega+\frac{1}{2}|\eta|^2-\eta \cdot \underline{\eta}\\
+        \nabla_4 \eta=&-\chi \cdot(\eta-\underline{\eta})-\frac{1}{2} R_{A 434}, \quad
+        \nabla_3 \underline{\eta}=-\underline{\chi} \cdot(\underline{\eta}-\eta)-\frac{1}{2} R_{A 343}, \\
+        \nabla_4 \underline{\omega} 
         =&2\omega\omegab-\frac{1}{2}  K+\frac{1}{2} \Rc_{34}+\frac{1}{4} R +\frac{1}{4}\chih\cdot\chibh-\frac{1}{8}\tr\chi\,\tr\chib+\frac{1}{2}\left|\eta\right|^2-\eta\cdot\etab, \\
-        \nabla_3 \omega
-        % =&\frac{1}{4}\left(\operatorname{Ric}_{34}+\sg^{A B} R_{3 A B 4}\right)+2 \underline{\omega} \omega+\frac{1}{2}|\underline{\eta}|^2-\eta \cdot \underline{\eta}\\
+        \nabla_3 \omega 
         =&2\omega\omegab-\frac{1}{2}  K+\frac{1}{2} \Rc_{34}+\frac{1}{4} R +\frac{1}{4}\chih\cdot\chibh-\frac{1}{8}\tr\chi\,\tr\chib+\frac{1}{2}\left|\underline\eta\right|^2-\eta\cdot\etab.
     \end{aligned}
 \end{equation}
@@ -98,7 +94,7 @@ we define the curvature components
 \end{equation}
 Then Gauss-Codazzi equations imply the following algebraic relations,
 \begin{equation}
-    K=-\rho+\frac{1}{2}R+\Rc_{34}+\frac{1}{2}\chibh\cdot\chih-\frac{1}{4}\tr\chib\tr\chi,
+    K=-\rho+\frac{1}{3}R+\frac{1}{2}\Rc_{34}+\frac{1}{2}\chibh\cdot\chih-\frac{1}{4}\tr\chib\tr\chi,
 \end{equation}
 \begin{equation}
     \cl\eta=-\cl\etab=\sigma+\frac{1}{2}\chibh\wedge\chih,
@@ -203,7 +199,7 @@ The methods of deriving the equations of difference and doing estimates are simi
 so we only write the proof in sketch. 
 
 Define auxiliary functions $\omega^\dagger,\omegab^\dagger$ by
-\[\nabla_3\omega^\dagger=\frac{1}{2}\cl\zeta,\ \omega^\dagger|_{H_{-1}}=0,\ \nabla_4\omegab^\dagger=\frac{1}{2}\cl\zeta,\ \omegab^\dagger|_{\Hb_0}=0.\]
+\[\nabla_3\omega^\dagger=\frac{1}{2}\cl\zeta,\ \omega^\dagger|_{H_0}=0,\ \nabla_4\omegab^\dagger=\frac{1}{2}\cl\zeta,\ \omegab^\dagger|_{\Hb_0}=0.\]
 We make bootstrap assumption
 \begin{equation*}
     \begin{aligned}
@@ -211,10 +207,10 @@ We make bootstrap assumption
         &\qquad+\|\wt{K},\wt{\betab},\nabla\wt{\eta},\nabla\wt\etab,\nabla\wt{\chib},\nabla\wt{\omegab},\nabla\wt{\omegab^\dagger}\|_{L^2_uH^3(S)}\leq B\exp(D(v+u))\epsilon.
     \end{aligned}
 \end{equation*}
-We will prove that we can choose $D$ sufficiently large so that the bootstrap constant $B$ can be improved to $B\leq 1$.
+We first fix $B$ sufficiently large to control the initial-data and forcing terms, and then choose $D$ sufficiently large to improve the bootstrap bound from $B$ to $B/2$.
 
-The motivation is direct. Let $\partial_uf\leq C_0f,\partial_vf\leq C_0f$, and suppose
-$$f(u,v)\leq B\exp(D(v+u))\epsilon,$$ then we integrate it 
+For motivation, let $f\geq0$ satisfy $\partial_uf\leq C_0f$ and $\partial_vf\leq C_0f$. Assume its data on $u=0$ and $v=0$ are bounded by $C_0\epsilon$. Under the bootstrap bound
+$$f(u,v)\leq B\exp(D(v+u))\epsilon,$$ integration gives
 \begin{equation*}
     \begin{aligned}
         f(u,v)-f(0,v)\leq&C_0\int_{0}^u f(u^\prime,v) du^\prime\\
@@ -223,21 +219,20 @@ $$f(u,v)\leq B\exp(D(v+u))\epsilon,$$ then we integrate it
         \leq & \frac{C_0B}{D}\left(\exp(D(u+v))-\exp(Du)\right)\epsilon \leq \frac{C_0B}{D} \exp(D(u+v))\epsilon.
     \end{aligned}
 \end{equation*}
-If we choose $D^{1/2}\geq C_0B$, the bootstrap assumption will be closed. Absorbing the bootstrap constant by the parameter $D$ actually shows the increasing rate is controlled exponentially. Even though the norms increase quickly, they will not exceed $O(\epsilon)\leq o(\epsilon^{1/2})$ in finite region.
+Choosing $B\geq4C_0$ and $D\geq4C_0$ improves this bound to $(B/2)\exp(D(u+v))\epsilon$. With $B$ and $D$ fixed independently of $\epsilon$, the resulting bound is $O(\epsilon)=o(\epsilon^{1/2})$ on a fixed finite region.
 
-In summary, we conclude 
+For the energy estimates we use the following integration bounds. All null integrals run from $0$ to the indicated endpoint, and the hypotheses hold throughout the rectangle.
 \begin{lemma}
-    Suppose $\|f\|_{L^2(S_{u,v})}\leq B\exp(D(v+u))\epsilon$, then we have
+    Let $D>0$. Suppose $\|f\|_{L^2(S_{u,v})}\leq B\exp(D(v+u))\epsilon$, then we have
     \begin{equation}
-        \|f\|_{L^2_uL^2(S)}+\|f\|_{L^2_vL^2(S)} \leq D^{-1/2}\exp(D(v+u))\epsilon,
+        \|f\|_{L^2_uL^2(S)}+\|f\|_{L^2_vL^2(S)} \leq \sqrt{2}BD^{-1/2}\exp(D(v+u))\epsilon.
     \end{equation}
-    when $D$ is sufficiently large.
 
     Suppose either $\|h\|_{L^2_uL^2(S)}\leq B\exp(D(u+v))\epsilon$ or $\|h\|_{L^2_vL^2(S)}\leq B\exp(D(u+v))\epsilon$, then we have    
     \begin{equation}
-        \|h\|_{L^2_uL^2_vL^2(S)} \leq D^{-1/2}\exp(D(v+u))\epsilon,
+        \|h\|_{L^2_uL^2_vL^2(S)} \leq B(2D)^{-1/2}\exp(D(v+u))\epsilon.
     \end{equation}
-    when $D$ is sufficiently large.
+    The same estimates hold with $H^3(S)$ in place of $L^2(S)$.
 \end{lemma}
 
 We use notation
@@ -259,41 +254,20 @@ Energy estimates give that
 \begin{equation*}
     \begin{aligned}
         &\|\wt\Psi_1\|^2_{L^2_vH^3(S)}+\|\wt\Psi_2\|^2_{L^2_uH^3(S)}\\
-        &\qquad\qquad\lesssim \epsilon^2+\|\wt{\partial g},\wt{g},\wt{\psi},\wt{\nabla\psi},\wt\Psi,\wt{b}\|^2_{L^2_uL^2_vH^3(S)}\lesssim (1+D^{-1/2})\exp(2D(u+v))\epsilon^2.
+        &\qquad\qquad\lesssim \epsilon^2+\|\wt{\partial g},\wt{g},\wt{\psi},\wt{\nabla\psi},\wt\Psi,\wt{b}\|^2_{L^2_uL^2_vH^3(S)}\lesssim (1+B^2/D)\exp(2D(u+v))\epsilon^2.
     \end{aligned}
 \end{equation*}
 Applying the estimate to pairs
 \[(\beta,(K,\cl\eta)),\ ((K,\cl\etab),\betab),\ (\nabla\tr\chib,0),\ (0,\nabla\tr\chi),\]
 \[ (\dv\etab-K,0),\ (0,\dv\eta-K),\ (\nabla\omega+{}^*\nabla\omega^\dagger-\frac{1}{2}\beta,0),\ (0,-\nabla\omegab+{}^*\nabla\omegab^\dagger-\frac{1}{2}\betab),\]
-will finish the proof. 
+yields a bound $C(1+B^2/D)\exp(2D(u+v))\epsilon^2$ for the square of the full bootstrap norm, where $C=C(C_0)$ is independent of $B$, $D$, and $\epsilon$. Choosing $B^2\geq8C$ and then $D\geq8C$ improves the bootstrap bound to $(B/2)\exp(D(u+v))\epsilon$, completing the proof sketch.
 \begin{remark}
     The conditions 
     \[\oc{\Rc}_{44}(0,v)=0,\ \oc{\Rc}_{33}(u,0)=0,\]
     guarantee that $(\oc{g},\oc{b},\oc{\Omega})$ is a valid initial data set for characteristic initial value problem of Einstein vacuum equation, and 
     \[\oc{\Rc}_{4A}(0,v)=0,\ \oc{\Rc}_{3A}(u,0)=0,\]
-    ensure that $\oc\zeta$ along $H_{0}$ and $\Hb_0$ is equal to the $\zeta$ of corresponding EVE solution. 
+    ensure that $\oc\zeta$ along $H_{0}$ and $\Hb_0$ is equal to the $\zeta$ of corresponding genuine solution. 
 \end{remark}
 
-% For Einstein scalar-field equations, we have similar proposition.
-% \begin{theorem}
-%     We consider metric $\oc{g}_{AB},\oc{b},\oc{\Omega},\oc{\phi}$ on $(0, 1)\times (0,1)\times \mathbb{S}^2$ such that
-%     \[\left(\oc{\Rc}_{33}-\oc{D_3\phi}\oc{D_3\phi}\right)(u,0)=0,\ \left(\oc{\Rc}_{44}-\oc{D_4\phi}\oc{D_4\phi}\right)(0,v)=0,\] 
-%     \[\left(\oc{\Rc}_{4A}-\oc{D_3\phi}\oc{\nabla_A\phi}\right)(0,v)=0,\ \left(\oc{\Rc}_{3A}-\oc{D_3\phi}\oc{\nabla_A\phi}\right)(u,0)=0,\]
-%     and estimates 
-%     \begin{equation}
-%         \|\oc{\Rc}-\oc{d\phi}\oc{d\phi}\|_{L^\infty_uL^\infty_vH^3(S)}\leq \epsilon.
-%     \end{equation}
-%     We assume moreover 
-%     \begin{equation}
-%         \| \partial_{\mathbb{S}}\oc{g}, \partial_{\mathbb{S}}\oc{b}, \partial_{\mathbb{S}}\oc\Omega, \oc{\psi}\|_{L^\infty_u L^\infty_v H^4(S)} \leq C_0,
-%     \end{equation}
-%     where $\psi$ stands for Ricci coefficients in interest.
-%     Then for $\epsilon=\epsilon(C_0)$ sufficiently small, there exists $(g,b,\Omega)$ solving EVE on $( 0,1)\times (0,1)\times \mathbb{S}^2$ with initial data 
-%     \[(g,b,\Omega)=(\oc{g},\oc{b},\oc\Omega),\ {\rm on}\ \Hb_0\cup H_{0},\]
-%     and estimates
-%     \begin{equation}
-%         \|g-\oc{g},b-\oc{b},\Omega-\oc{\Omega}\|_{L^\infty_u L^\infty_v H^4(S)}\leq \epsilon^{1/2}.
-%     \end{equation}
-% \end{theorem}
-
-% The methods of deriving the equations of difference and doing estimates are similar to section 7 of \cite{an-26},
+\subsection*{Acknowledgments}
+SW is supported by the NUS President Graduate Fellowship. 

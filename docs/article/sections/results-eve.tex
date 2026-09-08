@@ -492,12 +492,6 @@ six successive $v$-slabs.  Their terminal weighted updates are
 \end{equation}
 all below the prescribed $10^{-8}$ tolerance.
 
-Let $E_{\mathrm{Ric}}(u,v)$ denote the sum of the sectionwise $L^2(S_{u,v})$
-norms of the six weighted Ricci quantities listed in the curvature-residue
-subsection.  Table \ref{tab:results-exp5-residual} compares this aggregate
-residual on the protected mask with the same statistic on the entire
-coordinate grid.
-
 \begin{table}[htbp]
   \centering
   \caption{Aggregate Ricci residual for the crossed-shear experiment.}
@@ -517,6 +511,15 @@ coordinate grid.
   \end{tabular}
 \end{table}
 
+Let $E_{\mathrm{Ric}}(u,v)$ denote the sum of the sectionwise $L^2(S_{u,v})$
+norms of the six weighted Ricci quantities listed in the curvature-residue
+subsection.  Table \ref{tab:results-exp5-residual} compares this aggregate
+residual on the protected mask with the same statistic on the entire
+coordinate grid.
+
+
+
+
 The protected mask is constructed separately in the two characteristic
 coordinates.  In each coordinate it removes the complete first and last
 spectral elements and three LGL nodes on each side of every remaining
@@ -532,7 +535,7 @@ $1.78\times10^{-15}$.
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{%
+  \includegraphics[width=0.8\textwidth]{
     ../experiments/exp05/results/residual-spectrum.png}
   \caption{Spectrum of the aggregate Ricci residual
   $E_{\mathrm{Ric}}(u,v)$.  Colors show the elementwise spectral
@@ -553,4 +556,4 @@ unresolved layers, the maximum protected residual is
 $5.022\times10^{-3}$ as reported in Table
 \ref{tab:results-exp5-residual}.
 
-\clearpage
+% \clearpage

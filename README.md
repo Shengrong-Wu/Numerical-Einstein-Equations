@@ -15,7 +15,7 @@ spherical symmetry. It includes one reusable numerical package, validated
 configurations for eight experiments, exact-solution comparisons, independent
 curvature audits, and a trapped-region/apparent-horizon reconstruction.
 
-The research article is available as [docs/article.pdf](docs/article.pdf).
+The research article is available as [docs/article/article.pdf](docs/article/article.pdf).
 
 ## Research contributions
 
@@ -118,7 +118,8 @@ unless the machine has ample memory.
 ├── configs/
 │   └── experiments/       Validated smoke and research configurations
 ├── docs/
-│   └── article.pdf        Research article
+│   └── article/
+│       └── article.pdf    Research article
 ├── scripts/               Analysis and figure-generation helpers
 ├── src/
 │   └── nee/               Installable numerical package
@@ -178,3 +179,6 @@ run.
 
 Citation metadata are provided in `CITATION.cff`. The source code and
 documentation are distributed under the MIT License; see `LICENSE`.
+
+## Declaration of AI usage
+The author found the iteration scheme for Einstein equations, and used AI agents to build the codebase for numerical experiments.

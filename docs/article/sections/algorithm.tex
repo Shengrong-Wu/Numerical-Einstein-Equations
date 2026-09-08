@@ -2,6 +2,15 @@
 
 \section{Picard Iteration Design and Numerical Strategies}
 In this section, we introduce the iteration design and numerical strategies.
+The Picard hierarchy below is a numerical adaptation of the approximation
+scheme in~\cite{wu-26}.  We preserve its principal dependency order---freezing
+nonlinear coefficients at the previous iterate and successively solving
+transport equations in their geometrically distinguished null directions---but
+modify individual equations when an equivalent form is more suitable for
+numerical integration.  Accordingly, the formulas in this section define the
+numerical iteration used in the present work; they should not be read as a
+literal transcription of the analytic scheme in~\cite{wu-26}.
+
 \subsection{Picard iteration for Einstein equations}
 In this section, we first consider Einstein scalar-field equations
 \[\Rc=d\phi\otimes d\phi,\ \square_g\phi =0.\]

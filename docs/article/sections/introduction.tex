@@ -78,6 +78,17 @@ components as an undifferentiated system of equations: its update order
 follows the causal and geometric dependency structure of the double-null
 equations.
 
+The iteration architecture is adapted from the approximate-spacetime
+construction introduced by An and Wu~\cite{wu-26}.  Both constructions use a
+triangular hierarchy of double-null transport equations, with nonlinear
+coefficients evaluated at the preceding iterate.  The present work modifies
+that analytic construction into an executable numerical Picard map: it uses
+numerically convenient weighted variables and equivalent transport
+identities, imposes both characteristic traces discretely, and incorporates
+projection, relaxation, and residual auditing.  Thus the underlying
+geometric organization is largely the same, while some update equations and
+terms are reformulated for numerical computation.
+
 Two difficulties are particularly important.  The first is to obtain an
 executable form of the equations.  Analytic arguments can often group
 lower-order terms schematically or pass between conventionally equivalent

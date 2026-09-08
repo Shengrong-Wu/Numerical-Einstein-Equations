@@ -2,7 +2,11 @@
 /results/
 /tmp/
 /docs/*
-!/docs/article.pdf
+!/docs/article/
+!/docs/setup.tex
+!/docs/experiments/
+/docs/experiments/*
+!/docs/experiments/exp*/
 /.venv/
 /.pytest_cache/
 **/__pycache__/
@@ -18,4 +22,5 @@
 *.log
 *.out
 *.toc
+*.synctex.gz
 .DS_Store
