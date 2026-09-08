@@ -184,7 +184,11 @@ def _audit_mesh(public):
         neighbor_count=public.angular.neighbor_count, degree=4,
         spectral_degree=public.angular.differentiation_degree)
     coordinates = CharacteristicLGLMesh.create(
-        -np.log(-np.asarray(public.coordinates.u_breakpoints)), public.coordinates.u_degrees[0],
+        # Use the same canonical uniform tau grid as the evolution. Taking
+        # log(exp(tau)) through the public physical breakpoints shifts a few
+        # nodes by one ulp, which invalidates exact saved-grid replay.
+        np.linspace(0.0, math.log(2.0), len(public.coordinates.u_degrees) + 1),
+        public.coordinates.u_degrees[0],
         np.sqrt(np.asarray(public.coordinates.v_breakpoints)/float(public.physics['v1'])),
         public.coordinates.v_degrees[0], float(public.physics['v1']))
     return grid, coordinates
