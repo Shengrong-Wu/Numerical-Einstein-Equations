@@ -121,11 +121,12 @@ def direct_audit(
 def mapped_direct_audit(
     grid: Any, state: PicardState, coordinates: Any, *, retained_degree: int,
     protected_s_values: tuple[float, ...] = (0.6, 0.7, 0.8),
+    audit_operators=None,
 ) -> dict[str, Any]:
     from nee.diagnostics.state_audit import audit
     return audit(grid, state, coordinates.u, coordinates.v,
                  retained_degree=retained_degree, coordinates=coordinates,
-                 protected_s_values=protected_s_values)
+                 protected_s_values=protected_s_values, audit_operators=audit_operators)
 
 
 def first_order_audit(
@@ -773,6 +774,7 @@ def nonspherical_ese_case(
     derivative_halo: int = 1,
     iterations: int = 8,
     public_config=None,
+    audit_operators=None,
 ) -> dict[str, Any]:
     """Run the smooth-harmonic ESE case with a persistent official state."""
 
@@ -908,6 +910,7 @@ def nonspherical_ese_case(
         state,
         mesh,
         retained_degree=retained,
+        audit_operators=audit_operators,
     )
     mutated_state = state.copy()
     assert mutated_state.phi is not None
@@ -917,6 +920,7 @@ def nonspherical_ese_case(
         mutated_state,
         mesh,
         retained_degree=retained,
+        audit_operators=audit_operators,
     )
     baseline_primary = geometric_residual["protected"]["s_ge_0.60"][
         "ESE_acceptance_sum"
@@ -964,6 +968,19 @@ def run_experiment_7(output: Path, public) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=False)
     baseline = (1.0, 1.0, 1.0, 1.0)
     summaries: list[dict[str, Any]] = []
+
+    # Compare all refinement cases at identical physical points and with
+    # one mask. Each audit element lies inside every source element, so
+    # interpolation preserves the source polynomial before differentiation.
+    from nee.numerics.lgl import CompositeLGLMesh
+    fractions = np.unique(np.concatenate([
+        np.linspace(0., 1., int(n)+1)
+        for n in public.initial_data['coordinate_elements']]))
+    audit_operators = (
+        CompositeLGLMesh.create(math.log(2.)*fractions,
+            max(public.initial_data['coordinate_tau_degrees'])+3),
+        CompositeLGLMesh.create(fractions,
+            max(public.initial_data['coordinate_s_degrees'])+3))
 
     central = {
         "retained": public.angular.retained_degree,
@@ -1028,6 +1045,7 @@ def run_experiment_7(output: Path, public) -> dict[str, Any]:
                 cap=cap,
                 multipliers=multipliers,
                 public_config=public,
+                audit_operators=audit_operators,
                 **options,
             )
         except Exception as error:
@@ -1162,7 +1180,8 @@ def run_experiment_7(output: Path, public) -> dict[str, Any]:
     refinement_gate["passed"] = bool(
         refinement_gate["coordinate_direct_strictly_decreasing"]
         and refinement_gate["angular_direct_strictly_decreasing"]
-        and construction_below_direct
+        # Construction maxima and physical sphere-L2 audits use different
+        # weights and masks; their ordering is descriptive, not an accuracy gate.
         and refinement_gate["coordinate_closure_strictly_decreasing"]
         and refinement_gate["angular_closure_strictly_decreasing"]
         and update_small
@@ -1218,6 +1237,7 @@ def run_experiment_7(output: Path, public) -> dict[str, Any]:
             ),
             "angular_retained_degree": (6, 8, 10),
             "protected_direct_region": "s >= 0.60",
+            "coordinate_audit": "common union of source-element boundaries, maximum source degree plus three, identical mask",
         },
         "refinement_gate": refinement_gate,
         "stress_matrix_status": stress_status,

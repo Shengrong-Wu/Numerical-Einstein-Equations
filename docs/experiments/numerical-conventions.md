@@ -53,16 +53,22 @@ these same prescribed regions.
 
 ## Audit sampling
 
-For Experiments 4, 7, and 8 the independent residual audit raises each mapped
-coordinate element degree by three and resamples the retained angular fields
-at (L+1)^2+8 independent sphere points. This is a coordinate overgrid and a
-separate angular sampling grid, not an increase in the retained angular band.
-For example, L=8 uses 89 audit points. The angular convergence campaign changes
-L in the evolved state; it does not obtain extra modes by interpolation.
-The residual metadata records the actual grids and all protected masks.
-Experiment 5 instead differentiates its final native grid and uses its stated
-composite mask. Experiment 8 separately resamples the trapping sign test on
-the configured 1000-point sphere grid.
+For Experiments 4, 7, and 8 the independent residual audit transfers scalars,
+tangent vectors, and symmetric tensors in their respective harmonic spaces.
+Full weighted forms contain products of retained fields, so their transfer
+uses up to twice the retained degree, limited by the source grid's ability to
+resolve the derivative basis. The independent grid adds at least 12 sphere
+points and differentiates at one degree above the transfer band. Fitting the
+ambient tensor components as degree-L scalar fields would discard geometric
+modes; an analytic tensor-harmonic regression test detects this error.
+
+Each mapped coordinate element is normally raised by three degrees. Experiment
+7 instead uses one common partition containing the boundaries of every source
+refinement and one common degree (maximum source degree plus three), so all
+refinements use identical coordinate samples and protected masks. The metadata
+records these actual grids. Experiment 5 differentiates its native grid with
+its stated composite mask. Experiment 8 separately resamples the trapping
+sign test on the configured 1000-point sphere grid.
 
 The common TOML schema includes fixed legacy protocol descriptors as well as
 adjustable controls. Only fields listed as adjustable in parameter-contract.json

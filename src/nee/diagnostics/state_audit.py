@@ -11,6 +11,7 @@ import numpy as np
 from nee.discretization.overgrid import (
     _angular_resample, _coordinate_resample, _composite_interpolate,
     _project_tensor, _project_vector, resample_primitives, resample_primitives_power,
+    TypedAngularResampler,
 )
 from nee.state.fields import PrimitiveFields
 from nee.state.iterate import PicardState
@@ -20,7 +21,8 @@ from nee.diagnostics.construction_residuals import evaluate as closure_audit
 
 def audit(grid, state, u, v, *, retained_degree, coordinates=None,
           protected_s_values=(0.6, 0.7, 0.8), point_count=None,
-          degree_increment=3, coordinate_increment=4, halo=3):
+          degree_increment=3, coordinate_increment=4, halo=3,
+          audit_operators=None):
     if not isinstance(state, PicardState):
         from nee.solver.backend import from_numerical
         state = from_numerical(state, grid)
@@ -31,10 +33,22 @@ def audit(grid, state, u, v, *, retained_degree, coordinates=None,
             u_count=len(u)+coordinate_increment, v_count=len(v)+coordinate_increment,
             point_count=count, harmonic_degree=retained_degree)
     else:
+        # A full weighted form includes products such as (Omega trchi)*g.
+        # Preserve their typed work band; scalar degree-L fits of ambient
+        # tensor components would discard genuine geometric modes.
+        transfer_degree = min(2*retained_degree, int(np.sqrt(grid.count-1))-2)
+        if transfer_degree < retained_degree:
+            raise ValueError('source sphere cannot resolve the retained tensor audit band')
+        angular_transfer = TypedAngularResampler(transfer_degree)
+        count = point_count or max(grid.count+12, (transfer_degree+2)**2+8)
         target = resample_primitives_power(grid, primitives, coordinates,
             u_count=len(u)+coordinate_increment, v_count=len(v)+coordinate_increment,
-            point_count=count, harmonic_degree=retained_degree,
-            spectral_degree_increment=degree_increment)
+            point_count=count, harmonic_degree=transfer_degree,
+            spectral_degree_increment=degree_increment,
+            angular_transfer=angular_transfer,
+            differentiation_degree=transfer_degree+1,
+            audit_operators=audit_operators)
+        target.diagnostics['source_retained_degree'] = retained_degree
 
     def transfer(value):
         if coordinates is None:
@@ -42,7 +56,8 @@ def audit(grid, state, u, v, *, retained_degree, coordinates=None,
         else:
             value = _composite_interpolate(coordinates.tau, value, target.coordinates.tau, axis=1)
             value = _composite_interpolate(coordinates.s, value, target.coordinates.s, axis=2)
-        return _angular_resample(value, grid, target.grid, retained_degree)[0]
+        resample = _angular_resample if coordinates is None else angular_transfer
+        return resample(value, grid, target.grid, retained_degree)[0]
 
     arrays = {name: transfer(value) for name, value in state.arrays().items()
               if name not in {'g', 'b', 'log_Omega', 'phi'}}
@@ -79,8 +94,10 @@ def audit(grid, state, u, v, *, retained_degree, coordinates=None,
     safe_u[h:-h] = True
     safe_v[h:-h] = True
     if coordinates is not None:
-        for mesh, nodes, safe in ((coordinates.tau, target.coordinates.tau, safe_u),
-                                  (coordinates.s, target.coordinates.s, safe_v)):
+        tau_mask_mesh, s_mask_mesh = ((coordinates.tau, coordinates.s)
+                                    if audit_operators is None else audit_operators)
+        for mesh, nodes, safe in ((tau_mask_mesh, target.coordinates.tau, safe_u),
+                                  (s_mask_mesh, target.coordinates.s, safe_v)):
             for segment in mesh.segments[:-1]:
                 center = int(np.argmin(np.abs(nodes-segment.right)))
                 safe[max(0, center-h):min(len(safe), center+h+1)] = False

@@ -27,9 +27,13 @@ def metric_statistics(directory, sources):
 
 
 def protected_statistics(audit, coordinate_info, minimum=0.6):
-    # The stored maps live on a degree+3 composite LGL audit grid.
-    tau = CompositeLGLMesh.create(np.asarray(coordinate_info['tau_breakpoints']), np.asarray(coordinate_info['tau_degrees'])+3)
-    s = CompositeLGLMesh.create(np.asarray(coordinate_info['s_breakpoints']), np.asarray(coordinate_info['s_degrees'])+3)
+    # New audits record their actual grid, including the shared refinement grid.
+    recorded = audit.get('overgrid', {})
+    recorded = recorded if recorded.get('tau_breakpoints') is not None else None
+    info = recorded or coordinate_info
+    increment = 0 if recorded else 3
+    tau = CompositeLGLMesh.create(np.asarray(info['tau_breakpoints']), np.asarray(info['tau_degrees'])+increment)
+    s = CompositeLGLMesh.create(np.asarray(info['s_breakpoints']), np.asarray(info['s_degrees'])+increment)
     values = np.asarray(audit['einstein_section_L2_map'])
     if values.shape != (len(tau.nodes), len(s.nodes)):
         raise ValueError('article map shape differs from its recorded overgrid')

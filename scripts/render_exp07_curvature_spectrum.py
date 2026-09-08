@@ -33,11 +33,13 @@ def render(
     coordinates = summary["scalar_coordinates"]
     residual = np.asarray(audit["einstein_section_L2_map"])
 
-    increment = 3
-    tau_breakpoints = np.asarray(coordinates["tau_breakpoints"])
-    s_breakpoints = np.asarray(coordinates["s_breakpoints"])
-    tau_degrees = np.asarray(coordinates["tau_degrees"]) + increment
-    s_degrees = np.asarray(coordinates["s_degrees"]) + increment
+    recorded = audit.get('overgrid', {})
+    recorded = recorded if recorded.get('tau_breakpoints') is not None else None
+    mesh_info, increment = (recorded, 0) if recorded else (coordinates, 3)
+    tau_breakpoints = np.asarray(mesh_info["tau_breakpoints"])
+    s_breakpoints = np.asarray(mesh_info["s_breakpoints"])
+    tau_degrees = np.asarray(mesh_info["tau_degrees"]) + increment
+    s_degrees = np.asarray(mesh_info["s_degrees"]) + increment
     tau_mesh = CompositeLGLMesh.create(tau_breakpoints, tau_degrees)
     s_mesh = CompositeLGLMesh.create(s_breakpoints, s_degrees)
     if residual.shape != (len(tau_mesh.nodes), len(s_mesh.nodes)):
@@ -98,7 +100,7 @@ def render(
             rf"Einstein--scalar curvature-residual spectrum ($L={retained}$)"
             "\n"
             r"white contours: $10^{-4},10^{-3},10^{-2},10^{-1}$; "
-            "thin lines: source-element interfaces"
+            "thin lines: audit-element interfaces"
         ),
     )
     axis.text(

@@ -76,6 +76,28 @@ def _project_vector(grid: PointSphereGrid, vector: Array) -> Array:
     return np.einsum("nij,n...j->n...i", grid.projector, vector)
 
 
+class TypedAngularResampler:
+    """Transfer scalar, vector and symmetric tensor modes without lowering rank."""
+
+    def __init__(self, degree: int):
+        self.degree = degree
+        self.families = {}
+
+    def __call__(self, values, source_grid, target_grid, degree):
+        from nee.numerics.spherical_harmonics import AngularGalerkin
+        del degree  # The full-state transfer owns its explicitly declared band.
+        for grid in (source_grid, target_grid):
+            if id(grid) not in self.families:
+                self.families[id(grid)] = AngularGalerkin(grid, self.degree, self.degree)
+        rank = values.ndim - 3  # sphere, u, v, followed by ambient tensor slots
+        if rank not in (0, 1, 2):
+            raise ValueError('state resampling requires scalar, vector or symmetric tensor fields')
+        name = ('scalar', 'vector', 'sym2')[rank]
+        source = getattr(self.families[id(source_grid)], name)
+        target = getattr(self.families[id(target_grid)], name)
+        return target.synthesize(source.analyze(values)), source.condition
+
+
 def _project_tensor(grid: PointSphereGrid, tensor: Array) -> Array:
     value = np.einsum(
         "nia,n...ab,njb->n...ij", grid.projector, tensor, grid.projector
@@ -311,6 +333,9 @@ def resample_primitives_power(
     harmonic_degree: int,
     stencil: int = 7,
     spectral_degree_increment: int | None = None,
+    angular_transfer=None,
+    differentiation_degree: int | None = None,
+    audit_operators=None,
 ) -> OvergridResult:
     """Resample in ``(tau,s)`` and retain the exact physical chain rule.
 
@@ -331,7 +356,10 @@ def resample_primitives_power(
     delta = float(getattr(source_coordinates, "delta"))
     target_tau_operator = None
     target_s_operator = None
-    if spectral_degree_increment is None:
+    if audit_operators is not None:
+        target_tau_operator, target_s_operator = audit_operators
+        target_tau, target_s = target_tau_operator.nodes, target_s_operator.nodes
+    elif spectral_degree_increment is None:
         target_tau = chebyshev_lobatto(
             u_count, float(tau_mesh.nodes[0]), float(tau_mesh.nodes[-1])
         )
@@ -388,7 +416,7 @@ def resample_primitives_power(
         point_count,
         neighbor_count=min(max(24, 3 * harmonic_degree), point_count - 1),
         degree=min(4, harmonic_degree),
-        spectral_degree=harmonic_degree,
+        spectral_degree=harmonic_degree if differentiation_degree is None else differentiation_degree,
     )
 
     def transfer(value: Array) -> tuple[Array, float]:
@@ -398,7 +426,7 @@ def resample_primitives_power(
         in_coordinates = _composite_interpolate(
             s_mesh, in_tau, target_s, axis=2
         )
-        return _angular_resample(
+        return (_angular_resample if angular_transfer is None else angular_transfer)(
             in_coordinates,
             source_grid,
             target_grid,
@@ -446,13 +474,19 @@ def resample_primitives_power(
                 )
                 + " plus exact physical chain rule"
             ),
-            "angular_interpolant": "real scalar harmonics per ambient component",
+            "angular_interpolant": ("real scalar harmonics per ambient component"
+                if angular_transfer is None else "typed scalar, tangent-vector and symmetric-tensor harmonics"),
             "u_count": len(coordinates.u),
             "v_count": len(coordinates.v),
             "point_count": point_count,
             "harmonic_degree": harmonic_degree,
+            "differentiation_degree": harmonic_degree if differentiation_degree is None else differentiation_degree,
             "source_harmonic_condition": float(condition),
             "minimum_metric_eigenvalue": minimum_eigenvalue,
+            "tau_breakpoints": None if target_tau_operator is None else [target_tau_operator.segments[0].left, *[e.right for e in target_tau_operator.segments]],
+            "s_breakpoints": None if target_s_operator is None else [target_s_operator.segments[0].left, *[e.right for e in target_s_operator.segments]],
+            "tau_degrees": None if target_tau_operator is None else [e.degree for e in target_tau_operator.segments],
+            "s_degrees": None if target_s_operator is None else [e.degree for e in target_s_operator.segments],
         },
         coordinates=coordinates,
     )
