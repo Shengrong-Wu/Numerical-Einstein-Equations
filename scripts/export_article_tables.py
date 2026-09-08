@@ -48,11 +48,27 @@ def protected_statistics(audit, coordinate_info, minimum=0.6):
     return statistics(values[mask])
 
 
-def data_for(exp, root):
+def data_for(exp, root, audits_root=None):
     result=root/exp; data=result/'data'; summary=read(result/'summary.json')
     if summary.get('terminal_status') != 'completed':
         raise ValueError(f'{exp} is not a completed publication run')
     sources = [result/'summary.json', result/'manifest.json']
+    overrides = None
+    override_metadata = None
+    if audits_root is not None and (audits_root/(exp+'.json')).is_file():
+        override_path = audits_root/(exp+'.json')
+        overrides = read(override_path)
+        if overrides['experiment'] != exp or overrides['terminal_status'] != 'completed':
+            raise ValueError('diagnostic override has the wrong experiment or incomplete status')
+        if overrides['source_summary_sha256'] != hashlib.sha256((result/'summary.json').read_bytes()).hexdigest():
+            raise ValueError('diagnostic override belongs to a different run')
+        for row in overrides['cases'].values():
+            state_path = result/row['state']
+            if hashlib.sha256(state_path.read_bytes()).hexdigest() != row['state_sha256']:
+                raise ValueError('diagnostic override state hash does not match')
+            sources.append(state_path)
+        override_metadata = {'sha256':hashlib.sha256(override_path.read_bytes()).hexdigest(),
+                             'software':overrides['software'], 'method':overrides['method']}
     rows=[]
     if exp=='exp01':
         for family in ('schwarzschild','kerr-a0.0','kerr-a0.3','kerr-a0.7','kerr-a0.9'):
@@ -77,6 +93,8 @@ def data_for(exp, root):
     elif exp=='exp04':
         for name,label,old in [('strong_pulse','Strong pulse','strong_pulse_independent'),('zero_control','Zero control','numerical_zero_control_independent')]:
             audit=summary.get(old+'_first_order_residual',summary.get(old+'_four_metric_residual'))
+            if overrides is not None:
+                audit = overrides['cases']['strong-pulse' if name=='strong_pulse' else 'zero-control']['audit']
             protected=audit['protected']['s_ge_0.02']
             record=summary[name]['records'][-1]
             update=record.get('update',record.get('update_norm',record.get('picard_update')))
@@ -106,11 +124,13 @@ def data_for(exp, root):
             from nee.numerics.scalar_config import ExperimentConfig
             from nee.numerics.scalar_coordinates import mesh_from_config
             mesh=mesh_from_config(ExperimentConfig.from_dict(case['config']).scalar_coordinates)
+            audit = case['independent_Ric_minus_dphi_dphi'] if overrides is None else overrides['cases'][patch['name']]['audit']
             rows.append({'labels':[f"${patch['u_right']:.2f}$",f"${patch['v_cap']:.6f}$"],
-                **protected_statistics(case['independent_Ric_minus_dphi_dphi'],mesh.diagnostics())})
+                **protected_statistics(audit,mesh.diagnostics())})
     return {'experiment':exp,'status':summary.get('terminal_status'),
             'summary_sha256':hashlib.sha256((result/'summary.json').read_bytes()).hexdigest(),
             'software':read(result/'manifest.json')['software'],
+            'diagnostic_override':override_metadata,
             'source_artifacts':{str(path.relative_to(result)):hashlib.sha256(path.read_bytes()).hexdigest() for path in sources},
             'rows':rows}
 
@@ -125,11 +145,12 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--results-root',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--audits-root',type=Path,help='optional immutable saved-state re-audits')
     parser.add_argument('--experiments',nargs='+',default=[f'exp{i:02}' for i in range(1,9)])
     args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
     records=[]
     for exp in args.experiments:
-        payload=data_for(exp,args.results_root);records.append(payload)
+        payload=data_for(exp,args.results_root,args.audits_root);records.append(payload)
         lines=[]
         for row in payload['rows']:
             values=row['values'] if 'values' in row else [row[k] for k in ('median','mean','maximum')]
