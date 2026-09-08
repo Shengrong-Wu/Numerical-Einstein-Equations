@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from scipy.interpolate import CubicSpline, PchipInterpolator
@@ -111,7 +112,7 @@ class OvergridResult:
     u: Array
     v: Array
     fields: PrimitiveFields
-    diagnostics: dict[str, float | int | str]
+    diagnostics: dict[str, Any]
     coordinates: "PowerAuditCoordinates | None" = None
 
 
@@ -339,10 +340,9 @@ def resample_primitives_power(
 ) -> OvergridResult:
     """Resample in ``(tau,s)`` and retain the exact physical chain rule.
 
-    The target nodes are absent Chebyshev--Lobatto nodes in the computational
-    coordinates. The source field is evaluated from its piecewise LGL
-    polynomial, while all derivatives on the target grid are reconstructed
-    independently by local finite-difference weights in ``tau`` and ``s``.
+    Evaluate the source piecewise polynomial on independent computational
+    nodes. Derivatives use the supplied common LGL operators, degree-raised
+    source elements, or local polynomial weights, in that order of preference.
     """
 
     minimum_points = (harmonic_degree + 1) ** 2 + 8
@@ -469,7 +469,7 @@ def resample_primitives_power(
             "coordinate_derivatives": (
                 (
                     "independent local polynomial weights in tau,s"
-                    if spectral_degree_increment is None
+                    if target_tau_operator is None
                     else "independent higher-degree LGL overgrid operators"
                 )
                 + " plus exact physical chain rule"

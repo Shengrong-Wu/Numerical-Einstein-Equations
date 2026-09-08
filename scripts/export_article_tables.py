@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 from nee.geometry.curved_sphere import exact_fields
 from nee.numerics.lgl import CompositeLGLMesh
+from nee.io.state_artifact import file_hash
 
 
 def read(path):
@@ -60,11 +61,11 @@ def data_for(exp, root, audits_root=None):
         overrides = read(override_path)
         if overrides['experiment'] != exp or overrides['terminal_status'] != 'completed':
             raise ValueError('diagnostic override has the wrong experiment or incomplete status')
-        if overrides['source_summary_sha256'] != hashlib.sha256((result/'summary.json').read_bytes()).hexdigest():
+        if overrides['source_summary_sha256'] != file_hash(result/'summary.json'):
             raise ValueError('diagnostic override belongs to a different run')
         for row in overrides['cases'].values():
             state_path = result/row['state']
-            if hashlib.sha256(state_path.read_bytes()).hexdigest() != row['state_sha256']:
+            if file_hash(state_path) != row['state_sha256']:
                 raise ValueError('diagnostic override state hash does not match')
             sources.append(state_path)
         override_metadata = {'sha256':hashlib.sha256(override_path.read_bytes()).hexdigest(),
