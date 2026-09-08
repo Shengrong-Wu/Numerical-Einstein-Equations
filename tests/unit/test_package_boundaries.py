@@ -76,3 +76,13 @@ def test_primitive_fields_and_stopping_policy() -> None:
     assert fields.phi is None
     assert has_converged(1.0e-9, 1.0e-8)
     assert not has_converged(float("nan"), 1.0e-8)
+
+
+def test_crossed_pulse_fingerprint_hashes_installed_package_files():
+    import hashlib
+    from pathlib import Path
+    from nee.experiments.exp05_vacuum_crossed_pulses import campaign
+    package_root = Path(campaign.__file__).resolve().parents[2]
+    assert package_root.name == 'nee'
+    assert len(list(package_root.rglob('*.py'))) > 100
+    assert campaign.source_revision() != 'sha256:' + hashlib.sha256().hexdigest()

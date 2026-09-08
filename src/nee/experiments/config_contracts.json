@@ -530,7 +530,9 @@
       "angular.retained_degree",
       "angular.work_degree",
       "coordinates.u_degrees",
+      "coordinates.v_breakpoints",
       "coordinates.v_degrees",
+      "coordinates.v_max",
       "physics.cap",
       "physics.pulse_strength",
       "solver.maximum_sweeps"
@@ -614,6 +616,7 @@
       "coordinates.u_degrees",
       "coordinates.v_breakpoints",
       "coordinates.v_degrees",
+      "coordinates.v_max",
       "initial_data.Omega_chih_divisor",
       "physics.cap",
       "physics.control_strength",

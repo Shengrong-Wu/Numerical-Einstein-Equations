@@ -200,6 +200,15 @@ def load_config(path: str | Path) -> ExperimentConfig:
     if unknown or missing:
         raise ValueError(f"invalid top-level config keys; missing={sorted(missing)}, unknown={sorted(unknown)}")
     coordinate_data = _section(data, "coordinates")
+    angular_data = _section(data, "angular")
+    recorded_dimensions = {}
+    for section, values, names in (
+        ('coordinates', coordinate_data, ('u_node_count', 'v_node_count')),
+        ('angular', angular_data, ('scalar_retained_dimension', 'scalar_work_dimension')),
+    ):
+        for name in names:
+            if name in values:
+                recorded_dimensions[(section, name)] = values.pop(name)
     for name in ("u_breakpoints", "v_breakpoints"):
         coordinate_data[name] = tuple(float(value) for value in coordinate_data[name])
     for name in ("u_degrees", "v_degrees"):
@@ -210,7 +219,7 @@ def load_config(path: str | Path) -> ExperimentConfig:
         physics=_section(data, "physics"),
         initial_data=_section(data, "initial_data"),
         coordinates=CoordinateSection(**coordinate_data),
-        angular=AngularSection(**_section(data, "angular")),
+        angular=AngularSection(**angular_data),
         solver=SolverSection(**_section(data, "solver")),
         projection=ProjectionSection(**_section(data, "projection")),
         audit=AuditSection(**_section(data, "audit")),
@@ -218,6 +227,10 @@ def load_config(path: str | Path) -> ExperimentConfig:
         source_path=source,
     )
     config.validate()
+    resolved = config.resolved()
+    for (section, name), value in recorded_dimensions.items():
+        if type(value) is not int or value != resolved[section][name]:
+            raise ValueError(f'{section}.{name} does not match the declared discretization')
     return config
 
 

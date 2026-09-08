@@ -69,9 +69,9 @@ def source_revision() -> str:
     """Hash every maintained Python module in the installed package."""
 
     digest = hashlib.sha256()
-    package_root = ROOT / "src" / "nee"
+    package_root = Path(__file__).resolve().parents[2]
     for path in sorted(package_root.rglob("*.py")):
-        digest.update(str(path.relative_to(ROOT)).encode())
+        digest.update(str(path.relative_to(package_root)).encode())
         digest.update(b"\0")
         digest.update(path.read_bytes())
         digest.update(b"\0")

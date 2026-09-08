@@ -91,3 +91,14 @@ def test_exp08_mode_rejects_controls_that_it_does_not_execute():
             validate_supported(replace(config, initial_data={**config.initial_data, 'incoming_scalar_branch': 'positive'}))
     with pytest.raises(ValueError, match='atlas_point_counts'):
         validate_supported(replace(config, initial_data={**config.initial_data, 'atlas_point_counts': [500]*7}))
+
+
+def test_saved_resolved_configuration_is_reloadable_and_checks_derived_counts(tmp_path):
+    from nee.config import dump_resolved_config
+    config = load_config(ROOT/'configs/experiments/exp05/standard.toml')
+    path = tmp_path/'resolved.toml'
+    dump_resolved_config(config, path)
+    assert load_config(path).resolved() == config.resolved()
+    path.write_text(path.read_text().replace('u_node_count = 61', 'u_node_count = 62'))
+    with pytest.raises(ValueError, match='u_node_count'):
+        load_config(path)
