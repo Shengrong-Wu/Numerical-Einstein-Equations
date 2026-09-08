@@ -1202,9 +1202,10 @@ def run_experiment_7(output: Path, public) -> dict[str, Any]:
         "terminal_status": "completed" if refinement_gate["passed"] and all(row.get("terminal_status") in {"completed", "expected_rejection"} for row in summaries) else "failed",
         "runs": summaries,
         "harmonics": {
-            "Y_Omega": "normalized real Y_20",
-            "V_b": "normalized grad(real Y_21)",
-            "V_chi": "0.1 normalized grad(real Y_22)",
+            "Y_Omega": "(3 z^2 - 1)/2",
+            "V_b": "grad_round(x z)",
+            "Q_chi": "trace-free Hessian_round(x^2 - y^2)",
+            "normalization": "fixed analytic amplitudes, independent of sphere samples",
             "corner_power": 0.1,
             "corner_regularization": "none",
         },

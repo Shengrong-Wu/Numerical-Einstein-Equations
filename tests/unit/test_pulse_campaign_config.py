@@ -39,3 +39,18 @@ def test_standard_audit_replays_canonical_evolution_grid():
         np.sqrt(np.asarray(public.coordinates.v_breakpoints) / 0.5), 8, 0.5)
     np.testing.assert_array_equal(audit.u, evolution.u)
     np.testing.assert_array_equal(audit.v, evolution.v)
+
+
+def test_standard_pulse_disables_unrequested_operational_checkpoints(monkeypatch, tmp_path):
+    from nee.config import load_config
+    observed = {}
+
+    def fake_run(arguments):
+        observed['checkpoints'] = arguments.checkpoint_every_sweep
+        return {}
+
+    monkeypatch.setattr(campaign.q1, 'run', fake_run)
+    campaign._run_spectral_case(
+        output_root=tmp_path, label='test', strength=1.0, iterations=6,
+        public=load_config('configs/experiments/exp04/standard.toml'))
+    assert observed['checkpoints'] is False

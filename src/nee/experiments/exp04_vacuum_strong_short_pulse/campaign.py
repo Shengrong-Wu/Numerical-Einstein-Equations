@@ -158,6 +158,7 @@ def _run_spectral_case(
         "--u-halo", "2",
         "--v-halo", "1",
         "--output-label", label,
+        "--no-checkpoint-every-sweep",
     ]
     parsed = q1.parser().parse_args(arguments)
     previous_root = q1.ROOT
