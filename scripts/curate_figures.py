@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import shutil
+import tempfile
 from pathlib import Path
 
 from render_exp05_residual_spectrum import render as render_exp05
@@ -15,9 +16,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--results-root', type=Path, required=True)
     parser.add_argument('--output-root', type=Path, default=Path('docs/experiments'))
+    parser.add_argument('--experiments', nargs='+', choices=('exp05', 'exp07', 'exp08'), default=('exp05', 'exp07', 'exp08'))
     args = parser.parse_args()
     provenance = {}
-    for exp in ('exp05', 'exp07', 'exp08'):
+    for exp in args.experiments:
         source = args.results_root/exp
         summary_path = source/'summary.json'
         summary = json.loads(summary_path.read_text())
@@ -25,15 +27,21 @@ def main():
             raise ValueError(f'{exp} has not completed its declared gates')
         destination = args.output_root/exp/'results'
         destination.mkdir(parents=True, exist_ok=True)
+        inputs = [summary_path]
         if exp == 'exp05':
+            inputs.extend([source/'data'/'level-3'/'summary.json', source/'data'/'level-3'/'residual-maps.npz'])
             render_exp05(source/'data'/'level-3', destination/'residual-spectrum.png', samples_per_element=96)
         elif exp == 'exp07':
+            inputs.append(source/'data'/'cases'/'coordinate-level-2'/'summary.json')
             render_exp07(source/'data'/'cases'/'coordinate-level-2'/'summary.json', destination/'curvature-residual-spectrum.png', samples_per_element=96)
         else:
-            _summary_figure(source/'data', summary)
-            shutil.copy2(source/'data'/'figures'/'curved-domain-and-horizon.png', destination/'curved-domain-and-horizon.png')
+            with tempfile.TemporaryDirectory(prefix='nee-figure-') as temporary:
+                _summary_figure(Path(temporary), summary)
+                shutil.copy2(Path(temporary)/'figures'/'curved-domain-and-horizon.png', destination/'curved-domain-and-horizon.png')
         provenance[exp] = {'summary_sha256': hashlib.sha256(summary_path.read_bytes()).hexdigest(),
-                           'software': json.loads((source/'manifest.json').read_text())['software']}
+                           'software': json.loads((source/'manifest.json').read_text())['software'],
+                           'source_artifacts': {str(path.relative_to(source)):hashlib.sha256(path.read_bytes()).hexdigest() for path in inputs},
+                           'generator_scripts': {path.name:hashlib.sha256(path.read_bytes()).hexdigest() for path in (Path(__file__), Path(__file__).with_name('residual_plotting.py'), Path(__file__).with_name('render_exp05_residual_spectrum.py'), Path(__file__).with_name('render_exp07_curvature_spectrum.py'))}}
         (destination/'figure-provenance.json').write_text(json.dumps(provenance[exp], indent=2)+'\n')
 
 

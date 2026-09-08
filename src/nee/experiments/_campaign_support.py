@@ -20,18 +20,11 @@ from nee.geometry.curved_sphere import (  # noqa: E402
     exact_fields as curved_exact_fields,
     overgrid_audit as curved_overgrid_audit,
     solve as solve_curved,
-    warped_product_rectangular_residual_mpmath,
 )
 from nee.diagnostics.ricci_components import (  # noqa: E402
     components as first_order_components,
     section_maps as first_order_maps,
     summarize as summarize_first_order,
-)
-from nee.diagnostics.independent_audit import (  # noqa: E402
-    PrimitiveFields,
-    evaluate,
-    evaluate_blocked,
-    summarize_result_on_mask,
 )
 from nee.solver.backend import (  # noqa: E402
     ese_picard_step,
@@ -40,10 +33,6 @@ from nee.solver.backend import (  # noqa: E402
     vacuum_picard_step,
     weighted_update_map,
     weighted_update_norm,
-)
-from nee.discretization.overgrid import (  # noqa: E402
-    resample_primitives,
-    resample_primitives_power,
 )
 from nee.state.boundary import BoundaryData
 from nee.state.iterate import PicardState  # noqa: E402
@@ -152,48 +141,6 @@ def first_order_audit(
     )
     maps = first_order_maps(grid, state, u, values)
     return summarize_first_order(maps, halo=2)
-
-
-def spherical_high_precision_audit(
-    grid: Any,
-    state: PicardState,
-    u: Array,
-    v: Array,
-) -> dict[str, Any]:
-    """Reconstruct the spherical warped product and audit it with mpmath."""
-
-    radius_squared = 0.5 * np.einsum(
-        "nij,nuvij->nuv", grid.projector, state.g
-    )
-    radius = np.sqrt(np.mean(radius_squared, axis=0))
-    log_Omega = np.mean(state.log_Omega, axis=0)
-    result = warped_product_rectangular_residual_mpmath(
-        radius,
-        log_Omega,
-        u,
-        v,
-        halo=max(2, min(len(u), len(v)) // 8),
-        decimal_digits=35,
-    )
-    result["spherical_reconstruction_angular_variation"] = {
-        "radius_squared": float(
-            np.max(
-                np.abs(
-                    radius_squared
-                    - np.mean(radius_squared, axis=0, keepdims=True)
-                )
-            )
-        ),
-        "log_Omega": float(
-            np.max(
-                np.abs(
-                    state.log_Omega
-                    - np.mean(state.log_Omega, axis=0, keepdims=True)
-                )
-            )
-        ),
-    }
-    return result
 
 
 def vacuum_case(
@@ -556,9 +503,9 @@ def run_experiment_3(output: Path, public) -> dict[str, Any]:
                 )
                 protected = {}
                 for name, threshold in (
-                    ("r_ge_M", 1.0),
-                    ("r_ge_half_M", 0.5),
-                    ("r_ge_8M_epsilon", 8.0 * epsilon),
+                    ("r_ge_M", float(public.physics["mass"])),
+                    ("r_ge_half_M", 0.5*float(public.physics["mass"])),
+                    ("r_ge_8M_epsilon", 8.0 * float(public.physics["mass"]) * epsilon),
                 ):
                     mask = exact["radius"] >= threshold
                     protected[name] = (
@@ -690,51 +637,16 @@ def ese_case(
         retained_degree=config.angular.retained_degree,
         source_points=config.angular.point_count,
     )
-    # The mutation changes the numerical scalar field presented to the same
-    # independent geometric pipeline; it does not call an analytic identity.
-    exact_overgrid = resample_primitives(
-        grid,
-        PrimitiveFields(
-            g=exact.g,
-            log_Omega=exact.log_Omega,
-            b=exact.b,
-            phi=exact.phi,
-        ),
-        mesh.u,
-        mesh.v,
-        u_count=len(mesh.u) + 4,
-        v_count=len(mesh.v) + 4,
-        point_count=max(config.angular.point_count + 12, 64),
-        harmonic_degree=config.angular.retained_degree,
-    )
-    exact_direct = evaluate_blocked(
-        exact_overgrid.grid,
-        exact_overgrid.fields,
-        exact_overgrid.u,
-        exact_overgrid.v,
-        stencil=7,
-        derivative_halo=6,
-        mask_halo=4,
-        block_size=4,
-    )
-    mutated_fields = PrimitiveFields(
-        g=exact_overgrid.fields.g,
-        log_Omega=exact_overgrid.fields.log_Omega,
-        b=exact_overgrid.fields.b,
-        phi=1.01 * exact_overgrid.fields.phi,
-    )
-    mutated_direct = evaluate_blocked(
-        exact_overgrid.grid,
-        mutated_fields,
-        exact_overgrid.u,
-        exact_overgrid.v,
-        stencil=7,
-        derivative_halo=6,
-        mask_halo=4,
-        block_size=4,
-    )
+    # Change the matter field and its first-order derivatives consistently.
+    exact_direct = direct_audit(grid, exact, mesh.u, mesh.v,
+        retained_degree=config.angular.retained_degree, source_points=config.angular.point_count)
+    mutated_state = exact.copy()
+    for field in ('phi', 'Omega_e3phi', 'Omega_e4phi', 'nabla_phi'):
+        setattr(mutated_state, field, 1.01*getattr(mutated_state, field))
+    mutated_direct = direct_audit(grid, mutated_state, mesh.u, mesh.v,
+        retained_degree=config.angular.retained_degree, source_points=config.angular.point_count)
     mutation = {
-        "kind": "multiply the scalar field in the exact numerical state by 1.01",
+        "kind": "multiply the scalar field and its stored first derivatives by 1.01",
         "baseline_masked_residual": exact_direct[
             "masked_Linf_uv_L2_sphere"
         ],
@@ -818,11 +730,11 @@ def run_experiment_6(output: Path, public) -> dict[str, Any]:
     grid, _ = ese_bench.build_angular(config)
     mesh = ese_bench.mesh_from_config(config.scalar_coordinates)
     limit, diagnostics = ese_bench.jnw_exact_state(
-        grid, mesh.u, mesh.v, sigma=1.0, nu=1.0
+        grid, mesh.u, mesh.v, sigma=float(public.physics["sigma"]), nu=1.0
     )
     limit_test = {
         "nu": 1.0,
-        "expected_schwarzschild_mass": 0.5,
+        "expected_schwarzschild_mass": float(public.physics["sigma"])/2,
         "maximum_abs_phi": float(np.max(np.abs(limit.phi))),
         "maximum_abs_P3": float(np.max(np.abs(limit.Omega_e3phi))),
         "maximum_abs_P4": float(np.max(np.abs(limit.Omega_e4phi))),

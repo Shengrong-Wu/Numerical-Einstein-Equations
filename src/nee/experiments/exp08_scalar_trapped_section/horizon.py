@@ -70,6 +70,8 @@ def field_norms(values: Array) -> dict[str, float]:
 
 def acceptance_errors(report: dict, tolerance: float = 1.0e-5) -> list[str]:
     """Checks for accepting a numerical MOTS, rather than a solver return."""
+    if not np.isfinite(tolerance) or tolerance <= 0:
+        raise ValueError('MOTS tolerance must be finite and positive')
     errors = []
     surface = report['surface']
     if not report['nonlinear_success']:
@@ -79,13 +81,16 @@ def acceptance_errors(report: dict, tolerance: float = 1.0e-5) -> list[str]:
     for key in ('h_min', 'h_max', 'area'):
         if not np.isfinite(surface[key]):
             errors.append(f'nonfinite {key}')
+    if surface['area'] <= 0:
+        errors.append('surface area is not positive')
     residual = surface['theta_out']['linf']
     if not np.isfinite(residual) or residual > tolerance:
         errors.append('outgoing expansion exceeds acceptance tolerance')
     incoming = surface['theta_in']['maximum']
     if not np.isfinite(incoming) or incoming >= 0:
         errors.append('incoming expansion is not strictly negative')
-    if surface.get('distance_to_patch_boundary', surface['distance_to_patch_right']) <= 0:
+    margin = surface.get('distance_to_patch_boundary', surface['distance_to_patch_right'])
+    if not np.isfinite(margin) or margin <= 0:
         errors.append('surface is outside the patch interior')
     return errors
 
@@ -93,7 +98,7 @@ def acceptance_errors(report: dict, tolerance: float = 1.0e-5) -> list[str]:
 def solve_mots(
     patch: Patch, v_value: float, degree: int
 ) -> tuple[dict, dict[str, Array]]:
-    """Solve the outermost graph MOTS on one incoming null cone."""
+    """Solve a graph MOTS starting from the outermost detected constant bracket."""
 
     cone = NullConeGeometry.create_at_v(
         patch.grid, patch.fields, patch.mesh, float(v_value)
@@ -148,9 +153,11 @@ def solve_mots(
     )
     coefficients = fit.x
     h = basis @ coefficients
-    graph = cone.expansion(h)
     distance = min(float(h.min() - lower), float(upper - h.max()))
-    offset = min(0.002, max(2.0e-5, 0.25 * distance))
+    if distance <= 0:
+        raise ValueError("MOTS graph lies outside the patch interior")
+    graph = cone.expansion(h)
+    offset = min(0.002, 0.25 * distance)
     inward = cone.expansion(h - offset).theta_out
     outward = cone.expansion(h + offset).theta_out
     area = float(4.0 * math.pi * np.mean(graph.area_density))
@@ -236,12 +243,13 @@ def trace_horizon(
     tolerance: float = 1.0e-5,
     diagnostic_only: bool = False,
 ) -> dict:
-    """Trace the outermost MOTS through the supplied overlapping patches."""
+    """Trace accepted graph MOTSs through the supplied overlapping patches."""
 
     output.mkdir(parents=True, exist_ok=False)
     ordered_patches = sorted(patches, key=lambda item: item.cap)
     sections = []
     failures = []
+    rejected_candidates = []
     for v_value in np.asarray(requested_v)[::-1]:
         candidates = [
             patch
@@ -254,14 +262,19 @@ def trace_horizon(
             try:
                 report, arrays = solve_mots(patch, float(v_value), degree)
             except Exception as error:
-                errors.append({"patch": patch.name, "reason": str(error)})
+                rejection = {"v": float(v_value), "patch": patch.name, "reason": str(error)}
+                errors.append(rejection)
+                rejected_candidates.append(rejection)
                 continue
             reasons = acceptance_errors(report, tolerance)
             report['accepted'] = not reasons
             report['acceptance_tolerance'] = tolerance
             report['rejection_reasons'] = reasons
             if reasons and not diagnostic_only:
-                errors.append({'patch': patch.name, 'reasons': reasons, 'report': report})
+                rejection = {'v': float(v_value), 'patch': patch.name, 'reasons': reasons, 'report': report}
+                errors.append(rejection)
+                rejected_candidates.append(rejection)
+                save_surface(output / 'rejected' / f'v-{v_value:.10f}-{patch.name}', report, arrays)
                 continue
             save_surface(output / f"v-{v_value:.10f}", report, arrays)
             sections.append(report)
@@ -288,6 +301,7 @@ def trace_horizon(
         "degree": degree,
         "requested_v_count": int(len(requested_v)),
         "diagnostic_only": diagnostic_only,
+        "rejected_candidates": rejected_candidates,
         "acceptance_tolerance": tolerance,
         "solved_v_count": int(len(sections)),
         "failed_v_count": int(len(failures)),

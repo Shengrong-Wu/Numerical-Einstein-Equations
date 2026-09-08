@@ -19,54 +19,7 @@ from nee.numerics.lgl import CompositeLGLMesh
 Array = np.ndarray
 
 
-def dense_axis(
-    mesh: CompositeLGLMesh,
-    samples_per_element: int,
-) -> tuple[Array, list[Array]]:
-    pieces: list[Array] = []
-    matrices: list[Array] = []
-    for element, segment in enumerate(mesh.segments):
-        targets = np.linspace(
-            segment.left,
-            segment.right,
-            samples_per_element,
-            endpoint=(element == len(mesh.segments) - 1),
-        )
-        pieces.append(targets)
-        matrices.append(segment.interpolation_matrix(targets))
-    return np.concatenate(pieces), matrices
-
-
-def dense_log_residual(
-    residual: Array,
-    tau_mesh: CompositeLGLMesh,
-    s_mesh: CompositeLGLMesh,
-    samples_per_element: int,
-) -> tuple[Array, Array, Array]:
-    dense_tau, tau_matrices = dense_axis(
-        tau_mesh, samples_per_element
-    )
-    dense_s, s_matrices = dense_axis(s_mesh, samples_per_element)
-    log_nodes = np.log10(np.maximum(residual, 1.0e-7))
-    dense = np.empty((len(dense_tau), len(dense_s)))
-    tau_offset = 0
-    for tau_index, tau_matrix in zip(
-        tau_mesh.indices, tau_matrices, strict=True
-    ):
-        tau_count = len(tau_matrix)
-        s_offset = 0
-        for s_index, s_matrix in zip(
-            s_mesh.indices, s_matrices, strict=True
-        ):
-            s_count = len(s_matrix)
-            local = log_nodes[np.ix_(tau_index, s_index)]
-            dense[
-                tau_offset : tau_offset + tau_count,
-                s_offset : s_offset + s_count,
-            ] = tau_matrix @ local @ s_matrix.T
-            s_offset += s_count
-        tau_offset += tau_count
-    return dense_tau, dense_s, dense
+from residual_plotting import dense_open_log_residual
 
 
 def render(
@@ -92,12 +45,9 @@ def render(
             "the residual map does not match the independent audit overgrid"
         )
 
-    dense_tau, dense_s, dense_log = dense_log_residual(
-        residual,
-        tau_mesh,
-        s_mesh,
-        samples_per_element,
-    )
+    dense_tau, dense_s, dense_log = dense_open_log_residual(
+        residual, tau_mesh.nodes, s_mesh.nodes,
+        tau_mesh.indices, s_mesh.indices, samples_per_element)
     dense_u = -np.exp(-dense_tau)
     v_max = float(coordinates["v_max"])
     delta = float(coordinates["fractional_power"])
@@ -156,7 +106,7 @@ def render(
         0.99,
         (
             f"{samples_per_element} samples/element/axis; "
-            "independent four-metric audit"
+            "independent first-order audit; open grid"
         ),
         transform=axis.transAxes,
         ha="left",

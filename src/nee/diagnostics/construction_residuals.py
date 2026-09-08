@@ -46,6 +46,7 @@ def evaluate(
     omit_lie_derivative: bool = False,
     coordinates: Any | None = None,
     protected_s_minimum: float | None = None,
+    reliability_mask: Array | None = None,
 ) -> dict[str, Any]:
     metric_u = (
         high_order_differentiate(
@@ -67,14 +68,28 @@ def evaluate(
         )
     c3 = metric_u - 2.0 * state.Omega_chib
     c4 = metric_v - 2.0 * state.Omega_chi
+    def derivative(value, direction):
+        if coordinates is None:
+            nodes, axis = (u, 1) if direction == 'u' else (v, 2)
+            return high_order_differentiate(value, nodes, axis=axis, stencil=min(stencil, len(nodes)))
+        method = coordinates.differentiate_u if direction == 'u' else coordinates.differentiate_v
+        return method(value, axis=1 if direction == 'u' else 2)
     quantities: dict[str, Array] = {
         "C3": c3,
         "C4": c4,
+        "outgoing_lapse": derivative(state.log_Omega, 'v') + 2*state.Omega_omega,
+        "incoming_lapse": derivative(state.log_Omega, 'u')
+            + np.einsum('n...i,n...i->n...', state.b, scalar_gradient(grid, state.log_Omega))
+            + 2*state.Omega_omegab,
+        "shift_torsion": derivative(state.b, 'v') + 4*state.Omega[..., None]**2*state.zeta,
     }
+    if reliability_mask is not None:
+        reliability_mask = np.asarray(reliability_mask, dtype=bool)
+        if reliability_mask.shape != (len(u), len(v)) or not np.any(reliability_mask):
+            raise ValueError('closure reliability mask must select coordinate sections')
     result: dict[str, Any] = {
-        "method": "fresh derivatives of the stored primitives/full forms",
-        "C3": _summary(c3, halo),
-        "C4": _summary(c4, halo),
+        "method": "fresh first derivatives of stored primitives versus weighted forms",
+        **{name: _summary(value, halo, reliability_mask) for name, value in quantities.items()},
     }
     if state.is_scalar:
         phi_u = (
@@ -104,7 +119,7 @@ def evaluate(
         )
         result.update(
             {
-                name: _summary(value, halo)
+                name: _summary(value, halo, reliability_mask)
                 for name, value in quantities.items()
                 if name.startswith("scalar_")
             }

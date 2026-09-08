@@ -766,8 +766,8 @@ def _run_standard(output: Path, public: PublicConfig) -> dict[str, Any]:
                 "u_right": spec.u_right,
                 "v_cap": spec.v_cap,
                 "grid": {
-                    "u_count": 1 + 8 * spec.tau_elements,
-                    "v_count": 1 + 11 * spec.s_elements,
+                    "u_count": 1 + int(public.initial_data["tau_degree"]) * spec.tau_elements,
+                    "v_count": 1 + int(public.initial_data["s_degree"]) * spec.s_elements,
                     "sphere_point_count": spec.point_count,
                     "retained_degree": spec.retained_degree,
                 },
@@ -793,7 +793,7 @@ def _run_standard(output: Path, public: PublicConfig) -> dict[str, Any]:
         "region": {
             "u_interval": [-1.0, float(public.physics["u_right"])],
             "v_lower": 0.0,
-            "v_upper": "min(0.1*(-u)^(25/24), 0.05)",
+            "v_upper": f"min({public.physics['curved_constant']}*(-u)**{public.physics['curved_exponent']}, {domain_v_max})",
             "constant": float(public.physics["curved_constant"]),
             "exponent": float(public.physics["curved_exponent"]),
             "v_max": domain_v_max,
@@ -830,6 +830,8 @@ def _run_standard(output: Path, public: PublicConfig) -> dict[str, Any]:
         },
         "terminal_status": "completed",
     }
+    if not report["apparent_horizon"]["verified"]:
+        report["terminal_status"] = "failed"
     (output / "aggregate-summary.json").write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n"
     )

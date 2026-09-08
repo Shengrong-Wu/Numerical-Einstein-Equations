@@ -79,3 +79,15 @@ def test_fixed_protocol_settings_are_not_silently_ignored() -> None:
         validate_supported(replace(config, solver=replace(config.solver, relaxation=0.5)))
     with pytest.raises(ValueError, match='not an adjustable control'):
         validate_supported(replace(config, physics={**config.physics, 'misspelled_mass': 7}))
+
+
+def test_exp08_mode_rejects_controls_that_it_does_not_execute():
+    from dataclasses import replace
+    from nee.experiments.config_contract import validate_supported
+    for mode in ('smoke', 'standard', 'angular-control'):
+        config = load_config(ROOT/f'configs/experiments/exp08/{mode}.toml')
+        validate_supported(config)
+        with pytest.raises(ValueError, match='incoming_scalar_branch'):
+            validate_supported(replace(config, initial_data={**config.initial_data, 'incoming_scalar_branch': 'positive'}))
+    with pytest.raises(ValueError, match='atlas_point_counts'):
+        validate_supported(replace(config, initial_data={**config.initial_data, 'atlas_point_counts': [500]*7}))

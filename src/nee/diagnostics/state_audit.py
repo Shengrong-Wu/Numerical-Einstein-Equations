@@ -101,6 +101,9 @@ def audit(grid, state, u, v, *, retained_degree, coordinates=None,
         return result
 
     raw, masked = summary(open_mask), summary(mask)
+    closure_mask = mask.copy()
+    if coordinates is not None:
+        closure_mask &= target.coordinates.s[None, :] >= min(protected_s_values)
     result = {'method': 'first null derivatives of independently resampled weighted state; no construction sources',
         'norm': 'sphere L2 of Euclidean sum of squared null component norms',
         'endpoint_policy': 'exclude both characteristic endpoints; intrinsic angular derivatives use smooth sphere data',
@@ -115,7 +118,10 @@ def audit(grid, state, u, v, *, retained_degree, coordinates=None,
         'wave_section_L2_map': wave.tolist() if current.is_scalar else None,
         'components': masked['components'],
         'metric_connection_closures': closure_audit(target.grid, current, target.u, target.v,
-                                                   coordinates=target.coordinates, halo=h)}
+                                                   coordinates=target.coordinates, halo=h, reliability_mask=closure_mask)}
+    result['metric_connection_closures']['mask_cell_count'] = int(np.sum(closure_mask))
+    if coordinates is not None:
+        result['metric_connection_closures']['minimum_s'] = float(min(protected_s_values))
     if current.is_scalar:
         for name, row in (('raw', raw), ('masked', masked)):
             result[name+'_wave_Linf_uv_L2_sphere'] = row['wave_Linf_uv_L2_sphere']

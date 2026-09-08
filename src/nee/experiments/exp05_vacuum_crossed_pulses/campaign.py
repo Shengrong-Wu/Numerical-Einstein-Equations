@@ -500,6 +500,15 @@ def run_level(
     region_counts = plot_regions(
         output / "convergence-regions.png", mesh, total, protected
     )
+    from nee.numerics.sphere import lie_covariant_tensor
+    kinetic = {
+        'C3': mesh.differentiate_u(state.g, axis=1) + lie_covariant_tensor(grid, state.b, state.g) - 2*state.Omega_chib,
+        'C4': mesh.differentiate_v(state.g, axis=2) - 2*state.Omega_chi,
+        'outgoing_lapse': values['outgoing_lapse_closure'],
+        'incoming_lapse': values['incoming_lapse_closure'],
+    }
+    consistency = {name: {'protected_maximum': float(np.max(np.abs(value[:, protected])))}
+                   for name, value in kinetic.items()}
     summary = {
         "schema": "nee-official-experiment-05-level-v1",
         "case_id": resolution.name,
@@ -534,7 +543,7 @@ def run_level(
             "reliability_node_count": int(np.count_nonzero(protected)),
         },
         "residual_maxima": maxima,
-        "metric_connection_closures": {name: {"protected_maximum": float(np.max(np.abs(values[name][:, protected])))} for name in ("outgoing_lapse_closure", "incoming_lapse_closure")},
+        "metric_connection_closures": consistency,
         "region_counts": region_counts,
         "minimum_metric_eigenvalue": state.validate(grid.frames)[
             "minimum_metric_eigenvalue"

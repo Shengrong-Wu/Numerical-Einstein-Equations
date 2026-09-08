@@ -128,3 +128,20 @@ def test_first_order_mode_never_differentiates_outgoing_shear_in_v(monkeypatch) 
     monkeypatch.setattr(vacuum_residual, '_differentiate_v', checked)
     result = vacuum_residual.components(grid, state, u, v, mode='first_order', include_gauss_curvature=False)
     assert np.all(np.isfinite(result['Ric44']))
+
+
+def test_first_derivative_closures_detect_a_wrong_weighted_lapse():
+    from copy import deepcopy
+    from nee.solver.backend import from_numerical
+    from nee.diagnostics.construction_residuals import evaluate
+    grid = vacuum_benchmarks._grid(30, 3)
+    u, v = np.linspace(-4., -3., 31), np.linspace(0., .5, 31)
+    exact, _ = vacuum_benchmarks.regular_schwarzschild_state(grid, u, v, 1.)
+    state = from_numerical(exact, grid)
+    baseline = evaluate(grid, state, u, v, halo=4)
+    assert baseline['outgoing_lapse']['masked_maximum'] < 1e-10
+    assert baseline['incoming_lapse']['masked_maximum'] < 1e-10
+    assert baseline['shift_torsion']['masked_maximum'] < 1e-12
+    changed = deepcopy(state)
+    changed.Omega_omega *= 0.5
+    assert evaluate(grid, changed, u, v, halo=4)['outgoing_lapse']['masked_maximum'] > 1e-3

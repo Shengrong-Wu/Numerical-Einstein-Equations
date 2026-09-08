@@ -79,3 +79,12 @@ def test_mots_acceptance_checks_more_than_solver_success() -> None:
     invalid = copy.deepcopy(valid)
     invalid['surface']['theta_out']['linf'] = 0.01
     assert acceptance_errors(invalid)
+
+
+def test_mots_acceptance_rejects_nonfinite_domain_margin():
+    from nee.experiments.exp08_scalar_trapped_section.horizon import acceptance_errors
+    report = {'nonlinear_success': True, 'sign_check': {'bracketed': True},
+              'surface': {'h_min': -0.6, 'h_max': -0.5, 'area': 3.0,
+                          'distance_to_patch_right': float('nan'),
+                          'theta_out': {'linf': 1e-6}, 'theta_in': {'maximum': -1.0}}}
+    assert acceptance_errors(report)

@@ -31,7 +31,7 @@ The main contributions are:
 - Legendre--Gauss--Lobatto spectral elements in the two null directions,
   fractional-power and logarithmic coordinate maps, and pole-free angular
   differentiation with spherical-harmonic Galerkin projection.
-- Independent four-metric curvature reconstruction that does not reuse the
+- Independent first-order residual evaluation on resampled weighted states that does not reuse the
   equation right-hand sides employed by the Picard sweep.
 - Numerical evolution of strong nonspherical characteristic geometry,
   crossed low-regularity data, and nonspherical Einstein--scalar data.
@@ -183,9 +183,10 @@ manifest records the resolved configuration, code revision, dependency and
 platform information, array schemas, and content hashes needed to audit a
 run.
 
-To regenerate the article figures from a completed run collection:
+To regenerate the article tables and figures from the completed standard runs:
 
 ```bash
+python scripts/export_article_tables.py --results-root results/revision-20260908/production --output docs/article/tables
 python scripts/curate_figures.py --results-root results/revision-20260908/production
 ```
 
