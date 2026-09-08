@@ -1,0 +1,64 @@
+{
+  "experiment": "exp06",
+  "status": "completed",
+  "summary_sha256": "320b60801115ce6268063c583aaf2b67af8ca84c831727aa89990c4b5c4944e5",
+  "software": {
+    "commit": "6446c948837e2e70d1d0126408136ba52e3132a0",
+    "dirty": false,
+    "matplotlib": "3.10.7",
+    "numpy": "2.4.3",
+    "package": "numerical-einstein-equations",
+    "package_version": "0.1.0",
+    "pillow": "10.4.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.12",
+    "scipy": "1.16.3"
+  },
+  "diagnostic_override": null,
+  "source_artifacts": {
+    "summary.json": "320b60801115ce6268063c583aaf2b67af8ca84c831727aa89990c4b5c4944e5",
+    "manifest.json": "d17b732d75e479b73cd4e2066e44ac0e99360961ea4dfbd08aeb388babfacd19",
+    "data/nu-0.99/coordinate-2/official-state.npz": "bec4b94ac99833c88d7fe2f13caa06274a326a760ac479bfa47166a93d2794d4",
+    "data/nu-0.99/coordinate-2/official-exact-state.npz": "5760db66ca65a7f6838147e96ded7a2f21fefb76a079e6546f3ce02d6233666e",
+    "data/nu-0.80/coordinate-2/official-state.npz": "5a351a9abe099c081c255123952eaebb44559450b2fca866adbb04fb297ff2ca",
+    "data/nu-0.80/coordinate-2/official-exact-state.npz": "e1eb5cb168b09eb96b1bb513c5fd44385e628be030efa7d9ce97d471144bb32c",
+    "data/nu-0.50/coordinate-2/official-state.npz": "1408d5f3a0298bd521697e72ac6f4c35b264fd0738a69d7fc7b65783b33832d8",
+    "data/nu-0.50/coordinate-2/official-exact-state.npz": "c584dcd16a6a41fd2cb21fb76fc1d4d82338a491d3eb831af6b4c6a0671ce4d0",
+    "data/nu-0.20/coordinate-2/official-state.npz": "5df7b3365a9d1d1d90975a3139b955db2479adad1bb2fd458347274e5ee9f0ab",
+    "data/nu-0.20/coordinate-2/official-exact-state.npz": "207ddcc5e787d06bc1c3ab405f326a9dffe3b5dc68c61bfacfb86134ee047d47"
+  },
+  "rows": [
+    {
+      "labels": [
+        "$0.99$"
+      ],
+      "median": 7.211377900259622e-13,
+      "mean": 7.371865123214923e-13,
+      "maximum": 1.7173132944551278e-12
+    },
+    {
+      "labels": [
+        "$0.80$"
+      ],
+      "median": 1.8558781525182424e-12,
+      "mean": 1.7398089103935753e-12,
+      "maximum": 3.751276373861264e-12
+    },
+    {
+      "labels": [
+        "$0.50$"
+      ],
+      "median": 7.67600638753973e-12,
+      "mean": 7.474552279742118e-12,
+      "maximum": 2.7897854829115153e-11
+    },
+    {
+      "labels": [
+        "$0.20$"
+      ],
+      "median": 3.5755051413144915e-11,
+      "mean": 4.512841177449853e-11,
+      "maximum": 5.640910578467507e-10
+    }
+  ]
+}

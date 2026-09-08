@@ -1,0 +1,38 @@
+{
+  "summary_sha256": "7d87190be2018b8a1d9762786b488b6736558af451f1939e5e628115d0aa566d",
+  "software": {
+    "commit": "f30b483245bb26af116da74b5be65e955bc16b6c",
+    "dirty": false,
+    "matplotlib": "3.10.7",
+    "numpy": "2.4.3",
+    "package": "numerical-einstein-equations",
+    "package_version": "0.1.0",
+    "pillow": "10.4.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.12",
+    "scipy": "1.16.3"
+  },
+  "generator_software": {
+    "package": "numerical-einstein-equations",
+    "package_version": "0.1.0",
+    "commit": "7bc2c0c8db90c9bbcf0013e9b087d276214a8f6a",
+    "dirty": true,
+    "python": "3.12.12",
+    "numpy": "2.4.3",
+    "scipy": "1.16.3",
+    "matplotlib": "3.10.7",
+    "pillow": "10.4.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "source_artifacts": {
+    "summary.json": "7d87190be2018b8a1d9762786b488b6736558af451f1939e5e628115d0aa566d",
+    "data/apparent-horizon/degree4/apparent-horizon.png": "ee9e417d0d2dbc5ed5860d541f4b6255e797ae4bc1777a80e3ef3f02e055280e"
+  },
+  "generator_scripts": {
+    "curate_figures.py": "5c63adcef214f86e3525d6805d3cc5372b7d69c1eed4caf8c70c12ca2fc4ddbf",
+    "residual_plotting.py": "4992eaef6ea04a8d49495554d4703fdd147585faac760e442ea0955bbc5e27e4",
+    "render_exp05_residual_spectrum.py": "9cc1e6f9ec77fadf82a0d006e4c12831843f117a0cdcfe39d06ef2e77fac874a",
+    "render_exp07_curvature_spectrum.py": "6521f7e001a2d26e9d2128f1c0b8849d04121e6045d3736d8f92b314424aa2bf",
+    "campaign.py": "ceb711cdc70a1ad980cc0bd0a74eb09308036b75af7913b2bf8163e6b96e2b12"
+  }
+}

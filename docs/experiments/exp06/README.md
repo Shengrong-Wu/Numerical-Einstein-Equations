@@ -1,17 +1,15 @@
 # Experiment 6: regular exact scalar solutions
 
-## Setup
+Fisher-JNW data use \(\sigma=1\), \(\nu=0.99,0.8,0.5,0.2\), and two,
+four, and eight degree-six elements in each coordinate. Each case receives
+eight Einstein-scalar Picard sweeps. The separate \(\nu=1\) control has
+vanishing scalar variables and Schwarzschild mass \(\sigma/2\).
 
-Regular Fisher/JNW data use \(\sigma=1\) and
-\(\nu=0.99,0.8,0.5,0.2\) on 2, 4, and 8 degree-six elements. Each case runs
-eight Einstein--scalar Picard sweeps. The separate \(\nu=1\) control must have
-vanishing scalar variables and Schwarzschild mass \(1/2\).
+The primary statistic is the section-metric Frobenius error against the exact
+solution. Supplementary first-order residuals use the weighted state. A matter
+mutation multiplies the scalar and all its stored first derivatives by 1.01
+consistently, to check that the residual responds to an incorrect matter source.
 
-## Result
-
-All 12 numerical cases completed and the vacuum-limit control passed. Numerical
-and exact state archives contribute 336 mapped arrays and 107,353,392 values;
-all are bitwise identical in the same-grid validation, as are all 12 summaries.
-The finest \(\nu=0.99\) scalar-field maximum absolute error is
-\(1.14\times10^{-14}\), and the sphere-g maximum absolute error is
-\(2.09\times10^{-12}\).
+See the regenerated [table](../../article/tables/exp06-rows.tex),
+[provenance](../../article/tables/exp06-statistics.json), and
+[revision report](../revision-2026-09-08.md).

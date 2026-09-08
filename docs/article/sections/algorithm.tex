@@ -210,7 +210,19 @@ We use intrinsic equations of Lorentzian manifold to compute the Ricci curvature
 \[\Omega^2\widehat{\Rc}_{AB}=\Omega\nabla_3(\Omega\chih)+\frac{1}{2}\Omega\tr\chib\,\Omega\chih-\Omega^2\left(\nabla\hat\otimes\eta+\eta\hat\otimes\eta\right)+\frac{1}{2}\Omega\tr\chi\,\Omega\chibh,\]
 \[ \Omega^2g^{AB}\Rc_{AB}=\Omega\nabla_3(\Omega\tr\chi)+\Omega\tr\chi\Omega\tr\chib-2\Omega^2\dv\eta-2\Omega^2|\eta|^2+2\Omega^2K,\]
 \[\Omega^2\Rc_{34}=4\Omega\nabla_4(\Omega\omegab)-\Omega\chih\cdot\Omega\chibh-\frac{1}{2}\Omega\tr\chi\Omega\tr\chib+4\Omega^2\eta\cdot\etab -\Omega\nabla_3(\Omega\tr\chi)+2\Omega^2\dv\eta.\]
-We only need the first order derivatives of the iterated quantities in this way.
+For a fresh check of the outgoing constraint we also use
+\[
+ \Omega^2\Rc_{44}=-\partial_v(\Omega\tr\chi)
+ -4(\Omega\omega)(\Omega\tr\chi)
+ -\tfrac12(\Omega\tr\chi)^2-|\Omega\chih|^2.
+\]
+The coefficient $4$ includes the product-rule contribution from weighting
+$\tr\chi$ by $\Omega$, since $\partial_v\log\Omega=-2\Omega\omega$.
+Thus no outgoing null derivative of $\chih$ is required.  These formulas use
+first null derivatives of the stored connection variables; the intrinsic
+Gauss curvature $K$ uses the angularly smooth section metric.  The numerical
+metric--connection relations are checked separately.  Endpoint values at
+singular coordinate Jacobians are excluded from the reported residuals.
 
 \subsection{Legendre--Gauss--Lobatto spectral elements}
 

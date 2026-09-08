@@ -8,7 +8,10 @@
 
 \title{Picard Iteration for the Characteristic Initial Value Problem in Einstein Equations}
 \author{Shengrong Wu}
-\date{\today}
+\date{8 September 2026}
+
+% Expandable input keeps file hooks outside tabular row alignment.
+\newcommand{\TableRows}[1]{\csname @@input\endcsname #1 }
 
 \begin{document}
 
@@ -18,7 +21,7 @@
     Einstein scalar-field equations in double-null gauge, which transform the non-linear PDE into systems of ODE. The numerical
     realization combines characteristic constraint solves, LGL spectral
     elements, pole-free spherical operators, Galerkin projection, and
-    independent geometric residual audits.
+    independent first-order residual and consistency checks.
 \end{abstract}
 \tableofcontents
 
@@ -33,8 +36,10 @@
 The source code, experiment configurations, and instructions for reproducing
 the numerical experiments are available at\\
 \url{https://github.com/Shengrong-Wu/Numerical-Einstein-Equations}.
-% The version associated with this article is identified by release
-% \texttt{vX.Y.Z} and commit \texttt{COMMIT-HASH}.
+
+The numerical implementation is recorded at commit \texttt{f158a4e}.
+The generated tables and figures include provenance records identifying
+their evolution and diagnostic software versions and source-artifact hashes.
 
 \bibliographystyle{plain}
 \bibliography{ref}

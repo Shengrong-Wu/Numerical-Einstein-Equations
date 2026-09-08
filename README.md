@@ -52,10 +52,10 @@ studies, and independent residuals.
 | 1. Regular vacuum benchmarks | `nee.experiments.exp01_regular_vacuum` | Evolves regular Schwarzschild and Kerr data on short and long double-null rectangles. Numerical section metrics are compared directly with the exact metrics, followed by an independent vacuum-curvature audit. |
 | 2. Schwarzschild horizon | `nee.experiments.exp02_schwarzschild_horizon` | Approaches the horizon in static coordinates and crosses it in regular Kruskal coordinates on `-1 <= u <= -0.5` and `0 <= v <= 0.5`. The experiment separates coordinate degeneration from genuine curvature error. |
 | 3. Schwarzschild interior | `nee.experiments.exp03_schwarzschild_interior` | Evolves entirely inside the horizon toward future boundaries with exact radii from `1` down to `1/32`. The calculation records the increasing metric error and iteration difficulty near the curvature singularity. |
-| 4. Strong outgoing vacuum pulse | `nee.experiments.exp04_vacuum_strong_short_pulse` | Prescribes a strong nonspherical trace-free variation of the initial section metric and compares it with an otherwise identical zero control. The protected independent Ricci residual is `2.453e-3` for the pulse and `1.059e-6` for the control. |
+| 4. Strong outgoing vacuum pulse | `nee.experiments.exp04_vacuum_strong_short_pulse` | Prescribes a strong nonspherical trace-free variation of the initial section metric and compares it with an otherwise identical zero control. The protected independent first-order Ricci residual is `2.617e-5` for the pulse and `1.973e-9` for the control. |
 | 5. Crossed characteristic shears | `nee.experiments.exp05_vacuum_crossed_pulses` | Prescribes square-root profiles on both initial null hypersurfaces. The shears are finite, while the corresponding transverse curvature is unbounded at the corner. The full rectangle is evolved by slab continuation and audited component by component. |
-| 6. Exact Einstein--scalar benchmarks | `nee.experiments.exp06_regular_exact_scalar` | Evolves four Fisher--JNW solutions and the Schwarzschild vacuum limit. On the finest coordinate grid, the maximum section-metric error remains below `5.4e-10` for all four scalar cases. |
-| 7. Nonspherical Einstein--scalar data | `nee.experiments.exp07_nonspherical_scalar` | Evolves angularly varying lapse, shift, scalar field, and trace-free metric data with fractional-power behavior at the outgoing corner. The protected independent Einstein--scalar curvature residual decreases under coordinate refinement to a maximum of `3.470e-2`. |
+| 6. Exact Einstein--scalar benchmarks | `nee.experiments.exp06_regular_exact_scalar` | Evolves four Fisher--JNW solutions and the Schwarzschild vacuum limit. On the finest coordinate grid, the maximum section-metric error remains below `5.7e-10` for all four scalar cases. |
+| 7. Nonspherical Einstein--scalar data | `nee.experiments.exp07_nonspherical_scalar` | Evolves angularly varying lapse, shift, scalar field, and trace-free metric data with fractional-power behavior at the outgoing corner. Coordinate and angular refinements compare independent first-order Einstein--scalar residuals on a shared protected audit grid. |
 | 8. Scalar-pulse apparent horizon | `nee.experiments.exp08_scalar_trapped_section` | Covers `-1 <= u <= -0.05`, `0 <= v <= min(0.1*(-u)^(25/24), 0.05)` with an overlapping inner atlas. The run locates a trapped region and reconstructs 18 MOTSs over `0.00441 <= v <= 0.05`. At `v = 0.04`, the horizon has mean `u = -0.479401999`, area `3.05516039`, and coordinate-refinement graph difference `1.50e-7`. |
 
 Experiments without an explicit interior solution are assessed using
@@ -70,7 +70,7 @@ Python 3.12 is required. From the repository root:
 
 ```bash
 python -m pip install -e ".[dev]"
-python -m pytest -q tests/unit tests/integration
+python -m pytest -q tests
 ```
 
 The runtime dependencies and their retained versions are declared in
@@ -186,9 +186,14 @@ run.
 To regenerate the article tables and figures from the completed standard runs:
 
 ```bash
-python scripts/export_article_tables.py --results-root results/revision-20260908/production --output docs/article/tables
-python scripts/curate_figures.py --results-root results/revision-20260908/production
+python scripts/export_article_tables.py --results-root results/paper --output docs/article/tables
+python scripts/curate_figures.py --results-root results/paper
 ```
+
+The [8 September 2026 validation report](docs/experiments/revision-2026-09-08.md)
+records the corrected diagnostics, repeated production runs, and publication
+provenance. Each generated table and figure has an adjacent JSON record of its
+inputs and software version.
 
 ## Citation and license
 

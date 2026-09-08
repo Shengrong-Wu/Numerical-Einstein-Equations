@@ -5,7 +5,7 @@ Experiment 6 uses the explicit Fisher--Janis--Newman--Winicour family to
 measure the section-metric error directly.  Experiment 7 replaces spherical
 symmetry by smooth angular lapse, shift, shear, and scalar data; without an
 explicit reference spacetime, its accuracy is measured by the independently
-reconstructed curvature residual
+differentiated first-order curvature residual
 $\Rc-\dd\phi\otimes\dd\phi$.  Experiment 8 strengthens the scalar pulse,
 covers a curved characteristic region by an overlapping inner atlas, locates
 a trapped region, and reconstructs the associated apparent horizon as a tube
@@ -78,21 +78,14 @@ and coordinate nodes of the finest grid.
     $\nu$ & $\operatorname{median}E_g$ & $\operatorname{mean}E_g$
       & $\max E_g$ \\
     \midrule
-    $0.99$ & $1.142\times10^{-12}$ & $1.202\times10^{-12}$
-      & $2.956\times10^{-12}$ \\
-    $0.80$ & $3.834\times10^{-12}$ & $3.716\times10^{-12}$
-      & $7.763\times10^{-12}$ \\
-    $0.50$ & $1.431\times10^{-11}$ & $1.366\times10^{-11}$
-      & $2.779\times10^{-11}$ \\
-    $0.20$ & $4.478\times10^{-11}$ & $5.133\times10^{-11}$
-      & $5.317\times10^{-10}$ \\
+    \TableRows{tables/exp06-rows.tex}
     \bottomrule
   \end{tabular}
 \end{table}
 
 The error increases as $\nu$ moves away from the Schwarzschild limit and the
 scalar field becomes stronger, but even the $\nu=0.2$ case retains a maximum
-absolute metric error below $5.4\times10^{-10}$.
+absolute metric error below $5.7\times10^{-10}$.
 
 
 \subsection{Nonspherical scalar characteristic data}
@@ -102,27 +95,27 @@ The seventh experiment prescribes nonspherical characteristic data on
   -1\leq u\leq-\frac12,
   \qquad 0\leq v\leq0.04.
 \end{equation}
-Let $r=-u$ on the incoming initial hypersurface and let
-$(e_\vartheta,e_\varphi)$ be the orthonormal frame of the round sphere.  The
-free incoming data are
+Let $r=-u$ on the incoming initial hypersurface, and let $(x,y,z)$ be
+Cartesian coordinates restricted to the unit sphere.  Define the smooth fields
+\begin{equation}
+  Y=\frac{3z^2-1}{2},\qquad V=\nabla_{\roundg}(xz),\qquad
+  Q=\bigl(\nabla^2_{\roundg}(x^2-y^2)\bigr)^{\mathrm{tf}},
+  \qquad P_0=\frac{8\sqrt2}{5}.
+\end{equation}
+The free incoming data are
 \begin{equation}\label{eq:results-exp7-incoming-data}
   \slg(u,0)=r^2\roundg,\qquad
-  \Omega^2(u,0)=r^{1/4}(1+0.01\sin\vartheta),
-  \qquad b(u,0)=0.05\sin\vartheta\,\partial_\varphi.
-\end{equation}
-Set
-\begin{equation}
-  Q=\sin^2\vartheta
-  (e_\varphi\otimes e_\varphi-e_\vartheta\otimes e_\vartheta),
-  \qquad P_0=2.2627416998.
+  \Omega^2(u,0)=r^{1/4}(1+0.01Y),\qquad b(u,0)=0.05V.
 \end{equation}
 On the outgoing initial hypersurface we prescribe
 \begin{align}\label{eq:results-exp7-outgoing-data}
-  \Omega^2(-1,v)&=1+0.01\sin\vartheta,\\
+  \Omega^2(-1,v)&=1+0.01Y,\\
   (\Omega e_4\phi)(-1,v)&=P_0+v^{0.1},\\
-  \Omega\chih(-1,v)&=0.1v^{0.1}
-       \mathcal T_Q[\slg(-1,v)].
+  \Omega\chih(-1,v)&=0.1v^{0.1}\mathcal T_Q[\slg(-1,v)].
 \end{align}
+The normalizations are fixed analytically, independently of the sphere grid.
+The free metric, log-lapse, shift, and tensor profiles are represented in the
+prescribed angular Galerkin spaces before completing the face constraints.
 At the corner $\phi=0$, $\Omega\tr\chi=1.6$, $\zeta=0$, and
 $\Omega\omega=0$.  The positive branch of $\Omega e_3\phi$ and all remaining
 face fields are determined by the Einstein--scalar characteristic
@@ -134,14 +127,25 @@ power coordinate
 \end{equation}
 resolves their prescribed $v^{0.1}$ corner behavior.
 
-There is no explicit spacetime for comparison.  On the independent angular
-and coordinate overgrid we therefore use
+There is no explicit spacetime for comparison.  After independent angular resampling and coordinate overgrid
+refinement we therefore use
 \begin{equation}\label{eq:results-ese-curvature-error}
   E_{\mathrm{Ric}}(u,v)
   =\norm{\Rc-\dd\phi\otimes\dd\phi}_{L^2(S_{u,v})}.
 \end{equation}
+Here the Ricci components are computed from first null derivatives of the
+resampled weighted connection variables, with metric--connection and scalar
+consistency and the scalar wave residual checked separately.  The positive norm squares the null
+components with weights $1,1,2,1,1$ for $33,44,34,3A,4A$, respectively,
+and uses the full tensor norm for $AB$; it is not a Lorentzian contraction.
+For coordinate comparison, the audit uses the union of the two- and
+three-element source partitions, with degrees 11 and 14 in $\tau$ and $s$.
+All three solutions are therefore evaluated on the same $45\times57$ grid.
 The protected region removes three nodes from each outer endpoint and each
-spectral-element interface and requires $s\geq0.6$.  Table
+audit-element interface, requires $s\geq0.6$, and contains 198 sections.
+The scalar, vector, and tensor fields are transferred in their typed spaces;
+for the central angular discretization the transfer degree is 16 on 362
+independent sphere points. Table
 \ref{tab:results-exp7-curvature-error} shows coordinate convergence with the
 central $L=8$, $W=16$, 350-point angular discretization held fixed.
 
@@ -156,18 +160,17 @@ central $L=8$, $W=16$, 350-point angular discretization held fixed.
       & $\operatorname{mean}E_{\mathrm{Ric}}$
       & $\max E_{\mathrm{Ric}}$ \\
     \midrule
-    $13\times19$ & $9.074\times10^{-1}$ & $4.923$
-      & $2.815\times10^{1}$ \\
-    $17\times23$ & $3.115\times10^{-2}$ & $8.785\times10^{-2}$
-      & $4.011\times10^{-1}$ \\
-    $25\times34$ & $6.889\times10^{-3}$ & $1.091\times10^{-2}$
-      & $3.470\times10^{-2}$ \\
+    \TableRows{tables/exp07-rows.tex}
     \bottomrule
   \end{tabular}
 \end{table}
 
 All three coordinate runs complete six Picard sweeps, and the protected
-maximum decreases from $28.15$ to $3.47\times10^{-2}$.  Figure
+maximum decreases from $6.25\times10^{-2}$ to $1.07\times10^{-2}$.
+At fixed central coordinate resolution, the sum of the protected Einstein
+and scalar-wave residual maxima decreases from $3.99\times10^{-2}$ through
+$1.55\times10^{-2}$ to $9.79\times10^{-3}$ under angular refinement.
+Figure
 \ref{fig:results-exp7-curvature-spectrum} displays the finest-coordinate
 audit.  The plot includes the full open overgrid to expose the unresolved
 $v^{0.1}$ endpoint layer, whereas the statistics in Table
@@ -181,7 +184,7 @@ $v^{0.1}$ endpoint layer, whereas the statistics in Table
   $E_{\mathrm{Ric}}(u,v)$ for the finest coordinate run.  Colors show
   elementwise spectral interpolation of $\log_{10}E_{\mathrm{Ric}}$; white
   contours mark $10^{-4}$, $10^{-3}$, $10^{-2}$, and $10^{-1}$, and the thin
-  lines mark source-element interfaces.}
+  lines mark audit-element interfaces.}
   \label{fig:results-exp7-curvature-spectrum}
 \end{figure}
 
@@ -200,7 +203,8 @@ corner,
   \Omega\tr\chib=-2,\qquad
   (\Omega e_4\phi)(-1,0)=-2.2627416998.
 \end{equation}
-For
+Use the axisymmetric tensor
+$Q_{\rm ax}=-(\nabla^2_{\roundg}z^2)^{\mathrm{tf}}$ and set
 \begin{equation}
   F(v)=\left(\frac{v}{v+0.01}\right)^{0.1},
 \end{equation}
@@ -208,7 +212,7 @@ the outgoing scalar and shear perturbations are
 \begin{align}\label{eq:results-exp8-outgoing-data}
   e_4\phi(-1,v)-e_4\phi(-1,0)&=-2F(v),\\
   \Omega\chih(-1,v)&=0.1F(v)
-     \mathcal T_Q[\slg(-1,v)].
+     \mathcal T_{Q_{\rm ax}}[\slg(-1,v)].
 \end{align}
 Here $\Omega(-1,v)=1$, so the first line is also the corresponding statement
 for the stored variable $\Omega e_4\phi$.  The characteristic constraints
@@ -232,8 +236,8 @@ $1.53\times10^{-8}$.
 
 Table \ref{tab:results-exp8-curvature-error} applies
 \eqref{eq:results-ese-curvature-error} on the same $s\geq0.6$ protected region
-used above.  The close agreement shows that increasing the angular band has
-little effect on the curvature-residual distribution.
+used above.  These rows compare different atlas patches; the separate angular
+control tests the coordinate-refined anchor near $v=0.04$.
 
 \begin{table}[htbp]
   \centering
@@ -248,20 +252,7 @@ little effect on the curvature-residual distribution.
       & $\operatorname{mean}E_{\mathrm{Ric}}$
       & $\max E_{\mathrm{Ric}}$ \\
     \midrule
-    $-0.52$ & $0.050000$ & $6.645\times10^{-3}$
-      & $1.208\times10^{-2}$ & $7.557\times10^{-2}$ \\
-    $-0.45$ & $0.043527$ & $4.677\times10^{-3}$
-      & $8.273\times10^{-3}$ & $6.105\times10^{-2}$ \\
-    $-0.35$ & $0.033502$ & $3.104\times10^{-3}$
-      & $5.187\times10^{-3}$ & $3.936\times10^{-2}$ \\
-    $-0.25$ & $0.023597$ & $3.463\times10^{-3}$
-      & $4.458\times10^{-3}$ & $2.386\times10^{-2}$ \\
-    $-0.15$ & $0.013860$ & $4.172\times10^{-3}$
-      & $6.504\times10^{-3}$ & $4.055\times10^{-2}$ \\
-    $-0.10$ & $0.009085$ & $4.701\times10^{-3}$
-      & $8.131\times10^{-3}$ & $6.051\times10^{-2}$ \\
-    $-0.05$ & $0.004413$ & $3.156\times10^{-3}$
-      & $5.997\times10^{-3}$ & $4.688\times10^{-2}$ \\
+    \TableRows{tables/exp08-rows.tex}
     \bottomrule
   \end{tabular}
 \end{table}
@@ -303,17 +294,20 @@ $v=v_0$ we solve the angular graph equation
 \end{equation}
 The expansion is calculated from the four-metric connection and graph
 embedding and does not reuse the evolved expansion variable.  A section is
-retained only if it is the outermost constant-section sign bracket, has
-strictly negative $\theta_-$, and has opposite signs of $\theta_+$ under
-small inward and outward constant displacements.
+retained only if the nonlinear solve succeeds within the patch interior,
+$\norm{\theta_+}_{L^\infty}\leq10^{-5}$, $\theta_-$ is strictly negative,
+and small inward and outward constant displacements bracket $\theta_+$.
+The search starts from the outermost detected constant-section bracket;
+this does not establish outermostness among arbitrary angular graphs.
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.9\textwidth]
     {../experiments/exp08/results/curved-domain-and-horizon.png}
   \caption{Experiment 8 curved characteristic region, inner rectangular
-  atlas, sampled trapped sections, and reconstructed apparent horizon.  The
-  right panel shows the areal radius of the 18 retained MOTSs.}
+  atlas, sampled trapped sections, and reconstructed apparent horizon. Shading
+  shows the atlas union, red points are trapped sections, and the blue curve
+  joins the reconstructed MOTSs. The right panel shows their areal radii.}
   \label{fig:results-exp8-curved-domain-horizon}
 \end{figure}
 

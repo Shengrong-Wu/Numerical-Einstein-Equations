@@ -1,21 +1,18 @@
 # Experiment 1: regular exact vacuum solutions
 
-## Setup
+Schwarzschild and Kerr metrics with mass one are evolved on short and long
+double-null rectangles. Kerr uses rotations 0, 0.3, 0.7, and 0.9 and reference
+radius four. Coordinate refinements contain 17, 33, and 65 nodes per axis.
+Schwarzschild uses 50 sphere points and retained degree five; Kerr angular
+controls use 30, 50, and 86 points with retained degrees three, five, and seven.
+Every case receives eight Picard sweeps.
 
-Schwarzschild and Kerr metrics with mass one are evaluated on short and long
-regular double-null domains. The Kerr rotations are \(a=0,0.3,0.7,0.9\), with
-reference radius four. Coordinate grids use 17, 33, and 65 nodes; angular
-controls use 30, 50, and 86 Fibonacci points with retained degrees 3, 5, and 7.
+The primary statistic is the pointwise Frobenius error of the section metric
+against the exact reference, summarized over all coordinate and sphere points.
+First-order residuals and primitive/connection consistency are supplementary
+checks; a small Picard update alone is not an accuracy certificate.
 
-## Diagnostics and result
-
-Every case records exact g closures, fresh first-order null residuals,
-an independently reconstructed four-g Ricci tensor, and a deliberately
-mutated missing-Lie-derivative control. All 46 standard cases completed. The
-same-grid validation compared 368 state arrays containing 184,036,464 values;
-every value was bitwise identical to the retained numerical reference.
-
-The finest regular Schwarzschild short-domain independent masked residual is
-\(1.74\times10^{-7}\). Rotating Kerr cases have larger reconstructed residuals,
-so the exact g/closure comparison—not a small aggregate residual alone—is
-the primary correctness check.
+The regenerated [article table](../../article/tables/exp01-rows.tex) and
+[numerical provenance](../../article/tables/exp01-statistics.json) record the
+finest-grid results. See the [revision report](../revision-2026-09-08.md) for
+comparisons with retained results and the repeated Kerr calculation.

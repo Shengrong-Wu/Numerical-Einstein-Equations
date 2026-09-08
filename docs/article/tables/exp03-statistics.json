@@ -1,0 +1,84 @@
+{
+  "experiment": "exp03",
+  "status": "completed",
+  "summary_sha256": "b69d27cbd2da20494f711d4e7660db465d04f358860c748558dfca35eeef5ebf",
+  "software": {
+    "commit": "f30b483245bb26af116da74b5be65e955bc16b6c",
+    "dirty": false,
+    "matplotlib": "3.10.7",
+    "numpy": "2.4.3",
+    "package": "numerical-einstein-equations",
+    "package_version": "0.1.0",
+    "pillow": "10.4.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.12",
+    "scipy": "1.16.3"
+  },
+  "diagnostic_override": null,
+  "source_artifacts": {
+    "summary.json": "b69d27cbd2da20494f711d4e7660db465d04f358860c748558dfca35eeef5ebf",
+    "manifest.json": "e2b5ec6c7cd4c6931edeee93762e93665d89f530bea4ce7096c8dcf9acb4d19e",
+    "data/epsilon-0.50000000/coordinate-2/official-mapped-state.npz": "52f36b35933dc159feff0a6b59d467f7da6d2d34ebf0ac40a20faeef77c2269a",
+    "data/epsilon-0.25000000/coordinate-2/official-mapped-state.npz": "724150c85be456633ff5f8c37a09abe6905c453882485e066e41329ffc9e5aaf",
+    "data/epsilon-0.12500000/coordinate-2/official-mapped-state.npz": "af130d09b48e33e415c098784875f64151ea9a78a3e09c0e9b956421fd740700",
+    "data/epsilon-0.06250000/coordinate-2/official-mapped-state.npz": "73e3298513c2c236eb1bf3c6230cc039074a162dcb9b2913b8747f92a1cc0b5a",
+    "data/epsilon-0.03125000/coordinate-2/official-mapped-state.npz": "d06ac8ee3df607dd6e7ce157913710cc3823e77ef5546f5ffcade7109836a49b",
+    "data/epsilon-0.01562500/coordinate-2/official-mapped-state.npz": "d2c677b7b10d33705fc47d253afaebe345d8df270baa4b6d3e5233ebc882bc77"
+  },
+  "rows": [
+    {
+      "labels": [
+        "$2^{-1}$",
+        "$1$"
+      ],
+      "median": 2.0255467757704548e-07,
+      "mean": 5.157841583291605e-07,
+      "maximum": 2.2083227866829787e-06
+    },
+    {
+      "labels": [
+        "$2^{-2}$",
+        "$1/2$"
+      ],
+      "median": 2.8103926606237735e-05,
+      "mean": 4.039465576845747e-05,
+      "maximum": 0.00013643025212792915
+    },
+    {
+      "labels": [
+        "$2^{-3}$",
+        "$1/4$"
+      ],
+      "median": 0.0022120072011482007,
+      "mean": 0.004203325369454092,
+      "maximum": 0.018353889280651535
+    },
+    {
+      "labels": [
+        "$2^{-4}$",
+        "$1/8$"
+      ],
+      "median": 0.006969243052181311,
+      "mean": 0.012338396120648258,
+      "maximum": 0.061187839375832144
+    },
+    {
+      "labels": [
+        "$2^{-5}$",
+        "$1/16$"
+      ],
+      "median": 0.02019750928294788,
+      "mean": 0.03742607288499878,
+      "maximum": 0.28505463200084175
+    },
+    {
+      "labels": [
+        "$2^{-6}$",
+        "$1/32$"
+      ],
+      "median": 0.03418671801433166,
+      "mean": 0.08844577131181341,
+      "maximum": 0.4179826607038555
+    }
+  ]
+}

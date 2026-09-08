@@ -5,11 +5,14 @@ numerical difficulty.  The first three experiments admit explicit reference
 metrics and therefore measure the error directly by comparing the computed
 section metric with the exact one.  The last two experiments evolve genuinely
 nonspherical characteristic data, for which no explicit spacetime is
-available; there the error is measured by a positive norm of the reconstructed
-Ricci tensor on a stencil-protected interior region.  In this way the exact
-benchmarks test accuracy, while the short-pulse experiments test whether the
-iteration produces an approximately Ricci-flat geometry beyond the class of
-known solutions.
+available; there we report a positive norm of the first-order Ricci residual
+on a protected interior region, together with metric--connection consistency
+checks.  The residual is evaluated from the stored weighted connection
+variables and fresh derivatives, with the audit grid specified for each case.  This avoids
+second null derivatives of the metric and the potentially singular derivative
+$\nabla_4\chih$ at the initial corner; intrinsic angular curvature uses the
+smooth sphere data.  These diagnostics assess the numerical equations and do
+not furnish a certified metric-error bound.
 
 \subsection{Regular Schwarzschild and Kerr benchmarks}
 
@@ -121,26 +124,7 @@ order $10^{-6}$ in the mean for all rotating cases considered here.
     Family & Domain & $\operatorname{median} E_g$
       & $\operatorname{mean} E_g$ & $\max E_g$ \\
     \midrule
-    Schwarzschild & short & $2.820\times10^{-14}$ & $3.088\times10^{-14}$
-      & $1.238\times10^{-13}$ \\
-    Schwarzschild & long & $7.674\times10^{-13}$ & $7.407\times10^{-13}$
-      & $1.601\times10^{-12}$ \\
-    Kerr, $a=0$ & short & $1.172\times10^{-14}$ & $1.235\times10^{-14}$
-      & $4.236\times10^{-14}$ \\
-    Kerr, $a=0$ & long & $3.514\times10^{-13}$ & $3.433\times10^{-13}$
-      & $7.954\times10^{-13}$ \\
-    Kerr, $a=0.3$ & short & $2.960\times10^{-7}$ & $5.776\times10^{-7}$
-      & $8.135\times10^{-6}$ \\
-    Kerr, $a=0.3$ & long & $1.101\times10^{-6}$ & $2.316\times10^{-6}$
-      & $3.925\times10^{-5}$ \\
-    Kerr, $a=0.7$ & short & $4.467\times10^{-7}$ & $9.346\times10^{-7}$
-      & $1.791\times10^{-5}$ \\
-    Kerr, $a=0.7$ & long & $1.888\times10^{-6}$ & $4.375\times10^{-6}$
-      & $1.022\times10^{-4}$ \\
-    Kerr, $a=0.9$ & short & $5.329\times10^{-7}$ & $9.945\times10^{-7}$
-      & $1.747\times10^{-5}$ \\
-    Kerr, $a=0.9$ & long & $2.467\times10^{-6}$ & $5.371\times10^{-6}$
-      & $1.009\times10^{-4}$ \\
+    \TableRows{tables/exp01-rows.tex}
     \bottomrule
   \end{tabular}
 \end{table}
@@ -213,13 +197,9 @@ We again use the direct metric error $E_g$ defined in
 the finest grid.  The static-coordinate metric itself is reproduced to
 roundoff even as $\Omega^2$ approaches zero.  The Kruskal calculation also
 remains highly accurate across the horizon, with a mean section-metric error
-of $1.12\times10^{-12}$.  On the $17^2$, $33^2$, and $65^2$ Kruskal grids,
-the independent 35-decimal-digit masked Ricci residual decreases as
-\begin{equation}
-  3.99034\times10^{-6}
-  \ \longrightarrow\ 1.48083\times10^{-7}
-  \ \longrightarrow\ 7.86204\times10^{-9}.
-\end{equation}
+of $1.12\times10^{-12}$.  The supplementary curvature checks use first null derivatives of the
+weighted connection variables, with the metric--connection consistency
+reported separately.
 Derivative-based curvature diagnostics are more sensitive to the static lapse
 degeneration; this is a coordinate-conditioning effect and does not indicate
 a curvature singularity at $r=2M$.
@@ -234,22 +214,13 @@ a curvature singularity at $r=2M$.
     Coordinates & $\operatorname{median} E_g$
       & $\operatorname{mean} E_g$ & $\max E_g$ \\
     \midrule
-    Static, $\epsilon=10^{-1}$ & $2.627\times10^{-15}$ & $2.800\times10^{-15}$
-      & $1.358\times10^{-14}$ \\
-    Static, $\epsilon=10^{-2}$ & $2.473\times10^{-15}$ & $2.749\times10^{-15}$
-      & $1.435\times10^{-14}$ \\
-    Static, $\epsilon=10^{-4}$ & $1.858\times10^{-15}$ & $1.960\times10^{-15}$
-      & $8.129\times10^{-15}$ \\
-    Static, $\epsilon=10^{-6}$ & $1.776\times10^{-15}$ & $1.873\times10^{-15}$
-      & $7.501\times10^{-15}$ \\
-    Kruskal crossing & $1.134\times10^{-13}$ & $1.122\times10^{-12}$
-      & $2.923\times10^{-11}$ \\
+    \TableRows{tables/exp02-rows.tex}
     \bottomrule
   \end{tabular}
 \end{table}
 
 
-\subsection{Schwarzschild interior and approach to \(r=0\)}
+\subsection{Schwarzschild interior and approach to \texorpdfstring{\(r=0\)}{r=0}}
 
 The third experiment uses the Schwarzschild solution in the regular Kruskal
 form \eqref{eq:results-kruskal-double-null}, now entirely inside the event
@@ -325,18 +296,7 @@ statistics of \eqref{eq:results-exp3-metric-error} on the $49^2$ grid.
     $\epsilon$ & $r_{\mathrm{end}}$
       & $\operatorname{median}E_g$ & $\operatorname{mean}E_g$ & $\max E_g$ \\
     \midrule
-    $2^{-1}$ & $1$    & $2.026\times10^{-7}$ & $5.158\times10^{-7}$
-      & $2.208\times10^{-6}$ \\
-    $2^{-2}$ & $1/2$  & $2.810\times10^{-5}$ & $4.039\times10^{-5}$
-      & $1.364\times10^{-4}$ \\
-    $2^{-3}$ & $1/4$  & $2.212\times10^{-3}$ & $4.203\times10^{-3}$
-      & $1.835\times10^{-2}$ \\
-    $2^{-4}$ & $1/8$  & $6.969\times10^{-3}$ & $1.234\times10^{-2}$
-      & $6.119\times10^{-2}$ \\
-    $2^{-5}$ & $1/16$ & $2.020\times10^{-2}$ & $3.743\times10^{-2}$
-      & $2.851\times10^{-1}$ \\
-    $2^{-6}$ & $1/32$ & $3.419\times10^{-2}$ & $8.845\times10^{-2}$
-      & $4.180\times10^{-1}$ \\
+    \TableRows{tables/exp03-rows.tex}
     \bottomrule
   \end{tabular}
 \end{table}
@@ -400,7 +360,12 @@ respectively.  The angular discretization has $550$ sphere points, retained
 degree $L=10$, work degree $W=20$, and differentiation degree $D=21$.  Both
 runs complete six Picard sweeps.  Since no explicit spacetime is available,
 the accuracy statistic is the $L^\infty_{u,v}L^2(S)$ norm of the independently
-reconstructed four-metric Ricci residual on the stencil-protected interior.
+differentiated first-order Ricci residual on the stencil-protected interior.
+The audit transfers scalar, vector, and tensor fields in their typed harmonic
+spaces through degree 20 onto 562 sphere points, and raises each coordinate
+element degree by three. The protected metric--connection component defects
+are $1.75\times10^{-9}$ in the incoming direction and
+$2.77\times10^{-7}$ in the outgoing direction.
 
 \begin{table}[htbp]
   \centering
@@ -413,10 +378,7 @@ reconstructed four-metric Ricci residual on the stencil-protected interior.
     Data & final update & $L^\infty_{u,v}L^2(S)$
       & protected pointwise maximum \\
     \midrule
-    Strong pulse & $1.688\times10^{-10}$ & $2.453\times10^{-3}$
-      & $3.728\times10^{-3}$ \\
-    Zero control & $2.927\times10^{-13}$ & $1.059\times10^{-6}$
-      & $1.029\times10^{-6}$ \\
+    \TableRows{tables/exp04-rows.tex}
     \bottomrule
   \end{tabular}
 \end{table}
@@ -425,8 +387,9 @@ Every boundary spectral-deferred-correction element is accepted.  For the
 strong pulse, the maximum collocation and overgrid boundary defects are
 $6.36\times10^{-16}$ and $1.47\times10^{-8}$, respectively.  In the zero
 control, moving the residual mask farther from the short-pulse endpoint
-reduces the $L^\infty_{u,v}L^2(S)$ residual from $1.059\times10^{-6}$ to
-$1.114\times10^{-7}$.  The contrast between this numerical floor and the
+reduces the $L^\infty_{u,v}L^2(S)$ residual from $1.973\times10^{-9}$ to
+$1.737\times10^{-9}$. The exact Minkowski control has the same numerical
+floor, $1.973\times10^{-9}$.  The contrast between this numerical floor and the
 strong-pulse value isolates the error associated with evolving the
 nonspherical datum.
 
@@ -503,10 +466,7 @@ all below the prescribed $10^{-8}$ tolerance.
       & $\operatorname{mean}E_{\mathrm{Ric}}$
       & $\max E_{\mathrm{Ric}}$ \\
     \midrule
-    Protected mask & $144$ & $3.9842\times10^{-4}$
-      & $6.4274\times10^{-4}$ & $5.0216\times10^{-3}$ \\
-    Entire grid & $3721$ & $1.8216\times10^{-3}$
-      & $1.6499\times10^{1}$ & $1.3861\times10^{3}$ \\
+    \TableRows{tables/exp05-rows.tex}
     \bottomrule
   \end{tabular}
 \end{table}
@@ -514,8 +474,8 @@ all below the prescribed $10^{-8}$ tolerance.
 Let $E_{\mathrm{Ric}}(u,v)$ denote the sum of the sectionwise $L^2(S_{u,v})$
 norms of the six weighted Ricci quantities listed in the curvature-residue
 subsection.  Table \ref{tab:results-exp5-residual} compares this aggregate
-residual on the protected mask with the same statistic on the entire
-coordinate grid.
+residual on the protected mask with the same statistic on the open
+coordinate grid, excluding the four outer endpoint lines.
 
 
 
@@ -527,11 +487,14 @@ element interface.  The two-dimensional mask is the tensor product of these
 one-dimensional masks, leaving $12$ retained nodes in each direction and
 hence $144$ sections.  Its purpose is to omit locations at which the
 independent derivative reconstruction encounters the square-root endpoint,
-a terminal one-sided boundary, or an element interface; the entire-grid row
-retains all such locations.  The minimum section-metric eigenvalue is
+a terminal one-sided boundary, or an element interface; the open-grid row retains the nearby endpoint layers and element interfaces,
+but excludes the endpoint lines themselves.  The minimum section-metric eigenvalue is
 $2.938\times10^{-2}$, and all immutable characteristic traces are restored
 to roundoff, with maximum incoming $\Omega\tr\chi$ mismatch
-$1.78\times10^{-15}$.
+$1.78\times10^{-15}$.  On the protected mask the metric--connection
+defects $\partial_u g+\Lie_b g-2\Omega\chib$ and
+$\partial_v g-2\Omega\chi$ have maximum absolute ambient components
+$3.10\times10^{-4}$ and $1.85\times10^{-5}$, respectively.
 
 \begin{figure}[htbp]
   \centering
@@ -539,21 +502,18 @@ $1.78\times10^{-15}$.
     ../experiments/exp05/results/residual-spectrum.png}
   \caption{Spectrum of the aggregate Ricci residual
   $E_{\mathrm{Ric}}(u,v)$.  Colors show the elementwise spectral
-  interpolation of $\log_{10}E_{\mathrm{Ric}}$ on the entire coordinate
+  interpolation of $\log_{10}E_{\mathrm{Ric}}$ on the open coordinate
   grid; white contours mark $10^{-4}$, $10^{-3}$, $10^{-2}$, and $10^{-1}$,
   and the thin lines are coordinate-element interfaces.}
   \label{fig:results-exp5-residual-spectrum}
 \end{figure}
 
-Figure \ref{fig:results-exp5-residual-spectrum} deliberately displays the
-full reconstruction, including the unprotected endpoint layers.  The raw
-all-node residual reaches $1.386\times10^3$, with the largest contribution
-adjacent to $u=-1$.  Such large boundary values are expected because the
-initial data make both extreme null-curvature components infinite and because
-derivative stencils cross the square-root endpoint and element interfaces.
-They are not used as an interior accuracy statistic; after removing those
-unresolved layers, the maximum protected residual is
-$5.022\times10^{-3}$ as reported in Table
-\ref{tab:results-exp5-residual}.
+Figure \ref{fig:results-exp5-residual-spectrum} includes the unprotected
+layers of the open grid.  The extreme null-curvature components can diverge
+at the initial corner, but they are not differentiated to obtain this
+residual.  The large unprotected values instead expose errors in the
+first-order differentiation near the fractional-power endpoints and element
+interfaces.  They are not used as an interior accuracy statistic; the
+protected values are reported in Table~\ref{tab:results-exp5-residual}.
 
 % \clearpage

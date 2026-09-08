@@ -1,0 +1,74 @@
+{
+  "experiment": "exp02",
+  "status": "completed",
+  "summary_sha256": "9a8d5fed3b4d445aaf0d7c63df1869f15f2ce77532631932c269dca9565c4e43",
+  "software": {
+    "commit": "f30b483245bb26af116da74b5be65e955bc16b6c",
+    "dirty": false,
+    "matplotlib": "3.10.7",
+    "numpy": "2.4.3",
+    "package": "numerical-einstein-equations",
+    "package_version": "0.1.0",
+    "pillow": "10.4.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.12",
+    "scipy": "1.16.3"
+  },
+  "diagnostic_override": null,
+  "source_artifacts": {
+    "summary.json": "9a8d5fed3b4d445aaf0d7c63df1869f15f2ce77532631932c269dca9565c4e43",
+    "manifest.json": "ee0469d92d9c3de8e1fcaf947f2ddc8b998094bcc5202cec730dbf2168f0964e",
+    "data/static-epsilon-1e-01/coordinate-2/official-state.npz": "8959f4eba0893928143efb1f453fcb397349c979deca8be6ca5a003e9eb67cb2",
+    "data/static-epsilon-1e-01/coordinate-2/official-exact-state.npz": "f16ec12e138afa768ba917aebd2a0158d4b689ab13192d5e4d5edb972d1b1ab0",
+    "data/static-epsilon-1e-02/coordinate-2/official-state.npz": "14451f998b1a2b4eaf78443a783798175f9fc37742805a1999315664531b1b9c",
+    "data/static-epsilon-1e-02/coordinate-2/official-exact-state.npz": "00ec14678ddf4787195b2fc6efbc4c203f2ed2555201cfb3b1d9a97e49979370",
+    "data/static-epsilon-1e-04/coordinate-2/official-state.npz": "23b9d5f87d291200f32d2b64abe17e90402bc1a3abd78d56e6912eaf263422d4",
+    "data/static-epsilon-1e-04/coordinate-2/official-exact-state.npz": "09fb8c44e206ee45bbfb73c3fb249a78f55d8c43ab026c0e524c83e95ca3a379",
+    "data/static-epsilon-1e-06/coordinate-2/official-state.npz": "6d0f0abe20d0042e422c9f5155feb4af5e2b7bcfff43c3edcdf7114663d3cddc",
+    "data/static-epsilon-1e-06/coordinate-2/official-exact-state.npz": "47d0f49e1c4dce49f9b2ec5209b201aad6c9f2b88b8dbbd4195ecf4c0c6d4978",
+    "data/kruskal-crossing/coordinate-2/official-state.npz": "90d8086bab7c5eca18e8d78e7e866b5b7a120a4b43bc05982af56ed3292461fc",
+    "data/kruskal-crossing/coordinate-2/official-exact-state.npz": "d077147b53b4855235bf53231393fb29c1f68976fc814f32d0581f0c9e7fc4a8"
+  },
+  "rows": [
+    {
+      "labels": [
+        "Static, $\\epsilon=10^{-1}$"
+      ],
+      "median": 2.6272671962866384e-15,
+      "mean": 2.8004346604549585e-15,
+      "maximum": 1.3577669010719669e-14
+    },
+    {
+      "labels": [
+        "Static, $\\epsilon=10^{-2}$"
+      ],
+      "median": 2.4725840765205216e-15,
+      "mean": 2.7493744016803455e-15,
+      "maximum": 1.4346035191547132e-14
+    },
+    {
+      "labels": [
+        "Static, $\\epsilon=10^{-4}$"
+      ],
+      "median": 1.8577827478738127e-15,
+      "mean": 1.9603087865734516e-15,
+      "maximum": 8.128940492073856e-15
+    },
+    {
+      "labels": [
+        "Static, $\\epsilon=10^{-6}$"
+      ],
+      "median": 1.7763568394002505e-15,
+      "mean": 1.8731528618875804e-15,
+      "maximum": 7.501300553848845e-15
+    },
+    {
+      "labels": [
+        "Kruskal crossing"
+      ],
+      "median": 1.133874748255939e-13,
+      "mean": 1.1219179636353253e-12,
+      "maximum": 2.922610505130347e-11
+    }
+  ]
+}

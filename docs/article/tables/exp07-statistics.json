@@ -1,0 +1,51 @@
+{
+  "experiment": "exp07",
+  "status": "completed",
+  "summary_sha256": "31e8649c465c884631501ac44214ddd1406ad8a4a6f2625f97bbd0e32fa7251b",
+  "software": {
+    "commit": "ba991acc682eba2cfb09d73ab9ed609bb94b7985",
+    "dirty": false,
+    "matplotlib": "3.10.7",
+    "numpy": "2.4.3",
+    "package": "numerical-einstein-equations",
+    "package_version": "0.1.0",
+    "pillow": "10.4.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.12",
+    "scipy": "1.16.3"
+  },
+  "diagnostic_override": null,
+  "source_artifacts": {
+    "summary.json": "31e8649c465c884631501ac44214ddd1406ad8a4a6f2625f97bbd0e32fa7251b",
+    "manifest.json": "f3cf3d81de237ba9a7d2aac896de191603e8e8e0900f00f35a917a3410fb5bda",
+    "data/cases/coordinate-level-0/summary.json": "ccdccf04f667cd09facd85705bea42fff242dce27ac167b898aaa4ea38e66225",
+    "data/cases/baseline-cap-0.04/summary.json": "774e63a62acd81f868b2214b3a2d22a4a194bf9d93a02d0ce94fa6c4cd4409c5",
+    "data/cases/coordinate-level-2/summary.json": "814a30face2efc49fd983fd2d721898745d174ee7cfe953202e60ec0c9b94fd1"
+  },
+  "rows": [
+    {
+      "labels": [
+        "$13\\times19$"
+      ],
+      "median": 0.0059471194608543086,
+      "mean": 0.00990669733757943,
+      "maximum": 0.06251099002442154
+    },
+    {
+      "labels": [
+        "$17\\times23$"
+      ],
+      "median": 0.002677326361927213,
+      "mean": 0.0037063801686273773,
+      "maximum": 0.01361289190820178
+    },
+    {
+      "labels": [
+        "$25\\times34$"
+      ],
+      "median": 0.0015497883169782929,
+      "mean": 0.0026761768390711417,
+      "maximum": 0.010697617060156617
+    }
+  ]
+}

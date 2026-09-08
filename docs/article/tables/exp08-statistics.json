@@ -1,0 +1,126 @@
+{
+  "experiment": "exp08",
+  "status": "completed",
+  "summary_sha256": "7d87190be2018b8a1d9762786b488b6736558af451f1939e5e628115d0aa566d",
+  "software": {
+    "commit": "f30b483245bb26af116da74b5be65e955bc16b6c",
+    "dirty": false,
+    "matplotlib": "3.10.7",
+    "numpy": "2.4.3",
+    "package": "numerical-einstein-equations",
+    "package_version": "0.1.0",
+    "pillow": "10.4.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.12",
+    "scipy": "1.16.3"
+  },
+  "diagnostic_override": {
+    "sha256": "c64a68ba5e65f13921b920904cbb38d8e97c0e67cdc665da3ee51fcd5610e03c",
+    "software": {
+      "package": "numerical-einstein-equations",
+      "package_version": "0.1.0",
+      "commit": "f158a4ebf8667d419a2db2d17f250fbe67c9f39b",
+      "dirty": true,
+      "python": "3.12.12",
+      "numpy": "2.4.3",
+      "scipy": "1.16.3",
+      "matplotlib": "3.10.7",
+      "pillow": "10.4.0",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    },
+    "method": "new diagnostics from unchanged saved states; no evolution"
+  },
+  "source_artifacts": {
+    "summary.json": "7d87190be2018b8a1d9762786b488b6736558af451f1939e5e628115d0aa566d",
+    "manifest.json": "2a8bdd2d1742907a6d767aec63cae06735824bee7c7d4cc8936cdbe21b327a29",
+    "data/patches/anchor-standard/final-state.npz": "2753b3c8758de9217885db467bb63135683be8c3d268cdbbbb197e6e5d09b751",
+    "data/patches/atlas-u005-refined/final-state.npz": "db8deafd773cd1d2cbdc22b378b2e6b46f52cfd164bcd891a8cdc285038b2a51",
+    "data/patches/atlas-u010/final-state.npz": "46573272366d1c4b62e886cf3724e974c6babc9ce6ebac80d3300fcc0b0a9b4a",
+    "data/patches/atlas-u015/final-state.npz": "dca4fbe8192c4fbbae8842f481ec145d36874c7ef5fc8032eeee6522d048d45a",
+    "data/patches/atlas-u025/final-state.npz": "e8bd5d81e306420a6a3100f07eafec40105c1a375a73ba130c3f44ce88f6460f",
+    "data/patches/atlas-u035/final-state.npz": "c2c7da545192eff71cd0e06b3c3b2e2398d3e6e219945d91c8be1f43aeea9988",
+    "data/patches/atlas-u052/final-state.npz": "0b07771b8e9de17356187ecf2076fc4dd4510117d2a23ae912613a68c240d2e3",
+    "data/patches/mots-anchor-refined/final-state.npz": "3e9e5532a1b28bb563516e59433daa9d66c782362ad33e889af4097ecfff26e9",
+    "data/patches/mots-anchor-standard/final-state.npz": "9afe525d342a5e736e802ab67e8f9686954dd1adc84fad75898b62e2f46a5df4",
+    "data/patches/support-v005133/final-state.npz": "ea107949c60627ff30d627a7deda54cc654339e068213275f550d34746901b0a",
+    "data/patches/support-v006445/final-state.npz": "05ee4f744fc3a059302ea5572d508db70285c28823b379384a86f24ae077e339",
+    "data/patches/support-v008092/final-state.npz": "d384b3b3ebe27b49b3bfd3f07621845ffa642c4d550f513714d4acf423a4ed12",
+    "data/patches/support-v011826/final-state.npz": "ec31d0a179151088c8c5a03e49e07761150f362baefd1604db6c4859deb2e75d",
+    "data/patches/support-v016020/final-state.npz": "f03abe7588b319890c475f2927fcdaa9458f36e2ba2610920f4b825a2174b6f8",
+    "data/patches/support-v020115/final-state.npz": "56dd22116fe653a457675ba57ef15cc2ed4e19ea44ebf8c6e1ee2e889b717bd0",
+    "data/patches/support-v027248/final-state.npz": "84cf9aac59e885068a759467a60251d6961243ac11004ccfafeaff3c00d8662c",
+    "data/patches/support-v034214/final-state.npz": "5d411c9e0be3a475a38f03249d6e3bd99344d3b783db1883049a984f9e3b4e3e",
+    "data/patches/atlas-u052/summary.json": "d5fdcee094303c07435c9df04ea650f83e0c30ad6b2c17cad1e82aad498ee857",
+    "data/patches/anchor-standard/summary.json": "c3b8435ba1256f28b404e89ac9c5d4a5a25f052f10bc12bc695f1ceadeec2f62",
+    "data/patches/atlas-u035/summary.json": "d92938018b2241093eba303bd84ea5f7b6f60b1d5fa274e61b8d6bffb643b114",
+    "data/patches/atlas-u025/summary.json": "2ebdd9fb706eb7fee5b25ffdc0056a3157536fb45295d1b0fa06bf06c0d815fb",
+    "data/patches/atlas-u015/summary.json": "3f203e1beca9bca3b8749cc25453964fc75a502f8fe8c9a459baff64483c523e",
+    "data/patches/atlas-u010/summary.json": "90a5bc4efeb3265ac520b283d2190e871f1f3d650463bd551afe50df2aed20b7",
+    "data/patches/atlas-u005-refined/summary.json": "bd88a8a9b1d1d6ab3a30b9f95856b9b2a7e0c07f299fcd591bda6e51c366d87e"
+  },
+  "rows": [
+    {
+      "labels": [
+        "$-0.52$",
+        "$0.050000$"
+      ],
+      "median": 0.0002364672030734794,
+      "mean": 0.0020966335141810433,
+      "maximum": 0.034394647429081014
+    },
+    {
+      "labels": [
+        "$-0.45$",
+        "$0.043527$"
+      ],
+      "median": 0.00021414312385962912,
+      "mean": 0.0016051841678631118,
+      "maximum": 0.019145002752599654
+    },
+    {
+      "labels": [
+        "$-0.35$",
+        "$0.033502$"
+      ],
+      "median": 0.00014178443306477336,
+      "mean": 0.0010961332466239255,
+      "maximum": 0.012682651638537636
+    },
+    {
+      "labels": [
+        "$-0.25$",
+        "$0.023597$"
+      ],
+      "median": 8.420631464526312e-05,
+      "mean": 0.000792271649293044,
+      "maximum": 0.006760877125154085
+    },
+    {
+      "labels": [
+        "$-0.15$",
+        "$0.013860$"
+      ],
+      "median": 5.6547274246306646e-05,
+      "mean": 0.0006317910291471867,
+      "maximum": 0.0043169743760490716
+    },
+    {
+      "labels": [
+        "$-0.10$",
+        "$0.009085$"
+      ],
+      "median": 3.7613413205135385e-05,
+      "mean": 0.0005097009758031956,
+      "maximum": 0.004923354408466852
+    },
+    {
+      "labels": [
+        "$-0.05$",
+        "$0.004413$"
+      ],
+      "median": 9.847356501641757e-06,
+      "mean": 0.0001450974675297932,
+      "maximum": 0.0024460734401266482
+    }
+  ]
+}

@@ -1,0 +1,134 @@
+{
+  "experiment": "exp01",
+  "status": "completed",
+  "summary_sha256": "02435dbce0ce81e8919d03123669169b92e0b4b07e5795ea5971edcb07c5ca60",
+  "software": {
+    "commit": "f30b483245bb26af116da74b5be65e955bc16b6c",
+    "dirty": false,
+    "matplotlib": "3.10.7",
+    "numpy": "2.4.3",
+    "package": "numerical-einstein-equations",
+    "package_version": "0.1.0",
+    "pillow": "10.4.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.12",
+    "scipy": "1.16.3"
+  },
+  "diagnostic_override": null,
+  "source_artifacts": {
+    "summary.json": "02435dbce0ce81e8919d03123669169b92e0b4b07e5795ea5971edcb07c5ca60",
+    "manifest.json": "e9ee17d240bf82a15163e3bc895c7401e2c9c79af72f2396a220dccab75e213e",
+    "data/schwarzschild-short/coordinate-2/official-state.npz": "5be1aefcb00815d51c809d964379779d88f27b8161b48f3ca1482fef6b01918d",
+    "data/schwarzschild-short/coordinate-2/official-exact-state.npz": "7ce3839dea0971698ca569043bc27021bd4462ff5a855406175eaa2c2c421d3d",
+    "data/schwarzschild-long/coordinate-2/official-state.npz": "5e2cc9d52f544a8fea2d6e5be8ae26f5c519f4fa413a01d0b0ff65b1951be87a",
+    "data/schwarzschild-long/coordinate-2/official-exact-state.npz": "8d8c2c8317f5729f006d7880505667522292940da1aed26246ab86b882a4d362",
+    "data/kerr-a0.0-short/coordinate-2-angular-2/official-state.npz": "c6939a4038e4fc70bf1af12388fbde20894c67663290eef47812df7ec84bddc7",
+    "data/kerr-a0.0-short/coordinate-2-angular-2/official-exact-state.npz": "4835b4a49077830062a151e44d76b289b813a0d304ba349f85fa7d5acbfc42f8",
+    "data/kerr-a0.0-long/coordinate-2-angular-2/official-state.npz": "7a21f38162fbe4256a87fd27bef3c4c964c66f4c02712389df3a310bf6bbbd60",
+    "data/kerr-a0.0-long/coordinate-2-angular-2/official-exact-state.npz": "fcfca71176debed034a217ffd9781703ca7a925d4c8b32b2e2177d592912fde3",
+    "data/kerr-a0.3-short/coordinate-2-angular-2/official-state.npz": "7433a317881df80c36909114217045c99c3f395853873a4278655f8ebe7e9e3a",
+    "data/kerr-a0.3-short/coordinate-2-angular-2/official-exact-state.npz": "75577325fb0c1781b668872d82c2b7a7996ccae71289beb0c8c14add449f6fd9",
+    "data/kerr-a0.3-long/coordinate-2-angular-2/official-state.npz": "69f1e7f7de06f2b801483f7bdc6fb96929aa3818514f0809858f8f8196e6cb6a",
+    "data/kerr-a0.3-long/coordinate-2-angular-2/official-exact-state.npz": "0eb9124beba103b9485a7feab50a1d6928b942398d98ca9eb992476becfc00dd",
+    "data/kerr-a0.7-short/coordinate-2-angular-2/official-state.npz": "bf45b18b5dce3eefda933530348357ea5064a5262e4d1f673904cfd0827fa87f",
+    "data/kerr-a0.7-short/coordinate-2-angular-2/official-exact-state.npz": "40434ce553c65944347807a2503a0d59c374693e2f40353c0c798b247be4b382",
+    "data/kerr-a0.7-long/coordinate-2-angular-2/official-state.npz": "a37183ba0f145566cce041b4b830727a3bcd917f4581f1eed1d308bafd536223",
+    "data/kerr-a0.7-long/coordinate-2-angular-2/official-exact-state.npz": "d6572bd1466041649724b40ede8649b7536892ea776b595ebb30aa237923b8c7",
+    "data/kerr-a0.9-short/coordinate-2-angular-2/official-state.npz": "346253df75f54ef8755400bc584d8c4fd5b39815243e2fbcb200117ea534eca1",
+    "data/kerr-a0.9-short/coordinate-2-angular-2/official-exact-state.npz": "67dad117fa3e58856948e2ef89d5dd333235d13c3717815614dd168ccc2212a6",
+    "data/kerr-a0.9-long/coordinate-2-angular-2/official-state.npz": "6459629433745092531066dc2d3c305b5caef57ee69265e9962d0d60aed7b50d",
+    "data/kerr-a0.9-long/coordinate-2-angular-2/official-exact-state.npz": "9fb693f530abe94696ef7a439b57cd792a5821dd0d32150651b8c218e8cf6616"
+  },
+  "rows": [
+    {
+      "labels": [
+        "Schwarzschild",
+        "short"
+      ],
+      "median": 2.1683198553528097e-14,
+      "mean": 2.3874795732718348e-14,
+      "maximum": 1.0866491825700102e-13
+    },
+    {
+      "labels": [
+        "Schwarzschild",
+        "long"
+      ],
+      "median": 3.7817631691176613e-13,
+      "mean": 3.6857779617341985e-13,
+      "maximum": 9.207037171771127e-13
+    },
+    {
+      "labels": [
+        "Kerr, $a=0.0$",
+        "short"
+      ],
+      "median": 1.2642900811143284e-14,
+      "mean": 1.3132192367207102e-14,
+      "maximum": 4.2521686780628155e-14
+    },
+    {
+      "labels": [
+        "Kerr, $a=0.0$",
+        "long"
+      ],
+      "median": 3.444822671117019e-13,
+      "mean": 3.3871098477337434e-13,
+      "maximum": 7.69253801374398e-13
+    },
+    {
+      "labels": [
+        "Kerr, $a=0.3$",
+        "short"
+      ],
+      "median": 2.891528522172827e-07,
+      "mean": 5.72684921433322e-07,
+      "maximum": 8.03703357309994e-06
+    },
+    {
+      "labels": [
+        "Kerr, $a=0.3$",
+        "long"
+      ],
+      "median": 1.1201298679633828e-06,
+      "mean": 2.356321711852567e-06,
+      "maximum": 3.91818352411328e-05
+    },
+    {
+      "labels": [
+        "Kerr, $a=0.7$",
+        "short"
+      ],
+      "median": 4.44249659588599e-07,
+      "mean": 9.35951674790084e-07,
+      "maximum": 1.7921809248129198e-05
+    },
+    {
+      "labels": [
+        "Kerr, $a=0.7$",
+        "long"
+      ],
+      "median": 1.888497907434877e-06,
+      "mean": 4.383945005211137e-06,
+      "maximum": 0.00010304287032685126
+    },
+    {
+      "labels": [
+        "Kerr, $a=0.9$",
+        "short"
+      ],
+      "median": 5.246786378708591e-07,
+      "mean": 9.864200384055262e-07,
+      "maximum": 1.752725078558124e-05
+    },
+    {
+      "labels": [
+        "Kerr, $a=0.9$",
+        "long"
+      ],
+      "median": 2.4462136448641548e-06,
+      "mean": 5.372722282147968e-06,
+      "maximum": 0.00010216189594720645
+    }
+  ]
+}

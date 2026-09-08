@@ -1,0 +1,61 @@
+{
+  "experiment": "exp04",
+  "status": "completed",
+  "summary_sha256": "3edae840d9bfbda82fba9fac8d890e4816d9d22e65d3636d109001f7d35cccda",
+  "software": {
+    "commit": "fc64cf9717f5994aa6d10a602102f2650b93a91f",
+    "dirty": false,
+    "matplotlib": "3.10.7",
+    "numpy": "2.4.3",
+    "package": "numerical-einstein-equations",
+    "package_version": "0.1.0",
+    "pillow": "10.4.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.12",
+    "scipy": "1.16.3"
+  },
+  "diagnostic_override": {
+    "sha256": "e11223d73db61be17de64a94c2315dc747db5990fa862d1c62cc1227993652bb",
+    "software": {
+      "package": "numerical-einstein-equations",
+      "package_version": "0.1.0",
+      "commit": "7070e7dac089ef5bdb0e2a2e57a5ef924664affa",
+      "dirty": true,
+      "python": "3.12.12",
+      "numpy": "2.4.3",
+      "scipy": "1.16.3",
+      "matplotlib": "3.10.7",
+      "pillow": "10.4.0",
+      "platform": "macOS-26.6.2-arm64-arm-64bit"
+    },
+    "method": "new diagnostics from unchanged saved states; no evolution"
+  },
+  "source_artifacts": {
+    "summary.json": "3edae840d9bfbda82fba9fac8d890e4816d9d22e65d3636d109001f7d35cccda",
+    "manifest.json": "2b595be7edae6bf5a8809871bb102b28cb8749d974d4e983fbc30179aa18c9cb",
+    "data/results/Q1/strong-pulse/final-state.npz": "3a1f62c990d9c66e418c95e69359a81f1bcdf50409a7c875774946ea0c321c57",
+    "data/results/Q1/zero-control/final-state.npz": "ba2649b07c15883491dc6cc71364b36ee236b258f9ccf256bedd1ee754a3565d"
+  },
+  "rows": [
+    {
+      "labels": [
+        "Strong pulse"
+      ],
+      "values": [
+        1.6882297231173997e-10,
+        2.6166863256357524e-05,
+        3.297329158928306e-05
+      ]
+    },
+    {
+      "labels": [
+        "Zero control"
+      ],
+      "values": [
+        2.9268434669176486e-13,
+        1.97282484473601e-09,
+        1.2712334606164742e-09
+      ]
+    }
+  ]
+}

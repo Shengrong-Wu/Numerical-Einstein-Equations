@@ -1,0 +1,43 @@
+{
+  "experiment": "exp05",
+  "status": "completed",
+  "summary_sha256": "2548744b90099d27281ce45796c8d4fae7d09874a626843b454ae556d1483c19",
+  "software": {
+    "commit": "f30b483245bb26af116da74b5be65e955bc16b6c",
+    "dirty": false,
+    "matplotlib": "3.10.7",
+    "numpy": "2.4.3",
+    "package": "numerical-einstein-equations",
+    "package_version": "0.1.0",
+    "pillow": "10.4.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.12",
+    "scipy": "1.16.3"
+  },
+  "diagnostic_override": null,
+  "source_artifacts": {
+    "summary.json": "2548744b90099d27281ce45796c8d4fae7d09874a626843b454ae556d1483c19",
+    "manifest.json": "7a30a2cce5c91657a369c870278be089792ca7e944fba80e760f300d439ebd90",
+    "data/level-3/residual-maps.npz": "89ff0a2da597c9b41bb04100ba587d88b01c196c91eeb6fbc707e45e50a8cfd9"
+  },
+  "rows": [
+    {
+      "labels": [
+        "Protected mask",
+        "144"
+      ],
+      "median": 0.0003959656361501178,
+      "mean": 0.000591397204492642,
+      "maximum": 0.0034318835413109858
+    },
+    {
+      "labels": [
+        "Open grid",
+        "3481"
+      ],
+      "median": 0.0012866640546689845,
+      "mean": 8.94744040806156,
+      "maximum": 1371.4133011705403
+    }
+  ]
+}

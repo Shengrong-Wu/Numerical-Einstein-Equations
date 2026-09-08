@@ -1,0 +1,40 @@
+{
+  "summary_sha256": "2548744b90099d27281ce45796c8d4fae7d09874a626843b454ae556d1483c19",
+  "software": {
+    "commit": "f30b483245bb26af116da74b5be65e955bc16b6c",
+    "dirty": false,
+    "matplotlib": "3.10.7",
+    "numpy": "2.4.3",
+    "package": "numerical-einstein-equations",
+    "package_version": "0.1.0",
+    "pillow": "10.4.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.12",
+    "scipy": "1.16.3"
+  },
+  "generator_software": {
+    "package": "numerical-einstein-equations",
+    "package_version": "0.1.0",
+    "commit": "7bc2c0c8db90c9bbcf0013e9b087d276214a8f6a",
+    "dirty": true,
+    "python": "3.12.12",
+    "numpy": "2.4.3",
+    "scipy": "1.16.3",
+    "matplotlib": "3.10.7",
+    "pillow": "10.4.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "source_artifacts": {
+    "summary.json": "2548744b90099d27281ce45796c8d4fae7d09874a626843b454ae556d1483c19",
+    "data/level-3/summary.json": "9efb00c2ef9d849d1fff87aeb9fa6e4a6722af1f5aa06d46f0a2bf444fd0dbd1",
+    "data/level-3/residual-maps.npz": "89ff0a2da597c9b41bb04100ba587d88b01c196c91eeb6fbc707e45e50a8cfd9",
+    "data/level-3/convergence-regions.png": "00f560adde92893a6cedc27a3942e03d76370e919fefd229290ebe8b54b8caec"
+  },
+  "generator_scripts": {
+    "curate_figures.py": "5c63adcef214f86e3525d6805d3cc5372b7d69c1eed4caf8c70c12ca2fc4ddbf",
+    "residual_plotting.py": "4992eaef6ea04a8d49495554d4703fdd147585faac760e442ea0955bbc5e27e4",
+    "render_exp05_residual_spectrum.py": "9cc1e6f9ec77fadf82a0d006e4c12831843f117a0cdcfe39d06ef2e77fac874a",
+    "render_exp07_curvature_spectrum.py": "6521f7e001a2d26e9d2128f1c0b8849d04121e6045d3736d8f92b314424aa2bf",
+    "campaign.py": "ceb711cdc70a1ad980cc0bd0a74eb09308036b75af7913b2bf8163e6b96e2b12"
+  }
+}

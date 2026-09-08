@@ -95,8 +95,10 @@ lower-order terms schematically or pass between conventionally equivalent
 forms, whereas numerical evolution requires every displayed sign and
 numerical factor to be fixed consistently.  We address this by checking the
 formulas against identities derived from the four-metric, by testing exact
-solutions, and by evaluating curvature residuals independently of the
-quantities used to construct a Picard sweep.  The second difficulty is the
+solutions, and by evaluating first-order residuals using fresh derivatives
+of the stored weighted fields rather than the construction sources of a
+Picard sweep.  We check the metric--connection consistency separately and
+avoid second null derivatives at the rough characteristic endpoint.  The second difficulty is the
 iteration itself.  Its design requires identifying a closed hierarchy that
 respects the characteristic constraints, transports information in the
 correct direction, preserves the two initial traces, and remains meaningful
