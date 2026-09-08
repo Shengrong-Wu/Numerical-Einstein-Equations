@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 
 from nee.discretization.overgrid import (
-    _angular_resample, _coordinate_resample, _composite_interpolate,
+    _coordinate_resample, _composite_interpolate,
     _project_tensor, _project_vector, resample_primitives, resample_primitives_power,
     TypedAngularResampler,
 )
@@ -27,20 +27,21 @@ def audit(grid, state, u, v, *, retained_degree, coordinates=None,
         from nee.solver.backend import from_numerical
         state = from_numerical(state, grid)
     primitives = PrimitiveFields(g=state.g, log_Omega=state.log_Omega, b=state.b, phi=state.phi)
-    count = point_count or max((retained_degree + 1)**2 + 8, grid.count + 12 if coordinates is None else 0)
+    # Full weighted forms include products such as (Omega trchi)*g.
+    # A scalar degree-L fit of ambient tensor components discards geometric
+    # modes on regular grids as well as mapped ones.
+    transfer_degree = min(2*retained_degree, int(np.sqrt(grid.count-1))-2)
+    if transfer_degree < retained_degree:
+        raise ValueError('source sphere cannot resolve the retained tensor audit band')
+    angular_transfer = TypedAngularResampler(transfer_degree)
+    count = point_count or max(grid.count+12, (transfer_degree+2)**2+8)
     if coordinates is None:
         target = resample_primitives(grid, primitives, u, v,
             u_count=len(u)+coordinate_increment, v_count=len(v)+coordinate_increment,
-            point_count=count, harmonic_degree=retained_degree)
+            point_count=count, harmonic_degree=transfer_degree,
+            angular_transfer=angular_transfer,
+            differentiation_degree=transfer_degree+1)
     else:
-        # A full weighted form includes products such as (Omega trchi)*g.
-        # Preserve their typed work band; scalar degree-L fits of ambient
-        # tensor components would discard genuine geometric modes.
-        transfer_degree = min(2*retained_degree, int(np.sqrt(grid.count-1))-2)
-        if transfer_degree < retained_degree:
-            raise ValueError('source sphere cannot resolve the retained tensor audit band')
-        angular_transfer = TypedAngularResampler(transfer_degree)
-        count = point_count or max(grid.count+12, (transfer_degree+2)**2+8)
         target = resample_primitives_power(grid, primitives, coordinates,
             u_count=len(u)+coordinate_increment, v_count=len(v)+coordinate_increment,
             point_count=count, harmonic_degree=transfer_degree,
@@ -48,7 +49,8 @@ def audit(grid, state, u, v, *, retained_degree, coordinates=None,
             angular_transfer=angular_transfer,
             differentiation_degree=transfer_degree+1,
             audit_operators=audit_operators)
-        target.diagnostics['source_retained_degree'] = retained_degree
+    target.diagnostics['source_retained_degree'] = retained_degree
+    target.diagnostics['differentiation_degree'] = transfer_degree+1
 
     def transfer(value):
         if coordinates is None:
@@ -56,8 +58,7 @@ def audit(grid, state, u, v, *, retained_degree, coordinates=None,
         else:
             value = _composite_interpolate(coordinates.tau, value, target.coordinates.tau, axis=1)
             value = _composite_interpolate(coordinates.s, value, target.coordinates.s, axis=2)
-        resample = _angular_resample if coordinates is None else angular_transfer
-        return resample(value, grid, target.grid, retained_degree)[0]
+        return angular_transfer(value, grid, target.grid, retained_degree)[0]
 
     arrays = {name: transfer(value) for name, value in state.arrays().items()
               if name not in {'g', 'b', 'log_Omega', 'phi'}}

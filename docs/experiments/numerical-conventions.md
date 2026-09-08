@@ -53,7 +53,7 @@ these same prescribed regions.
 
 ## Audit sampling
 
-For Experiments 4, 7, and 8 the independent residual audit transfers scalars,
+The independent residual audit transfers scalars,
 tangent vectors, and symmetric tensors in their respective harmonic spaces.
 Full weighted forms contain products of retained fields, so their transfer
 uses up to twice the retained degree, limited by the source grid's ability to

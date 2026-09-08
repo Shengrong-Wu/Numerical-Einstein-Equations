@@ -244,6 +244,8 @@ def resample_primitives(
     v_count: int,
     point_count: int,
     harmonic_degree: int,
+    angular_transfer=None,
+    differentiation_degree: int | None = None,
 ) -> OvergridResult:
     """Fit primitives and evaluate them on nodes absent from construction."""
 
@@ -256,7 +258,7 @@ def resample_primitives(
         point_count,
         neighbor_count=min(max(24, 3 * harmonic_degree), point_count - 1),
         degree=min(4, harmonic_degree),
-        spectral_degree=harmonic_degree,
+        spectral_degree=harmonic_degree if differentiation_degree is None else differentiation_degree,
     )
     target_u = chebyshev_lobatto(
         u_count, float(source_u[0]), float(source_u[-1])
@@ -273,7 +275,7 @@ def resample_primitives(
             target_u,
             target_v,
         )
-        return _angular_resample(
+        return (_angular_resample if angular_transfer is None else angular_transfer)(
             coordinate, source_grid, target_grid, harmonic_degree
         )
 
@@ -312,7 +314,8 @@ def resample_primitives(
                 "tensor-product cubic; shape-preserving PCHIP on axes "
                 "whose spacing ratio exceeds 1e5"
             ),
-            "angular_interpolant": "real scalar harmonics per ambient component",
+            "angular_interpolant": ("real scalar harmonics per ambient component"
+                if angular_transfer is None else "typed scalar, tangent-vector and symmetric-tensor harmonics"),
             "u_count": u_count,
             "v_count": v_count,
             "point_count": point_count,
