@@ -599,6 +599,7 @@ def _summary_figure(output: Path, report: dict[str, Any]) -> None:
     )
     axes[0].plot(u_curve, v_curve, color="black", label="curved boundary")
     previous_u = -1.0
+    labeled_trapped_sections = False
     for row in report["atlas"]["patches"]:
         axes[0].fill_between(
             [previous_u, row["u_right"]],
@@ -611,8 +612,10 @@ def _summary_figure(output: Path, report: dict[str, Any]) -> None:
         coordinates = np.asarray(row["trapped_coordinates"])
         if coordinates.size:
             axes[0].scatter(
-                coordinates[:, 0], coordinates[:, 1], s=8, color="tab:red"
+                coordinates[:, 0], coordinates[:, 1], s=8, color="tab:red",
+                label=None if labeled_trapped_sections else "trapped sections",
             )
+            labeled_trapped_sections = True
     horizon = report["apparent_horizon"]["degree4"]["sections"]
     axes[0].plot(
         [row["surface"]["h_mean"] for row in horizon],
