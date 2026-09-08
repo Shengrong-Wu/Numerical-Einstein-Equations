@@ -116,43 +116,43 @@ def _run_spectral_case(
     label: str,
     strength: float,
     iterations: int,
+    public,
 ) -> dict[str, Any]:
     """Run the retained mapped LGL/Galerkin configuration from fresh data."""
 
     mesh_path = output_root / f"{label}-s-breakpoints.json"
     mesh_path.parent.mkdir(parents=True, exist_ok=True)
     mesh_path.write_text(
-        json.dumps([0.0, 0.022248595461286987, 0.044497190922573975,
-                    0.072248595461287, 0.1]) + "\n"
+        json.dumps(np.sqrt(np.asarray(public.coordinates.v_breakpoints) / float(public.physics["v1"])).tolist()) + "\n"
     )
     arguments = [
         "--boundary-mode", "low-band-hemisphere",
         "--c", str(strength),
-        "--Omega_chih-divisor", "3.2",
-        "--v1", "0.5",
-        "--v-endpoint", "0.005",
+        "--Omega_chih-divisor", str(public.initial_data["Omega_chih_divisor"]),
+        "--v1", str(public.physics["v1"]),
+        "--v-endpoint", str(public.physics["cap"]),
         "--coordinate-method", "lgl",
-        "--lgl-u-elements", "2",
-        "--lgl-u-degree", "8",
-        "--lgl-s-degree", "8",
+        "--lgl-u-elements", str(len(public.coordinates.u_degrees)),
+        "--lgl-u-degree", str(public.coordinates.u_degrees[0]),
+        "--lgl-s-degree", str(public.coordinates.v_degrees[0]),
         "--lgl-s-breakpoints-json", str(mesh_path),
-        "--points", "550",
-        "--neighbors", "40",
+        "--points", str(public.angular.point_count),
+        "--neighbors", str(public.angular.neighbor_count),
         "--angular-degree", "4",
-        "--spectral-degree", "21",
-        "--galerkin-retained-degree", "10",
-        "--galerkin-work-degree", "20",
+        "--spectral-degree", str(public.angular.differentiation_degree),
+        "--galerkin-retained-degree", str(public.angular.retained_degree),
+        "--galerkin-work-degree", str(public.angular.work_degree),
         "--iterations", str(iterations),
-        "--g-substeps", "2",
+        "--g-substeps", str(public.solver.metric_substeps),
         "--g-parameterization", "cholesky",
         "--g-integrator", "sdc",
-        "--sdc-tolerance", "1e-9",
+        "--sdc-tolerance", str(public.solver.tolerance),
         "--sdc-overgrid-tolerance", "1e-7",
-        "--sdc-maximum-corrections", "12",
+        "--sdc-maximum-corrections", str(public.solver.sdc_sweeps),
         "--u-integrator", "sdc",
-        "--u-sdc-tolerance", "1e-9",
+        "--u-sdc-tolerance", str(public.solver.tolerance),
         "--u-sdc-overgrid-tolerance", "1e-7",
-        "--u-sdc-maximum-corrections", "12",
+        "--u-sdc-maximum-corrections", str(public.solver.sdc_sweeps),
         "--u-sdc-half-trace-tolerance", "1e-9",
         "--u-sdc-half-trace-absolute-floor", "1e-14",
         "--u-halo", "2",
@@ -179,84 +179,57 @@ def _run_spectral_case(
         q1.calibrate_low_band_profiles = previous_calibrator
 
 
-def _audit_mesh() -> tuple[PointSphereGrid, CharacteristicLGLMesh]:
-    grid = PointSphereGrid.create(
-        550, neighbor_count=40, degree=4, spectral_degree=21
-    )
+def _audit_mesh(public):
+    grid = PointSphereGrid.create(public.angular.point_count,
+        neighbor_count=public.angular.neighbor_count, degree=4,
+        spectral_degree=public.angular.differentiation_degree)
     coordinates = CharacteristicLGLMesh.create(
-        np.linspace(0.0, math.log(2.0), 3),
-        8,
-        np.asarray(
-            [
-                0.0,
-                0.022248595461286987,
-                0.044497190922573975,
-                0.072248595461287,
-                0.1,
-            ]
-        ),
-        8,
-        0.5,
-    )
+        -np.log(-np.asarray(public.coordinates.u_breakpoints)), public.coordinates.u_degrees[0],
+        np.sqrt(np.asarray(public.coordinates.v_breakpoints)/float(public.physics['v1'])),
+        public.coordinates.v_degrees[0], float(public.physics['v1']))
     return grid, coordinates
 
 
-def _mapped_audit(output: Path, label: str) -> dict[str, Any]:
+def _mapped_audit(output: Path, label: str, public) -> dict[str, Any]:
     target = output / "results" / "Q1" / label
     state, u, v = load_state(target / "final-state.npz")
-    grid, coordinates = _audit_mesh()
+    grid, coordinates = _audit_mesh(public)
     if not np.array_equal(u, coordinates.u) or not np.array_equal(
         v, coordinates.v
     ):
         raise ValueError("pulse state nodes do not match its declared LGL mesh")
     maximum_s = float(coordinates.s.nodes[-1])
-    result = evaluate_mapped_overgrid(
-        grid,
-        PrimitiveFields(
-            g=state.g,
-            log_Omega=np.log(state.Omega),
-            b=state.b,
-            phi=None,
-        ),
-        coordinates,
-        retained_degree=10,
-        protected_s_values=tuple(
-            fraction * maximum_s for fraction in (0.2, 0.4, 0.6, 0.8)
-        ),
-    )
-    (target / "independent-four-g-audit.json").write_text(
+    from nee.diagnostics.state_audit import audit
+    result = audit(grid, state, u, v, coordinates=coordinates,
+        retained_degree=public.angular.retained_degree,
+        protected_s_values=tuple(fraction*maximum_s for fraction in (0.2, 0.4, 0.6, 0.8)))
+    (target / "independent-first-order-audit.json").write_text(
         json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
     )
     return result
 
 
-def _exact_zero_control_audit() -> dict[str, Any]:
-    grid, coordinates = _audit_mesh()
+def _exact_zero_control_audit(public) -> dict[str, Any]:
+    grid, coordinates = _audit_mesh(public)
     radius = coordinates.v[None, None, :] - coordinates.u[None, :, None]
     scalar_shape = (grid.count, len(coordinates.u), len(coordinates.v))
     maximum_s = float(coordinates.s.nodes[-1])
-    return evaluate_mapped_overgrid(
-        grid,
-        PrimitiveFields(
-            g=(
-                radius[..., None, None] ** 2
-                * grid.projector[:, None, None]
-            ),
-            log_Omega=np.zeros(scalar_shape),
-            b=np.zeros(scalar_shape + (3,)),
-            phi=None,
-        ),
-        coordinates,
-        retained_degree=10,
-        protected_s_values=tuple(
-            fraction * maximum_s for fraction in (0.2, 0.4, 0.6, 0.8)
-        ),
-    )
+    from nee.diagnostics.state_audit import audit
+    from nee.state.iterate import PicardState
+    metric = radius[..., None, None]**2 * grid.projector[:, None, None]
+    form = radius[..., None, None] * grid.projector[:, None, None]
+    zero = np.zeros(scalar_shape)
+    state = PicardState(g=metric, b=np.zeros(scalar_shape+(3,)), log_Omega=zero,
+        Omega_chi=form, Omega_chib=-form, zeta=np.zeros(scalar_shape+(3,)),
+        Omega_omega=zero.copy(), Omega_omegab=zero.copy())
+    return audit(grid, state, coordinates.u, coordinates.v, coordinates=coordinates,
+        retained_degree=public.angular.retained_degree,
+        protected_s_values=tuple(fraction*maximum_s for fraction in (0.2, 0.4, 0.6, 0.8)))
 
 
 def run_standard(
-    output: Path, *, iterations: int = 6
+    output: Path, *, public, iterations: int = 6
 ) -> dict[str, Any]:
     """Run the strong pulse and same-discretization zero control."""
 
@@ -266,28 +239,30 @@ def run_standard(
     strong = _run_spectral_case(
         output_root=output,
         label="strong-pulse",
-        strength=1.0,
+        strength=float(public.physics["pulse_strength"]),
         iterations=iterations,
+        public=public,
     )
     control = _run_spectral_case(
         output_root=output,
         label="zero-control",
-        strength=0.0,
+        strength=float(public.physics["control_strength"]),
         iterations=iterations,
+        public=public,
     )
-    strong_audit = _mapped_audit(output, "strong-pulse")
-    numerical_control_audit = _mapped_audit(output, "zero-control")
-    exact_control_audit = _exact_zero_control_audit()
+    strong_audit = _mapped_audit(output, "strong-pulse", public)
+    numerical_control_audit = _mapped_audit(output, "zero-control", public)
+    exact_control_audit = _exact_zero_control_audit(public)
     aggregate = {
         "schema": "nee-vacuum-strong-pulse-1",
         "experiment": 4,
         "strong_pulse": strong,
         "zero_control": control,
-        "strong_pulse_independent_four_metric_residual": strong_audit,
-        "numerical_zero_control_independent_four_metric_residual": (
+        "strong_pulse_independent_first_order_residual": strong_audit,
+        "numerical_zero_control_independent_first_order_residual": (
             numerical_control_audit
         ),
-        "exact_zero_control_independent_four_metric_residual": (
+        "exact_zero_control_independent_first_order_residual": (
             exact_control_audit
         ),
     }

@@ -504,6 +504,9 @@ def _solve_outgoing_metric(
 
 def construct_initial_data(
     scalar_config: ExperimentConfig,
+    *,
+    free_data_generator=analytic_incoming_free_data,
+    shear_generator=_draft_reference_shear,
 ) -> tuple[
     InitialDataBundle,
     PointSphereGrid,
@@ -513,7 +516,7 @@ def construct_initial_data(
     scalar_config.validate()
     grid, angular = build_angular(scalar_config)
     mesh = mesh_from_config(scalar_config.scalar_coordinates)
-    raw = analytic_incoming_free_data(grid, mesh, scalar_config)
+    raw = free_data_generator(grid, mesh, scalar_config)
     data = scalar_config.scalar_initial_data
     u = mesh.u
     radius = -u
@@ -728,7 +731,7 @@ def construct_initial_data(
         scalar_p_h,
         axis=1,
     )
-    reference_shape = _draft_reference_shear(
+    reference_shape = shear_generator(
         grid,
         data.shear_vector_amplitude,
         data.shear_profile,

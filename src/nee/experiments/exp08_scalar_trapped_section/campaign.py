@@ -679,6 +679,11 @@ def _run_standard(output: Path, public: PublicConfig) -> dict[str, Any]:
         target_v,
         degree=int(public.initial_data["mots_graph_degree"]),
     )
+    from .horizon import acceptance_errors
+    for candidate in (standard_mots, refined_mots):
+        reasons = acceptance_errors(candidate)
+        if reasons:
+            raise ValueError(f"MOTS control failed acceptance: {reasons}")
     save_surface(output / "mots-controls" / "standard", standard_mots, standard_arrays)
     save_surface(output / "mots-controls" / "refined", refined_mots, refined_arrays)
     mots_control = {
@@ -727,6 +732,7 @@ def _run_standard(output: Path, public: PublicConfig) -> dict[str, Any]:
         horizon_patches,
         output / "apparent-horizon" / "degree3-control",
         degree=int(public.initial_data["horizon_control_degree"]),
+        diagnostic_only=True,
         requested_v=requested_v,
     )
     degree3_by_v = {row["v"]: row for row in degree3["sections"]}
@@ -860,6 +866,10 @@ def _run_angular_control(output: Path, public: PublicConfig) -> dict[str, Any]:
         target_v,
         degree=int(public.initial_data["mots_graph_degree"]),
     )
+    from .horizon import acceptance_errors
+    reasons = acceptance_errors(mots)
+    if reasons:
+        raise ValueError(f"angular-control MOTS failed acceptance: {reasons}")
     save_surface(output / "mots-v0.04", mots, arrays)
     report = {
         "schema": "nee-exp08-angular-control-v1",
@@ -901,7 +911,7 @@ def _run_smoke(output: Path, public: PublicConfig) -> dict[str, Any]:
 
 
 def run_configuration(output: Path, config: PublicConfig) -> dict[str, Any]:
-    stem = config.source_path.stem if config.source_path is not None else "standard"
+    stem = config.experiment.mode
     if stem == "smoke":
         return _run_smoke(output, config)
     if stem == "angular-control":

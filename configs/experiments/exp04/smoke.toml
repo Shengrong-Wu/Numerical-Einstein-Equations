@@ -1,5 +1,6 @@
 schema_version = 1
 [experiment]
+mode = "smoke"
 identifier = "exp04"
 title = "Vacuum strong short pulse smoke test"
 equation_system = "vacuum"

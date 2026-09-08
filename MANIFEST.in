@@ -1,7 +1,10 @@
 include README.md
 include CITATION.cff
 recursive-include configs *.toml
-recursive-include docs *.bib *.md *.pdf *.png *.tex
+include docs/setup.tex
+recursive-include docs/article *.bib *.pdf *.tex
+recursive-include docs/experiments *.md *.json *.png
+exclude docs/experiments/validation.md
 recursive-include scripts *.py
 recursive-include tests *.py
 prune results

@@ -282,13 +282,17 @@ def components(
     calculations, so the result still measures Picard and compatibility
     defects.  Fresh v differentiation is retained in separately named
     closure diagnostics.
+    ``mode="first_order"`` differentiates the stored weighted connection
+    variables without constructing second null derivatives of the metric.
+    It evaluates Ric44 from the trace equation; it never differentiates
+    outgoing shear in the outgoing direction.
     ``mode="fresh"`` reconstructs both null Omega coefficients by
     differentiating ``log(Omega)``.  The
     ``mode="established"`` is retained so existing experiment summaries
     remain reproducible.
     """
 
-    if mode not in {"established", "construction", "fresh"}:
+    if mode not in {"established", "construction", "fresh", "first_order"}:
         raise ValueError(f"unknown residual mode: {mode}")
     if mode == "construction" and (
         previous_state is None or construction_context is None
@@ -549,7 +553,7 @@ def components(
             if mode == "construction"
             else (
                 -ric44_fresh_closure
-                if mode == "fresh"
+                if mode in {"fresh", "first_order"}
                 else np.zeros_like(ric44_fresh_closure)
             )
         ),

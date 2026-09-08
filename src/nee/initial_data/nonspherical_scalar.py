@@ -51,7 +51,7 @@ def _rotated_harmonic_fields(
     local = points @ rotation
     x, y, z = local.T
     y20 = 3.0 * z**2 - 1.0
-    y20 /= np.max(np.abs(y20))
+    y20 /= 2.0
 
     ambient_21_local = np.column_stack([z, np.zeros_like(z), x])
     ambient_22_local = np.column_stack([2.0 * x, -2.0 * y, np.zeros_like(z)])
@@ -63,8 +63,8 @@ def _rotated_harmonic_fields(
     grad_22 = ambient_22 - np.einsum(
         "ni,ni->n", ambient_22, points
     )[:, None] * points
-    grad_21 /= np.max(np.linalg.norm(grad_21, axis=1))
-    grad_22 *= 0.1 / np.max(np.linalg.norm(grad_22, axis=1))
+    # The analytic suprema are 1 for grad(xz) and 2 for grad(x^2-y^2).
+    grad_22 *= 0.05
     return y20, grad_21, grad_22
 
 
@@ -229,6 +229,7 @@ def _config(
     metric_substeps: int = 1,
     derivative_halo: int = 1,
     iterations: int = 3,
+    public_config=None,
 ) -> ExperimentConfig:
     result = ExperimentConfig(
         name=name,
@@ -273,5 +274,20 @@ def _config(
             derivative_halo_v=derivative_halo,
         ),
     )
+    if public_config is not None:
+        data = public_config.initial_data
+        result = replace(result,
+            angular=replace(result.angular, neighbor_count=min(public_config.angular.neighbor_count, points-1)),
+            scalar_coordinates=replace(result.scalar_coordinates,
+                u_left=public_config.coordinates.u_min, u_right=public_config.coordinates.u_max,
+                fractional_power=float(data['scalar_power'])),
+            scalar_initial_data=replace(result.scalar_initial_data,
+                lapse_radial_power=float(data['lapse_radial_power']),
+                lapse_angular_amplitude=float(data['lapse_angular_amplitude'])*lambda_omega,
+                shift_amplitude=float(data['shift_amplitude'])*lambda_b,
+                shear_vector_amplitude=float(data['shear_amplitude'])*(lambda_chi if lambda_chi else 1e-10),
+                outgoing_scalar_power=float(data['scalar_power']),
+                shear_profile_power=float(data['scalar_power']),
+                boundary_substeps=public_config.solver.boundary_substeps))
     result.validate()
     return result

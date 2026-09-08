@@ -382,6 +382,33 @@ def warped_product_residual(
     }
 
 
+def weighted_spherical_residual(radius, log_Omega, x_out, x_in, omega, omegab,
+                                u, xi, d_u, d_xi, v0, v0_prime, *, halo):
+    """First derivatives of the stored weighted forms in spherical symmetry."""
+    A, Ab = 2*x_out/radius**2, 2*x_in/radius**2
+    Au, Av = physical_derivatives(A, d_u, d_xi, xi, v0, v0_prime)
+    Abu, _ = physical_derivatives(Ab, d_u, d_xi, xi, v0, v0_prime)
+    _, Wbv = physical_derivatives(omegab, d_u, d_xi, xi, v0, v0_prime)
+    omega2 = np.exp(2*log_Omega)
+    r33 = -(Abu + 4*omegab*Ab + Ab**2/2)/omega2
+    r44 = -(Av + 4*omega*A + A**2/2)/omega2
+    r34 = (4*Wbv - A*Ab/2 - Au)/omega2
+    trace = (Au + A*Ab + 2*omega2/radius**2)/omega2
+    pointwise = np.sqrt(r33**2 + r44**2 + 2*r34**2 + trace**2/2)
+    section = np.sqrt(4*np.longdouble(math.pi))*radius*pointwise
+    scaled = -u[:, None]*section
+    safe = np.zeros(scaled.shape, bool)
+    safe[halo:-halo, halo:-halo] = True
+    if not np.any(safe):
+        raise ValueError('spherical residual mask is empty')
+    return {'method': 'first derivatives of weighted spherical connections',
+        'raw_maximum': float(np.max(scaled)), 'masked_maximum': float(np.max(scaled[safe])),
+        'component_raw_maxima': {'Ric33': float(np.max(np.abs(r33))),
+            'Ric44': float(np.max(np.abs(r44))), 'Ric34': float(np.max(np.abs(r34))),
+            'RicAB_coefficient': float(np.max(np.abs(trace/2)))},
+        'pointwise': np.asarray(pointwise, float), 'section_l2': np.asarray(section, float)}
+
+
 def warped_product_residual_mpmath(
     radius: Array,
     log_Omega: Array,
@@ -769,28 +796,10 @@ def solve(
     relative_radius = np.abs(radius - exact_radius) / np.maximum(
         np.abs(exact_radius), np.longdouble(1.0e-30)
     )
-    residual = warped_product_residual(
-        radius,
-        log_Omega,
-        u,
-        xi,
-        d_u,
-        d_xi,
-        exact["v0"],
-        exact["v0_prime"],
-        halo=max(2, min(u_count, xi_count) // 8),
-    )
-    high_precision_residual = (
-        warped_product_residual_mpmath(
-            radius,
-            log_Omega,
-            epsilon,
-            mass,
-            halo=max(2, min(u_count, xi_count) // 8),
-        )
-        if high_precision
-        else None
-    )
+    residual = weighted_spherical_residual(radius, log_Omega, radius*rv, radius*ru,
+        -0.5*ellv, -0.5*ellu, u, xi, d_u, d_xi, exact['v0'], exact['v0_prime'],
+        halo=max(2, min(u_count, xi_count)//8))
+    high_precision_residual = None
     diagnostics = {
         "epsilon": epsilon,
         "minimum_radius": float(np.min(radius)),
@@ -871,28 +880,12 @@ def overgrid_audit(
         mass,
         high_precision=epsilon <= 2.0**-4,
     )
-    residual = warped_product_residual(
-        radius,
-        log_Omega,
-        u,
-        xi,
-        d_u,
-        d_xi,
-        exact["v0"],
-        exact["v0_prime"],
-        halo=max(2, min(len(u), len(xi)) // 8),
-    )
-    high_precision = (
-        warped_product_residual_mpmath(
-            radius,
-            log_Omega,
-            epsilon,
-            mass,
-            halo=max(2, min(len(u), len(xi)) // 8),
-        )
-        if epsilon <= 2.0**-4
-        else None
-    )
+    residual = weighted_spherical_residual(radius, log_Omega,
+        transfer(solution.x_out_scalar), transfer(solution.x_in_scalar),
+        transfer(solution.Omega_omega), transfer(solution.Omega_omegab),
+        u, xi, d_u, d_xi, exact['v0'], exact['v0_prime'],
+        halo=max(2, min(len(u), len(xi))//8))
+    high_precision = None
     relative_radius = np.abs(radius - exact["radius"]) / np.maximum(
         np.abs(exact["radius"]), np.longdouble(1.0e-30)
     )

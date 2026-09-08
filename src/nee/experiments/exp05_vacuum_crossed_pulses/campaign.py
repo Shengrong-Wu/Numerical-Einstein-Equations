@@ -272,6 +272,9 @@ def plot_regions(
 def run_level(
     output: Path,
     resolution: Resolution,
+    *,
+    outgoing_amplitude: float = 1.0,
+    incoming_amplitude: float = 1.0,
 ) -> dict[str, Any]:
     breakpoints = np.linspace(0.0, 1.0, resolution.elements + 1)
     mesh = DoubleSqrtLGLMesh.create(
@@ -295,6 +298,8 @@ def run_level(
         grid,
         mesh,
         substeps=resolution.boundary_substeps,
+        outgoing_amplitude=outgoing_amplitude,
+        incoming_amplitude=incoming_amplitude,
     )
     boundary_path = output / "boundary-data.npz"
     save_boundary_data(
@@ -448,7 +453,7 @@ def run_level(
         state,
         mesh.u,
         mesh.v,
-        mode="fresh",
+        mode="first_order",
         scalar_coordinates=mesh,
         include_gauss_curvature=True,
     )
@@ -467,7 +472,6 @@ def run_level(
     open_grid[1:-1, 1:-1] = True
     maxima = {
         name: {
-            "all_nodes_including_characteristic_faces": float(np.max(value)),
             "open_grid": float(np.max(value[open_grid])),
             "protected_interior": float(np.max(value[protected])),
         }
@@ -500,6 +504,7 @@ def run_level(
         "schema": "nee-official-experiment-05-level-v1",
         "case_id": resolution.name,
         "resolution": resolution.__dict__,
+        "physics": {"outgoing_amplitude": outgoing_amplitude, "incoming_amplitude": incoming_amplitude},
         "mesh": mesh.diagnostics(),
         "angular": angular.diagnostics(),
         "tensor_certificates": certificates,
@@ -529,6 +534,7 @@ def run_level(
             "reliability_node_count": int(np.count_nonzero(protected)),
         },
         "residual_maxima": maxima,
+        "metric_connection_closures": {name: {"protected_maximum": float(np.max(np.abs(values[name][:, protected])))} for name in ("outgoing_lapse_closure", "incoming_lapse_closure")},
         "region_counts": region_counts,
         "minimum_metric_eigenvalue": state.validate(grid.frames)[
             "minimum_metric_eigenvalue"

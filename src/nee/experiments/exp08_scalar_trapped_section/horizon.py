@@ -68,6 +68,28 @@ def field_norms(values: Array) -> dict[str, float]:
     }
 
 
+def acceptance_errors(report: dict, tolerance: float = 1.0e-5) -> list[str]:
+    """Checks for accepting a numerical MOTS, rather than a solver return."""
+    errors = []
+    surface = report['surface']
+    if not report['nonlinear_success']:
+        errors.append('nonlinear solve did not succeed')
+    if not report['sign_check']['bracketed']:
+        errors.append('displaced sections do not bracket the outgoing expansion')
+    for key in ('h_min', 'h_max', 'area'):
+        if not np.isfinite(surface[key]):
+            errors.append(f'nonfinite {key}')
+    residual = surface['theta_out']['linf']
+    if not np.isfinite(residual) or residual > tolerance:
+        errors.append('outgoing expansion exceeds acceptance tolerance')
+    incoming = surface['theta_in']['maximum']
+    if not np.isfinite(incoming) or incoming >= 0:
+        errors.append('incoming expansion is not strictly negative')
+    if surface.get('distance_to_patch_boundary', surface['distance_to_patch_right']) <= 0:
+        errors.append('surface is outside the patch interior')
+    return errors
+
+
 def solve_mots(
     patch: Patch, v_value: float, degree: int
 ) -> tuple[dict, dict[str, Array]]:
@@ -166,6 +188,7 @@ def solve_mots(
             "h_max": float(h.max()),
             "h_peak_to_peak": float(np.ptp(h)),
             "distance_to_patch_right": float(upper - h.max()),
+            "distance_to_patch_boundary": float(distance),
             "area": area,
             "areal_radius": float(math.sqrt(area / (4.0 * math.pi))),
             "theta_out": field_norms(graph.theta_out),
@@ -210,6 +233,8 @@ def trace_horizon(
     *,
     degree: int,
     requested_v: Array,
+    tolerance: float = 1.0e-5,
+    diagnostic_only: bool = False,
 ) -> dict:
     """Trace the outermost MOTS through the supplied overlapping patches."""
 
@@ -230,6 +255,13 @@ def trace_horizon(
                 report, arrays = solve_mots(patch, float(v_value), degree)
             except Exception as error:
                 errors.append({"patch": patch.name, "reason": str(error)})
+                continue
+            reasons = acceptance_errors(report, tolerance)
+            report['accepted'] = not reasons
+            report['acceptance_tolerance'] = tolerance
+            report['rejection_reasons'] = reasons
+            if reasons and not diagnostic_only:
+                errors.append({'patch': patch.name, 'reasons': reasons, 'report': report})
                 continue
             save_surface(output / f"v-{v_value:.10f}", report, arrays)
             sections.append(report)
@@ -255,6 +287,8 @@ def trace_horizon(
         "schema": "nee-exp08-apparent-horizon-v1",
         "degree": degree,
         "requested_v_count": int(len(requested_v)),
+        "diagnostic_only": diagnostic_only,
+        "acceptance_tolerance": tolerance,
         "solved_v_count": int(len(sections)),
         "failed_v_count": int(len(failures)),
         "sections": sections,

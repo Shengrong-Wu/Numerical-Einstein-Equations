@@ -363,6 +363,8 @@ def construct_boundary_data(
     mesh: DoubleSqrtLGLMesh,
     *,
     substeps: int,
+    outgoing_amplitude: float = 1.0,
+    incoming_amplitude: float = 1.0,
 ) -> tuple[BoundaryData, dict[str, Any]]:
     tensors = quadratic_hessian_tensors(grid)
     certificates = tensor_norm_certificates(grid, tensors)
@@ -372,10 +374,10 @@ def construct_boundary_data(
         if certificate["Linf"] > 1.0 + 1.0e-12:
             raise ValueError(f"{name} violates the Linf upper bound")
     outgoing = solve_outgoing_face(
-        grid, mesh.v, tensors[0], substeps=substeps
+        grid, mesh.v, outgoing_amplitude * tensors[0], substeps=substeps
     )
     incoming = solve_incoming_face(
-        grid, mesh.u, tensors[1], substeps=substeps
+        grid, mesh.u, incoming_amplitude * tensors[1], substeps=substeps
     )
     for name in ("g", "zeta", "b"):
         mismatch = float(

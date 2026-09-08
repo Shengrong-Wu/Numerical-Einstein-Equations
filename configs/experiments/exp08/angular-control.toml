@@ -1,6 +1,7 @@
 schema_version = 1
 
 [experiment]
+mode = "angular-control"
 identifier = "exp08"
 title = "Scalar-pulse apparent-horizon angular control"
 equation_system = "scalar_field"

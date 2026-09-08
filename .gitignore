@@ -7,6 +7,7 @@
 !/docs/experiments/
 /docs/experiments/*
 !/docs/experiments/exp*/
+!/docs/experiments/numerical-conventions.md
 /.venv/
 /.pytest_cache/
 **/__pycache__/

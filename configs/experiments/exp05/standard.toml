@@ -1,11 +1,12 @@
 schema_version = 1
 [experiment]
+mode = "standard"
 identifier = "exp05"
 title = "Vacuum crossed mild nonsmooth pulses"
 equation_system = "vacuum"
 [physics]
-outgoing_amplitude = 0.1
-incoming_amplitude = 0.1
+outgoing_amplitude = 1.0
+incoming_amplitude = 1.0
 [initial_data]
 profile = "crossed_mild_nonsmooth_shears"
 [coordinates]

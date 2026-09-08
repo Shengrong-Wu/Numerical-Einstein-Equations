@@ -35,7 +35,7 @@ def components(
         state,
         u,
         v,
-        mode="fresh",
+        mode="first_order",
         scalar_coordinates=coordinates,
     )
     if not state.is_scalar:
@@ -101,6 +101,8 @@ def section_maps(
     state: PicardState,
     u: Array,
     values: dict[str, Array],
+    *,
+    scale_invariant: bool = True,
 ) -> dict[str, Array]:
     inverse_g = tangent_inverse(grid, state.g)
     Omega = state.Omega
@@ -144,7 +146,7 @@ def section_maps(
     )
     area_ratio = np.sqrt(np.maximum(np.linalg.det(local), 0.0))
     return {
-        name: (-u[:, None])
+        name: ((-u[:, None]) if scale_invariant else 1.0)
         * np.sqrt(
             np.maximum(
                 4.0 * math.pi * np.mean(value * area_ratio, axis=0),

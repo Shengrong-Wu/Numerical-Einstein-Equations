@@ -105,9 +105,16 @@ def run(
     output_directory: Path,
     initial_data_path: Path,
     regenerate_initial_data: bool,
+    *,
+    construct_initial_data_fn=construct_initial_data,
+    initial_state_fn=initial_state,
+    picard_step_fn=picard_step,
+    update_norm_fn=update_norm,
+    update_map_fn=update_map,
+    save_state_fn=save_state,
 ) -> dict[str, object]:
     if regenerate_initial_data or not initial_data_path.exists():
-        bundle, grid, angular, mesh = construct_initial_data(scalar_config)
+        bundle, grid, angular, mesh = construct_initial_data_fn(scalar_config)
         bundle.save(initial_data_path)
         write_summary(
             bundle,
@@ -119,13 +126,13 @@ def run(
         bundle = InitialDataBundle.load(initial_data_path)
         grid, angular = build_angular(scalar_config)
         mesh = mesh_from_config(scalar_config.scalar_coordinates)
-    state = initial_state(bundle, angular)
+    state = initial_state_fn(bundle, angular)
     iteration_summaries: list[dict[str, object]] = []
     update_maps: list[Array] = []
     residual_maps: dict[str, list[Array]] = {}
     for iteration in range(1, scalar_config.solver.picard_iterations + 1):
         previous = state
-        state, context = picard_step(
+        state, context = picard_step_fn(
             grid,
             angular,
             mesh,
@@ -133,8 +140,8 @@ def run(
             bundle,
             metric_substeps=scalar_config.solver.metric_substeps,
         )
-        change = update_norm(state, previous)
-        change_map = update_map(state, previous)
+        change = update_norm_fn(state, previous)
+        change_map = update_map_fn(state, previous)
         residual_values = components(
             grid, state, previous, context, mesh
         )
@@ -178,7 +185,7 @@ def run(
         )
 
     output_directory.mkdir(parents=True, exist_ok=True)
-    save_state(
+    save_state_fn(
         output_directory / "final-state.npz",
         state,
         update_maps,

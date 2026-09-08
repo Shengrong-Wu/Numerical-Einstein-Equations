@@ -62,7 +62,7 @@ def write_json(path: Path, value: Any) -> None:
 def direct_residual_value(summary: dict[str, Any]) -> float | None:
     try:
         value = float(
-            summary["independent_four_metric_residual"][
+            summary["independent_first_order_residual"][
                 "masked_Linf_uv_L2_sphere"
             ]
         )
@@ -125,143 +125,18 @@ def direct_audit(
     retained_degree: int,
     source_points: int,
 ) -> dict[str, Any]:
-    point_count = max(
-        source_points + 12, (retained_degree + 1) ** 2 + 12
-    )
-    overgrid = resample_primitives(
-        grid,
-        PrimitiveFields(
-            g=state.g,
-            log_Omega=state.log_Omega,
-            b=state.b,
-            phi=state.phi,
-        ),
-        u,
-        v,
-        u_count=len(u) + 4,
-        v_count=len(v) + 4,
-        point_count=point_count,
-        harmonic_degree=retained_degree,
-    )
-    summary = evaluate_blocked(
-        overgrid.grid,
-        overgrid.fields,
-        overgrid.u,
-        overgrid.v,
-        stencil=7,
-        block_size=4,
-        derivative_halo=6,
-        mask_halo=4,
-    )
-    summary["overgrid"] = overgrid.diagnostics
-    return summary
+    from nee.diagnostics.state_audit import audit
+    return audit(grid, state, u, v, retained_degree=retained_degree)
 
 
 def mapped_direct_audit(
-    grid: Any,
-    state: PicardState,
-    coordinates: Any,
-    *,
-    retained_degree: int,
+    grid: Any, state: PicardState, coordinates: Any, *, retained_degree: int,
     protected_s_values: tuple[float, ...] = (0.6, 0.7, 0.8),
 ) -> dict[str, Any]:
-    """Audit a power-coordinate state without reinterpolating in physical v."""
-
-    if not protected_s_values:
-        raise ValueError("at least one protected s threshold is required")
-    if any(
-        not math.isfinite(value) for value in protected_s_values
-    ) or any(
-        right <= left
-        for left, right in zip(
-            protected_s_values, protected_s_values[1:], strict=False
-        )
-    ):
-        raise ValueError(
-            "protected s thresholds must be finite and strictly increasing"
-        )
-    point_count = (retained_degree + 1) ** 2 + 8
-    overgrid = resample_primitives_power(
-        grid,
-        PrimitiveFields(
-            g=state.g,
-            log_Omega=state.log_Omega,
-            b=state.b,
-            phi=state.phi,
-        ),
-        coordinates,
-        u_count=len(coordinates.u) + 4,
-        v_count=len(coordinates.v) + 4,
-        point_count=point_count,
-        harmonic_degree=retained_degree,
-        stencil=7,
-        spectral_degree_increment=3,
-    )
-    result = evaluate(
-        overgrid.grid,
-        overgrid.fields,
-        overgrid.u,
-        overgrid.v,
-        stencil=7,
-        mask_halo=3,
-        coordinates=overgrid.coordinates,
-    )
-    target = overgrid.coordinates
-    assert target is not None
-    safe_u = np.ones(len(target.u), dtype=bool)
-    safe_v_base = np.ones(len(target.v), dtype=bool)
-    outer_halo = 3
-    interface_halo = 3
-    safe_u[:outer_halo] = False
-    safe_u[-outer_halo:] = False
-    safe_v_base[-outer_halo:] = False
-    for source_mesh, target_nodes, safe in (
-        (coordinates.tau, target.tau, safe_u),
-        (coordinates.s, target.s, safe_v_base),
-    ):
-        for segment in source_mesh.segments[:-1]:
-            center = int(np.argmin(np.abs(target_nodes - segment.right)))
-            safe[
-                max(0, center - interface_halo) : min(
-                    len(safe), center + interface_halo + 1
-                )
-            ] = False
-    protected = {}
-    for minimum_s in protected_s_values:
-        safe_v = safe_v_base & (target.s >= minimum_s)
-        mask = safe_u[:, None] & safe_v[None, :]
-        protected[f"s_ge_{minimum_s:.2f}"] = summarize_result_on_mask(
-            result,
-            mask,
-            label=(
-                f"s >= {minimum_s:.2f}, outer halo {outer_halo}, "
-                f"interface halo {interface_halo}"
-            ),
-        )
-    summary = dict(result.summary)
-    summary.update(
-        {
-            "method": (
-                "four-g connection difference on an independent "
-                "higher-degree (tau,s) LGL overgrid"
-            ),
-            "overgrid": overgrid.diagnostics,
-            "protected": protected,
-            "primary_protected_region": (
-                f"s_ge_{protected_s_values[0]:.2f}"
-            ),
-            "section_L2_map": result.section_l2.tolist(),
-            "einstein_section_L2_map": (
-                result.einstein_section_l2.tolist()
-            ),
-            "wave_section_L2_map": (
-                None
-                if result.wave_section_l2 is None
-                else result.wave_section_l2.tolist()
-            ),
-        }
-    )
-    return summary
+    from nee.diagnostics.state_audit import audit
+    return audit(grid, state, coordinates.u, coordinates.v,
+                 retained_degree=retained_degree, coordinates=coordinates,
+                 protected_s_values=protected_s_values)
 
 
 def first_order_audit(
@@ -332,6 +207,7 @@ def vacuum_case(
     iterations: int,
     output: Path,
     high_precision_spherical: bool = False,
+    metric_substeps: int = 2,
 ) -> dict[str, Any]:
     if output.exists():
         raise FileExistsError(f"immutable case exists: {output}")
@@ -351,7 +227,7 @@ def vacuum_case(
             boundary.outgoing,
             u,
             v,
-            metric_substeps=2,
+            metric_substeps=metric_substeps,
             metric_parameterization="direct",
             metric_integrator="rk4",
             u_integrator="rk4",
@@ -397,9 +273,8 @@ def vacuum_case(
         source_points=points,
     )
     high_precision_residual = (
-        spherical_high_precision_audit(grid, state, u, v)
-        if high_precision_spherical
-        else None
+        {"status": "omitted", "reason": "use weighted first-order audit without second null derivatives"}
+        if high_precision_spherical else None
     )
     state.save(output / "official-state.npz", u=u, v=v)
     exact.save(output / "official-exact-state.npz", u=u, v=v)
@@ -430,7 +305,7 @@ def vacuum_case(
             ),
         },
         "first_order_null_residual_fresh": null_residual,
-        "independent_four_metric_residual": geometric_residual,
+        "independent_first_order_residual": geometric_residual,
         "independent_spherical_residual_high_precision": (
             high_precision_residual
         ),
@@ -439,39 +314,40 @@ def vacuum_case(
     return summary
 
 
-def run_experiment_1(output: Path) -> dict[str, Any]:
+def run_experiment_1(output: Path, public) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=False)
-    levels = ((17, 17), (33, 33), (65, 65))
+    levels = tuple((n, n) for n in public.initial_data["coordinate_counts"])
     domains = {
         "short": (-1.0, -0.5, 0.0, 0.5),
         "long": (-1.0, 0.0, 0.0, 1.0),
     }
     summaries: list[dict[str, Any]] = []
-    for domain_name, bounds in domains.items():
+    for domain_name in public.initial_data["domains"]:
+        bounds = domains[domain_name]
         for level, (nu, nv) in enumerate(levels):
             summaries.append(
                 vacuum_case(
                     case_id=f"exp01-schwarzschild-{domain_name}-C{level}",
                     builder=lambda grid, u, v: (
                         vacuum_bench.regular_schwarzschild_state(
-                            grid, u, v, 1.0
+                            grid, u, v, float(public.physics["mass"])
                         )
                     ),
                     u=np.linspace(bounds[0], bounds[1], nu),
                     v=np.linspace(bounds[2], bounds[3], nv),
-                    points=50,
-                    retained_degree=5,
-                    iterations=8,
+                    points=public.initial_data.get("schwarzschild_point_count", public.angular.point_count),
+                    retained_degree=public.initial_data.get("schwarzschild_retained_degree", public.angular.retained_degree),
+                    iterations=public.solver.maximum_sweeps,
                     output=output
                     / f"schwarzschild-{domain_name}"
                     / f"coordinate-{level}",
                 )
             )
-    for rotation in (0.0, 0.3, 0.7, 0.9):
+    for rotation in public.physics["kerr_rotations"]:
         builder = (
             (
                 lambda grid, u, v: vacuum_bench.kerr_zero_spin_state(
-                    grid, u, v, 1.0
+                    grid, u, v, float(public.physics["mass"])
                 )
             )
             if rotation == 0.0
@@ -480,13 +356,14 @@ def run_experiment_1(output: Path) -> dict[str, Any]:
                     grid,
                     u,
                     v,
-                    mass=1.0,
+                    mass=float(public.physics["mass"]),
                     rotation=a,
-                    reference_radius=4.0,
+                    reference_radius=float(public.physics["reference_radius"]),
                 )
             )
         )
-        for domain_name, bounds in domains.items():
+        for domain_name in public.initial_data["domains"]:
+            bounds = domains[domain_name]
             for level, (nu, nv) in enumerate(levels):
                 try:
                     summary = vacuum_case(
@@ -496,9 +373,9 @@ def run_experiment_1(output: Path) -> dict[str, Any]:
                         builder=builder,
                         u=np.linspace(bounds[0], bounds[1], nu),
                         v=np.linspace(bounds[2], bounds[3], nv),
-                        points=86,
-                        retained_degree=7,
-                        iterations=8,
+                        points=public.initial_data["angular_point_counts"][-1],
+                        retained_degree=public.initial_data["angular_retained_degrees"][-1],
+                        iterations=public.solver.maximum_sweeps,
                         output=output
                         / f"kerr-a{rotation:.1f}-{domain_name}"
                         / f"coordinate-{level}-angular-2",
@@ -521,18 +398,18 @@ def run_experiment_1(output: Path) -> dict[str, Any]:
                     write_json(case / "summary.json", summary)
                 summaries.append(summary)
             # Two additional angular levels at the middle coordinate grid.
-            for angular_level, (points, degree) in enumerate(((30, 3), (50, 5))):
+            for angular_level, (points, degree) in enumerate(zip(public.initial_data["angular_point_counts"][:-1], public.initial_data["angular_retained_degrees"][:-1], strict=True)):
                 try:
                     summary = vacuum_case(
                         case_id=(
                             f"exp01-kerr-a{rotation:.1f}-{domain_name}-C1-A{angular_level}"
                         ),
                         builder=builder,
-                        u=np.linspace(bounds[0], bounds[1], 33),
-                        v=np.linspace(bounds[2], bounds[3], 33),
+                        u=np.linspace(bounds[0], bounds[1], public.initial_data["coordinate_counts"][1]),
+                        v=np.linspace(bounds[2], bounds[3], public.initial_data["coordinate_counts"][1]),
                         points=points,
                         retained_degree=degree,
-                        iterations=8,
+                        iterations=public.solver.maximum_sweeps,
                         output=output
                         / f"kerr-a{rotation:.1f}-{domain_name}"
                         / f"coordinate-1-angular-{angular_level}",
@@ -563,11 +440,11 @@ def run_experiment_1(output: Path) -> dict[str, Any]:
     return aggregate
 
 
-def run_experiment_2(output: Path) -> dict[str, Any]:
+def run_experiment_2(output: Path, public) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=False)
-    levels = ((17, 17), (33, 33), (65, 65))
+    levels = tuple((n, n) for n in public.initial_data["coordinate_counts"])
     summaries = []
-    for epsilon in (1.0e-1, 1.0e-2, 1.0e-4, 1.0e-6):
+    for epsilon in public.physics["static_epsilons"]:
         for level, (nu, nv) in enumerate(levels):
             case = output / f"static-epsilon-{epsilon:.0e}" / f"coordinate-{level}"
             try:
@@ -575,15 +452,16 @@ def run_experiment_2(output: Path) -> dict[str, Any]:
                     case_id=f"exp02-static-eps{epsilon:.0e}-C{level}",
                     builder=lambda grid, u, v, e=epsilon: (
                         vacuum_bench.near_horizon_static_state(
-                            grid, u, v, 1.0, e
+                            grid, u, v, float(public.physics["mass"]), e
                         )
                     ),
                     u=np.linspace(-1.0, -0.5, nu),
                     v=np.linspace(0.0, 0.5, nv),
-                    points=50,
-                    retained_degree=5,
-                    iterations=8,
+                    points=public.initial_data.get("schwarzschild_point_count", public.angular.point_count),
+                    retained_degree=public.initial_data.get("schwarzschild_retained_degree", public.angular.retained_degree),
+                    iterations=public.solver.maximum_sweeps,
                     output=case,
+                    metric_substeps=public.solver.metric_substeps,
                     high_precision_spherical=epsilon <= 1.0e-4,
                 )
             except Exception as error:
@@ -604,15 +482,15 @@ def run_experiment_2(output: Path) -> dict[str, Any]:
                     grid,
                     u,
                     v,
-                    1.0,
-                    u_offset=0.75,
-                    v_offset=1.0,
+                    float(public.physics["mass"]),
+                    u_offset=float(public.physics["u_offset"]),
+                    v_offset=float(public.physics["v_offset"]),
                 ),
                 u=np.linspace(-1.0, -0.5, nu),
                 v=np.linspace(0.0, 0.5, nv),
-                points=50,
-                retained_degree=5,
-                iterations=8,
+                points=public.angular.point_count,
+                retained_degree=public.angular.retained_degree,
+                iterations=public.solver.maximum_sweeps,
                 output=output / "kruskal-crossing" / f"coordinate-{level}",
                 high_precision_spherical=True,
             )
@@ -630,11 +508,11 @@ def run_experiment_2(output: Path) -> dict[str, Any]:
     return aggregate
 
 
-def run_experiment_3(output: Path) -> dict[str, Any]:
+def run_experiment_3(output: Path, public) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=False)
-    levels = (17, 33, 49)
+    levels = public.initial_data["coordinate_counts"]
     summaries = []
-    for epsilon in (2.0**-power for power in range(1, 7)):
+    for epsilon in public.physics["epsilons"]:
         for level, count in enumerate(levels):
             case = output / f"epsilon-{epsilon:.8f}" / f"coordinate-{level}"
             case.mkdir(parents=True)
@@ -645,7 +523,7 @@ def run_experiment_3(output: Path) -> dict[str, Any]:
                     u_nodes,
                     xi_nodes,
                     epsilon,
-                    1.0,
+                    float(public.physics["mass"]),
                     high_precision=epsilon <= 2.0**-4,
                 )
                 np.savez_compressed(
@@ -668,10 +546,11 @@ def run_experiment_3(output: Path) -> dict[str, Any]:
                     epsilon,
                     count,
                     count,
-                    iterations=20,
-                    tolerance=1.0e-12,
+                    iterations=public.solver.maximum_sweeps,
+                    tolerance=public.solver.tolerance,
+                    mass=float(public.physics["mass"]),
                 )
-                overgrid = curved_overgrid_audit(solution, epsilon)
+                overgrid = curved_overgrid_audit(solution, epsilon, mass=float(public.physics["mass"]))
                 relative = np.abs(solution.radius - exact["radius"]) / np.maximum(
                     np.abs(exact["radius"]), 1.0e-30
                 )
@@ -750,6 +629,7 @@ def ese_case(
     level: int,
     config: Any,
     output: Path,
+    sigma: float = 1.0,
 ) -> dict[str, Any]:
     if output.exists():
         raise FileExistsError(f"immutable case exists: {output}")
@@ -757,7 +637,7 @@ def ese_case(
     grid, angular = ese_bench.build_angular(config)
     mesh = ese_bench.mesh_from_config(config.scalar_coordinates)
     exact_old, exact_diagnostics = ese_bench.jnw_exact_state(
-        grid, mesh.u, mesh.v, sigma=1.0, nu=nu
+        grid, mesh.u, mesh.v, sigma=sigma, nu=nu
     )
     bundle = ese_bench._faces(
         exact_old, mesh.u, mesh.v, exact_diagnostics
@@ -881,18 +761,18 @@ def ese_case(
         "records": records,
         "closures": closures,
         "first_order_null_residual_fresh": null_residual,
-        "independent_four_metric_residual": geometric_residual,
+        "independent_first_order_residual": geometric_residual,
         "independent_state_mutation_test": mutation,
     }
     write_json(output / "summary.json", summary)
     return summary
 
 
-def run_experiment_6(output: Path) -> dict[str, Any]:
+def run_experiment_6(output: Path, public) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=False)
-    levels = ((2, 6, 2, 6), (4, 6, 4, 6), (8, 6, 8, 6))
+    levels = tuple((n, public.initial_data["coordinate_degree"], n, public.initial_data["coordinate_degree"]) for n in public.initial_data["coordinate_elements"])
     summaries = []
-    for nu in (0.99, 0.8, 0.5, 0.2):
+    for nu in public.physics["nu_values"]:
         for level, (te, td, se, sd) in enumerate(levels):
             config = ese_bench._configuration(
                 name=f"jnw-nu{nu:.2f}-C{level}",
@@ -900,7 +780,7 @@ def run_experiment_6(output: Path) -> dict[str, Any]:
                 tau_degree=td,
                 s_elements=se,
                 s_degree=sd,
-                iterations=8,
+                iterations=public.solver.maximum_sweeps,
                 # Spherical data need no expensive high angular band.
                 quick=True,
             )
@@ -911,6 +791,7 @@ def run_experiment_6(output: Path) -> dict[str, Any]:
                     level=level,
                     config=config,
                     output=case,
+                    sigma=float(public.physics["sigma"]),
                 )
             except Exception as error:
                 case.mkdir(parents=True, exist_ok=True)
@@ -979,6 +860,7 @@ def nonspherical_ese_case(
     metric_substeps: int = 1,
     derivative_halo: int = 1,
     iterations: int = 8,
+    public_config=None,
 ) -> dict[str, Any]:
     """Run the smooth-harmonic ESE case with a persistent official state."""
 
@@ -1057,37 +939,28 @@ def nonspherical_ese_case(
         )
         state.save(path, u=u, v=v, extra=extra)
 
-    nonspherical._scaled_construct = scaled_construct
-    ese_run.initial_state = initial_state
-    ese_run.picard_step = step
-    ese_run.update_norm = weighted_update_norm
-    ese_run.update_map = weighted_update_map
-    ese_run.save_state = save_state
-    try:
-        numerical_summary = nonspherical._run_case(
-            output=output,
-            name=name,
-            cap=cap,
-            multipliers=multipliers,
-            rotation_angle=rotation_angle,
-            retained=retained,
-            work=work,
-            points=points,
-            tau_elements=tau_elements,
-            s_elements=s_elements,
-            tau_degree=tau_degree,
-            s_degree=s_degree,
-            metric_substeps=metric_substeps,
-            derivative_halo=derivative_halo,
-            iterations=iterations,
-        )
-    finally:
-        nonspherical._scaled_construct = original_scaled_construct
-        ese_run.initial_state = original_initial_state
-        ese_run.picard_step = original_step
-        ese_run.update_norm = original_update_norm
-        ese_run.update_map = original_update_map
-        ese_run.save_state = original_save_state
+    numerical_summary = nonspherical._run_case(
+        output=output,
+        name=name,
+        cap=cap,
+        multipliers=multipliers,
+        rotation_angle=rotation_angle,
+        retained=retained,
+        work=work,
+        points=points,
+        tau_elements=tau_elements,
+        s_elements=s_elements,
+        tau_degree=tau_degree,
+        s_degree=s_degree,
+        metric_substeps=metric_substeps,
+        derivative_halo=derivative_halo,
+        iterations=iterations,
+        public_config=public_config,
+        construct_wrapper=scaled_construct,
+        run_hooks={"initial_state_fn": initial_state, "picard_step_fn": step,
+                   "update_norm_fn": weighted_update_norm, "update_map_fn": weighted_update_map,
+                   "save_state_fn": save_state},
+    )
 
     case_output = output / "cases" / name
     if "state" not in captured:
@@ -1164,7 +1037,7 @@ def nonspherical_ese_case(
         "boundary_digest": boundary.digest,
         "corrected_closures": closures,
         "first_order_null_residual_fresh": null_residual,
-        "independent_four_metric_residual": geometric_residual,
+        "independent_first_order_residual": geometric_residual,
         "independent_state_mutation_test": mutation,
         "limitations": [
             "The one-step algebraic kernel remains the numerical backend RK4 "
@@ -1175,30 +1048,30 @@ def nonspherical_ese_case(
     return summary
 
 
-def run_experiment_7(output: Path) -> dict[str, Any]:
+def run_experiment_7(output: Path, public) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=False)
     baseline = (1.0, 1.0, 1.0, 1.0)
     summaries: list[dict[str, Any]] = []
 
     central = {
-        "retained": 8,
-        "work": 16,
-        "points": 350,
-        "tau_elements": 2,
-        "s_elements": 2,
-        "tau_degree": 8,
-        "s_degree": 11,
-        "metric_substeps": 2,
+        "retained": public.angular.retained_degree,
+        "work": public.angular.work_degree,
+        "points": public.angular.point_count,
+        "tau_elements": public.initial_data["coordinate_elements"][1],
+        "s_elements": public.initial_data["coordinate_elements"][1],
+        "tau_degree": public.initial_data["coordinate_tau_degrees"][1],
+        "s_degree": public.initial_data["coordinate_s_degrees"][1],
+        "metric_substeps": public.solver.metric_substeps,
         "derivative_halo": 2,
-        "iterations": 6,
+        "iterations": public.solver.maximum_sweeps,
     }
     refinement_cases = [
         (
             "coordinate-level-0",
             {
                 **central,
-                "tau_degree": 6,
-                "s_degree": 9,
+                "tau_degree": public.initial_data["coordinate_tau_degrees"][0],
+                "s_degree": public.initial_data["coordinate_s_degrees"][0],
             },
         ),
         ("baseline-cap-0.04", central),
@@ -1206,26 +1079,26 @@ def run_experiment_7(output: Path) -> dict[str, Any]:
             "coordinate-level-2",
             {
                 **central,
-                "tau_elements": 3,
-                "s_elements": 3,
+                "tau_elements": public.initial_data["coordinate_elements"][2],
+                "s_elements": public.initial_data["coordinate_elements"][2],
             },
         ),
         (
             "angular-level-0",
             {
                 **central,
-                "retained": 6,
-                "work": 12,
-                "points": 200,
+                "retained": public.initial_data["angular_retained_degrees"][0],
+                "work": public.initial_data["angular_work_degrees"][0],
+                "points": public.initial_data["angular_point_counts"][0],
             },
         ),
         (
             "angular-level-2",
             {
                 **central,
-                "retained": 10,
-                "work": 20,
-                "points": 550,
+                "retained": public.initial_data["angular_retained_degrees"][2],
+                "work": public.initial_data["angular_work_degrees"][2],
+                "points": public.initial_data["angular_point_counts"][2],
             },
         ),
     ]
@@ -1242,6 +1115,7 @@ def run_experiment_7(output: Path) -> dict[str, Any]:
                 name=name,
                 cap=cap,
                 multipliers=multipliers,
+                public_config=public,
                 **options,
             )
         except Exception as error:
@@ -1255,19 +1129,22 @@ def run_experiment_7(output: Path) -> dict[str, Any]:
                 ),
                 "error": repr(error),
             }
+            if name in public.initial_data['expected_constraint_rejections'] and isinstance(error, FloatingPointError) and 'radicand' in str(error):
+                summary['terminal_status'] = 'expected_rejection'
+                summary['expected_outcome'] = 'invalid characteristic scalar constraint'
             write_json(case / "summary.json", summary)
         summaries.append(summary)
         return summary
 
     refinement = {
-        name: execute(name, 0.04, baseline, options)
+        name: execute(name, float(public.physics["central_cap"]), baseline, options)
         for name, options in refinement_cases
     }
 
     def protected_residual(name: str) -> float | None:
         try:
             return float(
-                refinement[name]["independent_four_metric_residual"][
+                refinement[name]["independent_first_order_residual"][
                     "protected"
                 ]["s_ge_0.60"]["ESE_acceptance_sum"]
             )
@@ -1384,11 +1261,11 @@ def run_experiment_7(output: Path) -> dict[str, Any]:
         stress_status = "completed after the baseline refinement gate passed"
         execute(
             "rotated-baseline",
-            0.04,
+            float(public.physics["central_cap"]),
             baseline,
-            {**central, "rotation_angle": 0.731},
+            {**central, "rotation_angle": float(public.physics["rotation_angle"])},
         )
-        for cap in (0.01, 0.02, 0.10):
+        for cap in public.physics["stress_caps"]:
             execute(f"baseline-cap-{cap:.2f}", cap, baseline, central)
         for axis in range(4):
             for value in (0.0, 0.5, 2.0):
@@ -1396,20 +1273,21 @@ def run_experiment_7(output: Path) -> dict[str, Any]:
                 multipliers[axis] = value
                 execute(
                     f"stress-axis-{axis}-value-{value:.1f}",
-                    0.04,
+                    float(public.physics["central_cap"]),
                     tuple(multipliers),
                     central,
                 )
         for value in (0.0, 0.5, 2.0):
             execute(
                 f"stress-joint-{value:.1f}",
-                0.04,
+                float(public.physics["central_cap"]),
                 (value, value, value, value),
                 central,
             )
     aggregate = {
         "schema": "nee-official-experiment-07-aggregate-v1",
         "experiment": 7,
+        "terminal_status": "completed" if refinement_gate["passed"] and all(row.get("terminal_status") in {"completed", "expected_rejection"} for row in summaries) else "failed",
         "runs": summaries,
         "harmonics": {
             "Y_Omega": "normalized real Y_20",
@@ -1421,9 +1299,9 @@ def run_experiment_7(output: Path) -> dict[str, Any]:
         "refinement_controls": {
             "central_configuration": central,
             "coordinate_levels": (
-                {"elements": 2, "tau_degree": 6, "s_degree": 9},
-                {"elements": 2, "tau_degree": 8, "s_degree": 11},
-                {"elements": 3, "tau_degree": 8, "s_degree": 11},
+                {"elements": 2, "tau_degree": public.initial_data["coordinate_tau_degrees"][0], "s_degree": 9},
+                {"elements": 2, "tau_degree": public.initial_data["coordinate_tau_degrees"][1], "s_degree": 11},
+                {"elements": 3, "tau_degree": public.initial_data["coordinate_tau_degrees"][1], "s_degree": 11},
             ),
             "angular_retained_degree": (6, 8, 10),
             "protected_direct_region": "s >= 0.60",

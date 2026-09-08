@@ -14,11 +14,13 @@ def test_standard_pulse_campaign_uses_requested_sweep_count(
 
     monkeypatch.setattr(campaign, "_run_spectral_case", fake_run)
     monkeypatch.setattr(
-        campaign, "_mapped_audit", lambda output, label: {"label": label}
+        campaign, "_mapped_audit", lambda output, label, public: {"label": label}
     )
     monkeypatch.setattr(
-        campaign, "_exact_zero_control_audit", lambda: {"exact": True}
+        campaign, "_exact_zero_control_audit", lambda public: {"exact": True}
     )
-    campaign.run_standard(tmp_path / "run", iterations=4)
+    from nee.config import load_config
+    public = load_config("configs/experiments/exp04/standard.toml")
+    campaign.run_standard(tmp_path / "run", public=public, iterations=4)
 
     assert requested == [("strong-pulse", 4), ("zero-control", 4)]

@@ -69,7 +69,7 @@ convergence region.
 Python 3.12 is required. From the repository root:
 
 ```bash
-python -m pip install -e .
+python -m pip install -e ".[dev]"
 python -m pytest -q tests/unit tests/integration
 ```
 
@@ -89,6 +89,15 @@ python -m nee.experiments.exp01_regular_vacuum \
 
 Replace `smoke.toml` with `standard.toml` for the research configuration.
 Experiment 8 also provides `angular-control.toml`.
+The `[experiment].mode` field selects the run mode; filenames have no effect.
+Each run writes `parameter-contract.json`, listing adjustable controls and
+fixed protocol descriptors. Changing an unsupported setting is an error.
+Campaign summaries record the actual settings of each refinement case.
+
+The [weighted-state conventions](docs/experiments/numerical-conventions.md)
+explain the lapse factors and the first-order residuals used for rough data.
+Metric/connection consistency is reported alongside these residuals.
+
 
 The common command-line entrance is:
 
@@ -100,7 +109,7 @@ nee run exp01 \
 
 Existing output directories are rejected unless `--resume` is supplied.
 Resume mode revalidates the resolved configuration and saved content hashes
-before accepting an earlier checkpoint or completed run.
+before reusing a completed run. It does not continue an interrupted computation.
 
 Smoke runs are intended for installation and interface checks. The standard
 experiments range from minutes to many hours and the larger nonspherical cases
@@ -161,12 +170,11 @@ A completed run writes:
 
 ```text
 resolved-config.toml
+parameter-contract.json
 manifest.json
-boundary-data.npz
-final-state.npz
+artifacts.json
 summary.json
-residual-maps.npz
-figures/
+data/                     All individual cases and their numerical artifacts
 run.log
 ```
 
@@ -174,6 +182,12 @@ Raw numerical output under `results/` is intentionally not committed. The
 manifest records the resolved configuration, code revision, dependency and
 platform information, array schemas, and content hashes needed to audit a
 run.
+
+To regenerate the article figures from a completed run collection:
+
+```bash
+python scripts/curate_figures.py --results-root results/revision-20260908/production
+```
 
 ## Citation and license
 

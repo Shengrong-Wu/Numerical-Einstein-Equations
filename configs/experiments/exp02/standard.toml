@@ -1,5 +1,6 @@
 schema_version = 1
 [experiment]
+mode = "standard"
 identifier = "exp02"
 title = "Schwarzschild static horizon approach and Kruskal crossing"
 equation_system = "vacuum"

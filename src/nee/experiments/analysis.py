@@ -19,5 +19,5 @@ def _statuses(value: Any) -> Iterator[str]:
 
 def terminal_status(summary: dict[str, Any]) -> str:
     statuses = tuple(_statuses(summary))
-    return "failed" if any(value != "completed" for value in statuses) else "completed"
+    return "failed" if any(value not in {"completed", "expected_rejection"} for value in statuses) else "completed"
 

@@ -1,5 +1,6 @@
 schema_version = 1
 [experiment]
+mode = "standard"
 identifier = "exp04"
 title = "Vacuum strong short pulse and zero control"
 equation_system = "vacuum"

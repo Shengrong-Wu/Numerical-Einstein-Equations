@@ -1,5 +1,6 @@
 schema_version = 1
 [experiment]
+mode = "standard"
 identifier = "exp01"
 title = "Regular exact Schwarzschild and Kerr vacuum solutions"
 equation_system = "vacuum"
@@ -8,6 +9,8 @@ mass = 1.0
 kerr_rotations = [0.0, 0.3, 0.7, 0.9]
 reference_radius = 4.0
 [initial_data]
+schwarzschild_point_count = 50
+schwarzschild_retained_degree = 5
 families = ["schwarzschild", "kerr"]
 domains = ["short", "long"]
 coordinate_counts = [17, 33, 65]

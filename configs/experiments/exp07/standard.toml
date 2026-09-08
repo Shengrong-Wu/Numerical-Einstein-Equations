@@ -1,5 +1,6 @@
 schema_version = 1
 [experiment]
+mode = "standard"
 identifier = "exp07"
 title = "Nonspherical Einstein--scalar characteristic data"
 equation_system = "scalar_field"
@@ -8,6 +9,7 @@ central_cap = 0.04
 stress_caps = [0.01, 0.02, 0.1]
 rotation_angle = 0.731
 [initial_data]
+expected_constraint_rejections = ["stress-axis-1-value-2.0", "stress-joint-2.0"]
 profile = "smooth_harmonic"
 lapse_radial_power = 0.25
 lapse_angular_amplitude = 0.01

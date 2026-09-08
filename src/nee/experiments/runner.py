@@ -45,39 +45,27 @@ def _digest(path: Path) -> str:
     return f"sha256:{digest.hexdigest()}"
 
 
-def _first(root: Path, names: tuple[str, ...]) -> Path | None:
-    candidates = [path for name in names for path in root.rglob(name)]
-    return min(candidates, key=lambda path: (len(path.parts), str(path))) if candidates else None
-
-
-def _promote_artifacts(output: Path, data: Path) -> dict[str, str]:
-    choices = {
-        "boundary-data.npz": ("boundary-data.npz", "boundary-data-official.npz"),
-        "final-state.npz": ("final-state.npz", "official-state.npz", "official-mapped-state.npz"),
-        "residual-maps.npz": ("residual-maps.npz",),
-    }
-    hashes: dict[str, str] = {}
-    for target_name, source_names in choices.items():
-        target = output / target_name
-        if not target.exists():
-            source = _first(data, source_names)
-            if source is not None:
-                shutil.copy2(source, target)
-        if target.exists():
-            hashes[target_name] = _digest(target)
-    if not (output / "residual-maps.npz").exists():
-        state = output / "final-state.npz"
-        arrays: dict[str, np.ndarray] = {}
-        if state.exists():
-            with np.load(state, allow_pickle=False) as archive:
-                arrays = {
-                    name: np.asarray(archive[name])
-                    for name in archive.files
-                    if "residual" in name or "update_map" in name
-                }
-        np.savez_compressed(output / "residual-maps.npz", **arrays)
-        hashes["residual-maps.npz"] = _digest(output / "residual-maps.npz")
-    return hashes
+def _collect_artifacts(output: Path, data: Path):
+    """Index every case explicitly; never promote an arbitrary first match."""
+    hashes, schemas, cases = {}, {}, {}
+    for artifact in sorted(data.rglob('*')):
+        if not artifact.is_file() or artifact.suffix not in {'.npz', '.json', '.png', '.toml'}:
+            continue
+        name = artifact.relative_to(output).as_posix()
+        hashes[name] = _digest(artifact)
+        case = artifact.parent.relative_to(data).as_posix()
+        cases.setdefault(case, []).append(name)
+        if artifact.suffix == '.npz':
+            with np.load(artifact, allow_pickle=False) as archive:
+                schemas[name] = {}
+                for key in archive.files:
+                    value = archive[key]
+                    schemas[name][key] = {'shape': list(value.shape), 'dtype': str(value.dtype)}
+    if not schemas:
+        raise ValueError('campaign produced no numerical array artifacts')
+    write_json(output / 'artifacts.json', {'cases': cases, 'array_schemas': schemas})
+    hashes['artifacts.json'] = _digest(output / 'artifacts.json')
+    return hashes, schemas
 
 
 def _validate_resume(
@@ -119,6 +107,8 @@ def public_main(identifier: str, argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     definition = get(identifier)
     config = load_config(args.config)
+    from .config_contract import validate_supported
+    contract = validate_supported(config)
     if config.experiment.identifier != identifier:
         parser.error(
             f"configuration is for {config.experiment.identifier}, not {identifier}"
@@ -133,6 +123,7 @@ def public_main(identifier: str, argv: Sequence[str] | None = None) -> int:
     output.mkdir(parents=True)
     (output / "figures").mkdir()
     dump_resolved_config(config, output / "resolved-config.toml")
+    write_json(output / "parameter-contract.json", contract)
     data = output / "data"
     started = time.time()
     try:
@@ -146,22 +137,23 @@ def public_main(identifier: str, argv: Sequence[str] | None = None) -> int:
                 print(f"terminal status: {status}")
         summary["terminal_status"] = status
         write_json(output / "summary.json", summary)
-        outputs = _promote_artifacts(output, data)
+        outputs, schemas = _collect_artifacts(output, data)
         outputs["summary.json"] = _digest(output / "summary.json")
-        boundary_hash = outputs.get("boundary-data.npz")
+        boundary_hashes = {name: value for name, value in outputs.items() if "boundary" in name and name.endswith(".npz")}
         manifest = build_manifest(
             root=Path(__file__).resolve().parents[3],
             experiment=identifier,
             started_at=started,
             config=config.resolved(),
-            inputs={} if boundary_hash is None else {"boundary-data.npz": boundary_hash},
+            inputs=boundary_hashes,
             outputs=outputs,
             arrays={},
         )
+        manifest["array_schemas"] = schemas
         manifest["status"] = status
         write_json(output / "manifest.json", manifest)
         print(f"summary: {output / 'summary.json'}")
-        print(f"retained state: {output / 'final-state.npz'}")
+        print(f"case artifacts: {output / 'artifacts.json'}")
         return 0 if status == "completed" else 2
     except Exception as error:
         failure = {

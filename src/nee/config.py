@@ -14,6 +14,7 @@ class ExperimentSection:
     identifier: str
     title: str
     equation_system: str
+    mode: str = "standard"
 
 
 @dataclass(frozen=True)
@@ -147,6 +148,12 @@ class ExperimentConfig:
             raise ValueError("experiment identifier must start with exp")
         if self.experiment.equation_system not in {"vacuum", "scalar_field"}:
             raise ValueError("equation_system must be vacuum or scalar_field")
+        if self.experiment.mode not in {"smoke", "standard", "angular-control"}:
+            raise ValueError("experiment mode must be smoke, standard, or angular-control")
+        if self.experiment.mode == "angular-control" and self.experiment.identifier != "exp08":
+            raise ValueError("angular-control is only supported by exp08")
+        if self.output.checkpoints:
+            raise ValueError("interrupted-run checkpoints are not implemented; use immutable completed runs")
         self.coordinates.validate()
         self.angular.validate()
         self.solver.validate()
@@ -239,4 +246,3 @@ def dump_resolved_config(config: ExperimentConfig, path: str | Path) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text("\n".join(lines), encoding="utf-8")
-

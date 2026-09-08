@@ -36,6 +36,9 @@ def _run_case(
     metric_substeps: int = 1,
     derivative_halo: int = 1,
     iterations: int = 3,
+    construct_wrapper=_scaled_construct,
+    run_hooks: dict[str, Any] | None = None,
+    public_config: Any | None = None,
 ) -> dict[str, Any]:
     case_output = output / "cases" / name
     initial_path = output / "boundary-data" / f"{name}.npz"
@@ -60,29 +63,21 @@ def _run_case(
         metric_substeps=metric_substeps,
         derivative_halo=derivative_halo,
         iterations=iterations,
+        public_config=public_config,
     )
     rotation = _rotation_z(rotation_angle)
-    original_free = idata.analytic_incoming_free_data
-    original_shear = idata._draft_reference_shear
-    original_construct = idata.construct_initial_data
-    original_run_construct = ese_run.construct_initial_data
-    idata.analytic_incoming_free_data = _plan_free_data(rotation)
-    idata._draft_reference_shear = _plan_reference_shear(rotation)
-    scaled = _scaled_construct(original_construct, lp, lc)
-    idata.construct_initial_data = scaled
-    ese_run.construct_initial_data = scaled
-    try:
-        result = ese_run.run(
-            config,
-            case_output,
-            initial_path,
-            regenerate_initial_data=True,
+    def construct(numerical_config):
+        return idata.construct_initial_data(
+            numerical_config,
+            free_data_generator=_plan_free_data(rotation),
+            shear_generator=_plan_reference_shear(rotation),
         )
-    finally:
-        idata.analytic_incoming_free_data = original_free
-        idata._draft_reference_shear = original_shear
-        idata.construct_initial_data = original_construct
-        ese_run.construct_initial_data = original_run_construct
+
+    scaled = construct_wrapper(construct, lp, lc)
+    result = ese_run.run(
+        config, case_output, initial_path, regenerate_initial_data=True,
+        construct_initial_data_fn=scaled, **(run_hooks or {}),
+    )
     result["official_multipliers"] = {
         "lambda_omega": lo,
         "lambda_b": lb,

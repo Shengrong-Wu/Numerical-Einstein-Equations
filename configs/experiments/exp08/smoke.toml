@@ -1,6 +1,7 @@
 schema_version = 1
 
 [experiment]
+mode = "smoke"
 identifier = "exp08"
 title = "Scalar-pulse curved-domain smoke test"
 equation_system = "scalar_field"

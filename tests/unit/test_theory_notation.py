@@ -90,3 +90,41 @@ def test_exp08_rectangles_lie_inside_configured_curved_region() -> None:
     target_u = float(config.physics["target_u"])
     target_v = float(config.physics["target_v"])
     assert target_v < constant * (-target_u) ** exponent
+
+
+def test_weighted_raychaudhuri_coefficients_and_first_order_diagnostic() -> None:
+    from nee.numerics.vacuum_residual import components
+    grid = vacuum_benchmarks._grid(30, 3)
+    u, v = np.linspace(-4.0, -3.0, 31), np.linspace(0.0, 0.5, 31)
+    state, _ = vacuum_benchmarks.regular_schwarzschild_state(grid, u, v, 1.0)
+    values = components(grid, state, u, v, mode='first_order', include_gauss_curvature=False)
+    np.testing.assert_allclose(values['Ric44'][:, 4:-4, 4:-4], 0, atol=2e-10)
+    np.testing.assert_allclose(values['Omega2_Ric33'][:, 4:-4, 4:-4], 0, atol=2e-9)
+    import copy
+    wrong = copy.deepcopy(state)
+    wrong.Omega_omega *= 0.5
+    changed = components(grid, wrong, u, v, mode='first_order', include_gauss_curvature=False)
+    assert np.max(np.abs(changed['Ric44'][:, 4:-4, 4:-4])) > 1e-4
+
+
+def test_harmonic_normalization_is_independent_of_other_sample_points() -> None:
+    from nee.initial_data.nonspherical_scalar import _rotated_harmonic_fields
+    points = np.array([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.], [0.6, 0., 0.8]])
+    small = _rotated_harmonic_fields(points[3:], np.eye(3))
+    larger = _rotated_harmonic_fields(points, np.eye(3))
+    for a, b in zip(small, larger):
+        np.testing.assert_allclose(a, b[3:], atol=0, rtol=0)
+
+
+def test_first_order_mode_never_differentiates_outgoing_shear_in_v(monkeypatch) -> None:
+    from nee.numerics import vacuum_residual
+    grid = vacuum_benchmarks._grid(30, 3)
+    u, v = np.linspace(-1, -0.5, 9), np.linspace(0, 0.1, 9)
+    state, _ = vacuum_benchmarks.regular_schwarzschild_state(grid, u, v, 1.0)
+    differentiate = vacuum_residual._differentiate_v
+    def checked(value, *args, **kwargs):
+        assert value.ndim != 5, 'outgoing tensor derivative would require extra null regularity'
+        return differentiate(value, *args, **kwargs)
+    monkeypatch.setattr(vacuum_residual, '_differentiate_v', checked)
+    result = vacuum_residual.components(grid, state, u, v, mode='first_order', include_gauss_curvature=False)
+    assert np.all(np.isfinite(result['Ric44']))

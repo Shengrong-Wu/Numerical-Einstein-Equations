@@ -44,3 +44,38 @@ def test_unknown_top_level_key_is_rejected(tmp_path: Path) -> None:
     path.write_text("unknown = 1\n" + original)
     with pytest.raises(ValueError):
         load_config(path)
+
+
+def test_renamed_smoke_file_keeps_mode_and_passes_physical_parameters(tmp_path, monkeypatch) -> None:
+    from dataclasses import replace
+    from nee.experiments import campaigns
+    path = tmp_path / 'renamed.toml'
+    path.write_text((ROOT/'configs/experiments/exp01/smoke.toml').read_text())
+    config = load_config(path)
+    config = replace(config, physics={**config.physics, 'mass': 7.0},
+                     solver=replace(config.solver, maximum_sweeps=3))
+    captured = {}
+    def exact(grid, u, v, mass):
+        captured['mass'] = mass
+        return None, {}
+    def case(**kwargs):
+        captured.update(kwargs)
+        kwargs['builder'](None, kwargs['u'], kwargs['v'])
+        return {'terminal_status': 'completed'}
+    monkeypatch.setattr(campaigns.vacuum_benchmarks, 'regular_schwarzschild_state', exact)
+    monkeypatch.setattr(campaigns.support, 'vacuum_case', case)
+    campaigns.regular_vacuum(config, tmp_path/'output')
+    assert config.experiment.mode == 'smoke'
+    assert captured['mass'] == 7.0
+    assert captured['iterations'] == 3
+
+
+def test_fixed_protocol_settings_are_not_silently_ignored() -> None:
+    from dataclasses import replace
+    from nee.experiments.config_contract import validate_supported
+    config = load_config(ROOT/'configs/experiments/exp01/standard.toml')
+    validate_supported(config)
+    with pytest.raises(ValueError, match='not an adjustable control'):
+        validate_supported(replace(config, solver=replace(config.solver, relaxation=0.5)))
+    with pytest.raises(ValueError, match='not an adjustable control'):
+        validate_supported(replace(config, physics={**config.physics, 'misspelled_mass': 7}))

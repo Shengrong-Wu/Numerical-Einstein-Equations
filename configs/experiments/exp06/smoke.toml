@@ -1,11 +1,12 @@
 schema_version = 1
 [experiment]
+mode = "smoke"
 identifier = "exp06"
 title = "Regular exact scalar smoke test"
 equation_system = "scalar_field"
 [physics]
 sigma = 1.0
-nu = 0.8
+nu_values = [0.8]
 [initial_data]
 family = "fisher_jnw"
 [coordinates]

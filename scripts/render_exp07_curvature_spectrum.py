@@ -76,7 +76,7 @@ def render(
     samples_per_element: int,
 ) -> None:
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
-    audit = summary["independent_four_metric_residual"]
+    audit = summary["independent_first_order_residual"]
     coordinates = summary["scalar_coordinates"]
     residual = np.asarray(audit["einstein_section_L2_map"])
 

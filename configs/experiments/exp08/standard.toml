@@ -1,6 +1,7 @@
 schema_version = 1
 
 [experiment]
+mode = "standard"
 identifier = "exp08"
 title = "Scalar-pulse trapped region and apparent horizon"
 equation_system = "scalar_field"

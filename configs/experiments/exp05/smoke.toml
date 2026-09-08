@@ -1,5 +1,6 @@
 schema_version = 1
 [experiment]
+mode = "smoke"
 identifier = "exp05"
 title = "Vacuum crossed pulses smoke test"
 equation_system = "vacuum"

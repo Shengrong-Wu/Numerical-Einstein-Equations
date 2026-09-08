@@ -38,3 +38,17 @@ def test_resume_validates_config_and_artifact_hashes(tmp_path: Path) -> None:
     artifact.write_text('{"changed": true}\n', encoding="utf-8")
     with pytest.raises(ValueError, match="content-hash"):
         _validate_resume(tmp_path, config)
+
+
+def test_manifest_keeps_multiple_case_artifacts(tmp_path: Path) -> None:
+    import numpy as np
+    from nee.experiments.runner import _collect_artifacts
+    for case in ('a', 'b'):
+        directory = tmp_path / 'data' / case
+        directory.mkdir(parents=True)
+        np.savez(directory / 'final-state.npz', radius=np.ones((2, 3)))
+    hashes, schemas = _collect_artifacts(tmp_path, tmp_path / 'data')
+    assert set(schemas) == {'data/a/final-state.npz', 'data/b/final-state.npz'}
+    assert schemas['data/a/final-state.npz']['radius']['shape'] == [2, 3]
+    assert not (tmp_path / 'final-state.npz').exists()
+    assert 'artifacts.json' in hashes

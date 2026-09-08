@@ -143,6 +143,14 @@ We remark that it is necessary to treat $\zeta^{(i+1)}$ as a vector field instea
     \end{aligned}\right.
 \end{equation}
 
+The incoming lapse coefficient must then use the updated shift:
+\begin{equation}
+    (\Omega\omegab)^{(i+1)}=(\Omega\omegab)^{(i+1/2)}
+    -\frac12\bigl(b^{(i+1)}-b^{(i)}\bigr)\cdot\nabla\log\Omega^{(i+1)}.
+\end{equation}
+The numerical implementation applies the angular projection to this correction
+and restores the prescribed traces after projection and relaxation.
+
 \noindent\textbf{5. Construction of $g^{(i+1)}$ and $(\Omega\chi)^{(i+1)}$}
 
 It remains to define $g^{(i+1)}$. We consider the following $(g,\tr\chi,\chih)$ system,

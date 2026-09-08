@@ -1,15 +1,21 @@
 schema_version = 1
 [experiment]
+mode = "smoke"
 identifier = "exp07"
 title = "Nonspherical scalar smoke test"
 equation_system = "scalar_field"
 [physics]
-cap = 0.02
+central_cap = 0.02
 rotation_angle = 0.0
 [initial_data]
 profile = "smooth_harmonic"
 scalar_multiplier = 1.0
 shear_multiplier = 1.0
+lapse_radial_power = 0.25
+lapse_angular_amplitude = 0.01
+shift_amplitude = 0.05
+shear_amplitude = 0.1
+scalar_power = 0.1
 [coordinates]
 u_min = -1.0
 u_max = -0.5

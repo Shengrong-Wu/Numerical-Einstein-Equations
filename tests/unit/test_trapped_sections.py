@@ -62,3 +62,20 @@ def test_endpoint_halo_excludes_candidates() -> None:
     assert not np.any(protected[:3])
     assert not np.any(protected[-3:])
     assert np.all(protected[3:-3])
+
+
+def test_mots_acceptance_checks_more_than_solver_success() -> None:
+    import copy
+    from nee.experiments.exp08_scalar_trapped_section.horizon import acceptance_errors
+    valid = {'nonlinear_success': True, 'sign_check': {'bracketed': True},
+             'surface': {'h_min': -0.6, 'h_max': -0.5, 'area': 3.0,
+                         'distance_to_patch_right': 0.1,
+                         'theta_out': {'linf': 1e-6}, 'theta_in': {'maximum': -1.0}}}
+    assert not acceptance_errors(valid)
+    for field, value in [('nonlinear_success', False), ('sign_check', {'bracketed': False})]:
+        invalid = copy.deepcopy(valid)
+        invalid[field] = value
+        assert acceptance_errors(invalid)
+    invalid = copy.deepcopy(valid)
+    invalid['surface']['theta_out']['linf'] = 0.01
+    assert acceptance_errors(invalid)

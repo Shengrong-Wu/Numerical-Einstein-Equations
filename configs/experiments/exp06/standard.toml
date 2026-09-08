@@ -1,5 +1,6 @@
 schema_version = 1
 [experiment]
+mode = "standard"
 identifier = "exp06"
 title = "Regular exact Fisher/JNW Einstein--scalar field"
 equation_system = "scalar_field"
